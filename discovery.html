@@ -24,11 +24,9 @@
             height: 100vh;
             max-width: 430px;
             margin: 0 auto;
-            background: #000000; /* Pure black base */
+            background: #000000;
             overflow: hidden;
         }
-
-        /* No more song themes - using dynamic colors */
 
         /* Compact Top Player - DYNAMIC BACKGROUND */
         .top-player {
@@ -108,32 +106,16 @@
             opacity: 0.8;
         }
 
-        /* TIKTOK-STYLE MOMENT CONTAINER - FIXED POSITIONING */
+        /* MOMENT CONTAINER - FIXED POSITIONING */
         .moment-container {
             position: absolute;
-            top: 55px; /* Start after mini-player */
+            top: 55px;
             left: 0;
             right: 0;
             bottom: 0;
             overflow: hidden;
         }
 
-        /* Swipe zone - WORKING VERSION */
-        .swipe-zone-up {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            z-index: 50;
-            pointer-events: none;
-        }
-
-        .swipe-zone-up.active {
-            pointer-events: all;
-        }
-
-        /* Individual moment cards that can slide independently */
         /* Individual moment cards - DYNAMIC BACKGROUND */
         .moment-card {
             position: absolute;
@@ -144,26 +126,13 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            transition: transform 0.35s cubic-bezier(0.23, 1, 0.32, 1); /* Smooth spring easing */
+            transition: transform 0.35s cubic-bezier(0.23, 1, 0.32, 1);
             will-change: transform;
-            /* Hardware acceleration */
             transform: translate3d(0, 0, 0);
             background: var(--card-bg, #000000);
         }
 
-        .moment-card.dragging {
-            transition: none;
-            /* Motion blur during dragging for smoothness */
-            filter: blur(0.5px);
-        }
-
-        /* Fade content slightly during movement for smoother feel */
-        .moment-card.dragging .discussion-thread {
-            opacity: 0.7;
-            transition: opacity 0.1s ease;
-        }
-
-        /* Initial positions for different cards */
+        /* Card positions */
         .moment-card.current {
             transform: translate3d(0, 0%, 0);
             z-index: 10;
@@ -298,13 +267,13 @@
             gap: 3px;
         }
 
-        /* Discussion Thread - STOPS BEFORE SWIPE ZONE */
+        /* Discussion Thread */
         .discussion-thread {
             position: absolute;
             top: 140px;
             left: 0;
             right: 0;
-            bottom: 115px; /* Stops 115px from bottom to avoid swipe zone */
+            bottom: 0;
             background: rgba(0, 0, 0, 0.95);
             backdrop-filter: blur(20px);
         }
@@ -344,11 +313,11 @@
             color: rgba(255, 255, 255, 0.5);
         }
 
-        /* Scrollable Comments - WITH BOTTOM PADDING */
+        /* Scrollable Comments */
         .comments-list {
             height: 100%;
             overflow-y: auto;
-            padding: 8px 0 130px; /* Extra bottom padding so last comments aren't covered */
+            padding: 8px 0 20px;
             scroll-behavior: smooth;
         }
 
@@ -471,76 +440,108 @@
             background: rgba(255, 255, 255, 0.05);
         }
 
-        /* Sidebar inside each moment card - MOVED UP 16PX */
-        .moment-card .right-sidebar {
-            position: absolute;
-            right: 8px;
-            top: 50%;
-            transform: translateY(calc(-50% - 16px)); /* Moved up 16px */
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-            z-index: 15;
+        /* CROSS NAVIGATION SYSTEM - Bottom Right */
+        .cross-navigation {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 140px;
+            height: 140px;
+            z-index: 99;
         }
 
-        .moment-card .sidebar-action {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            background: rgba(0, 0, 0, 0.4);
-            backdrop-filter: blur(10px);
+        .nav-cross {
+            position: relative;
+            width: 100%;
+            height: 100%;
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            grid-template-rows: 1fr 1fr 1fr;
+            gap: 6px;
+        }
+
+        .nav-btn {
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(15px);
             border: 1px solid rgba(255, 255, 255, 0.15);
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
             display: flex;
             align-items: center;
             justify-content: center;
             font-size: 18px;
-            color: white;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
+            font-weight: 600;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
         }
 
-        .moment-card .sidebar-action:hover {
-            background: rgba(255, 255, 255, 0.1);
-            transform: scale(1.1);
+        .nav-btn:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: scale(1.05);
             border-color: rgba(255, 255, 255, 0.3);
         }
 
-        .moment-card .sidebar-action.active {
-            background: rgba(255, 255, 255, 0.2);
-            color: #ff0040;
+        .nav-btn:active {
+            transform: scale(0.95);
         }
 
-        .moment-card .song-nav-btn {
-            width: 48px;
-            height: 48px;
+        /* Cross positions */
+        .nav-up {
+            grid-column: 2;
+            grid-row: 1;
+            border-radius: 12px 12px 4px 4px;
+        }
+
+        .nav-left {
+            grid-column: 1;
+            grid-row: 2;
+            border-radius: 12px 4px 4px 12px;
+        }
+
+        .nav-center {
+            grid-column: 2;
+            grid-row: 2;
             border-radius: 50%;
-            background: rgba(0, 0, 0, 0.6);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 16px;
-            color: white;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+            background: rgba(29, 185, 84, 0.9);
+            border-color: rgba(29, 185, 84, 0.6);
+            font-size: 20px;
         }
 
-        .moment-card .song-nav-btn:hover {
-            background: rgba(255, 255, 255, 0.15);
+        .nav-center:hover {
+            background: rgba(29, 185, 84, 1);
             transform: scale(1.1);
-            border-color: rgba(255, 255, 255, 0.4);
         }
 
-        /* Navigation Hints - WITH GRADIENT FADE */
+        .nav-right {
+            grid-column: 3;
+            grid-row: 2;
+            border-radius: 4px 12px 12px 4px;
+        }
+
+        .nav-down {
+            grid-column: 2;
+            grid-row: 3;
+            border-radius: 4px 4px 12px 12px;
+        }
+
+        /* Action states */
+        .nav-center.liked {
+            background: #ff0040;
+            border-color: #ff0040;
+        }
+
+        .nav-center.saved {
+            background: #f39c12;
+            border-color: #f39c12;
+        }
+
+        /* Navigation Hints */
         .nav-hints {
             position: fixed;
             bottom: 0;
             left: 0;
             right: 0;
-            height: 120px;
+            height: 80px;
             display: flex;
             align-items: flex-end;
             justify-content: center;
@@ -549,17 +550,17 @@
             color: rgba(255, 255, 255, 0.6);
             z-index: 60;
             pointer-events: none;
-            background: linear-gradient(to top, rgba(0, 0, 0, 0.8) 0%, rgba(0, 0, 0, 0.4) 50%, transparent 100%);
-            padding-bottom: 20px;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0.3) 50%, transparent 100%);
+            padding-bottom: 15px;
         }
 
         .nav-hint {
             display: flex;
             align-items: center;
             gap: 3px;
-            padding: 6px 12px;
+            padding: 4px 8px;
             background: rgba(0, 0, 0, 0.6);
-            border-radius: 16px;
+            border-radius: 12px;
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
@@ -635,46 +636,35 @@
             </div>
         </div>
 
-        <!-- TIKTOK-STYLE MOMENT CONTAINER -->
+        <!-- MOMENT CONTAINER -->
         <div class="moment-container" id="momentContainer">
             <!-- Individual moment cards will be positioned here -->
         </div>
 
-        <!-- Swipe Zone - Bottom 200px only -->
-        <div class="swipe-zone" id="swipeZone"></div>
-
-        <!-- Enhanced Right Sidebar -->
-        <div class="right-sidebar">
-            <!-- Social Actions -->
-            <button class="sidebar-action" onclick="toggleLike()" id="likeBtn">❤️</button>
-            <button class="sidebar-action" onclick="shareDiscussion()">📤</button>
-            <button class="sidebar-action" onclick="saveDiscussion()">📚</button>
-            <button class="sidebar-action" onclick="addComment()">💬</button>
-            
-            <!-- Song Navigation - Bottom Position -->
-            <button class="song-nav-btn" onclick="nextSong()" id="nextSongBtn">
-                <div class="nav-icon">⬆️</div>
-                <div class="nav-text">Next Song</div>
-            </button>
-            <button class="song-nav-btn" onclick="prevSong()" id="prevSongBtn">
-                <div class="nav-icon">⬇️</div>
-                <div class="nav-text">Prev Song</div>
-            </button>
+        <!-- CROSS NAVIGATION SYSTEM -->
+        <div class="cross-navigation">
+            <div class="nav-cross">
+                <button class="nav-btn nav-up" id="navUp">⬆</button>
+                <button class="nav-btn nav-left" id="navLeft">⬅</button>
+                <button class="nav-btn nav-center" id="navCenter">❤</button>
+                <button class="nav-btn nav-right" id="navRight">➡</button>
+                <button class="nav-btn nav-down" id="navDown">⬇</button>
+            </div>
         </div>
 
         <!-- Navigation Hints -->
         <div class="nav-hints">
             <div class="nav-hint">
-                <span>⬆️⬇️</span>
-                <span>Swipe moments (bottom 100px)</span>
+                <span>⬆⬇</span>
+                <span>Moments</span>
             </div>
             <div class="nav-hint">
-                <span>📜</span>
-                <span>Scroll comments (middle)</span>
+                <span>⬅➡</span>
+                <span>Songs</span>
             </div>
             <div class="nav-hint">
-                <span>🎵</span>
-                <span>Tap buttons for songs</span>
+                <span>❤</span>
+                <span>Actions</span>
             </div>
         </div>
 
@@ -685,14 +675,7 @@
     <script>
         let currentMomentIndex = 0;
         let currentSongIndex = 0;
-
-        // Touch/swipe state
-        let startY = 0;
-        let startX = 0;
-        let currentY = 0;
-        let currentX = 0;
-        let isDragging = false;
-        let startTime = 0;
+        let centerActionMode = 'like'; // like, comment, save, share
 
         // Card references
         let currentCard = null;
@@ -861,6 +844,14 @@
             }
         ];
 
+        // Center action modes
+        const centerActions = {
+            like: { icon: '❤', color: '#ff0040', action: 'toggleLike' },
+            comment: { icon: '💬', color: '#1DB954', action: 'addComment' },
+            save: { icon: '⭐', color: '#f39c12', action: 'saveDiscussion' },
+            share: { icon: '↗', color: '#667eea', action: 'shareDiscussion' }
+        };
+
         // Format time
         function formatTime(seconds) {
             const minutes = Math.floor(seconds / 60);
@@ -972,23 +963,10 @@
                         `).join('')}
                     </div>
                 </div>
-
-                <!-- RIGHT SIDEBAR - MOVES WITH CONTENT -->
-                <div class="right-sidebar">
-                    <!-- Social Actions - Minimal White -->
-                    <button class="sidebar-action" onclick="toggleLike()">❤</button>
-                    <button class="sidebar-action" onclick="shareDiscussion()">↗</button>
-                    <button class="sidebar-action" onclick="saveDiscussion()">⭐</button>
-                    <button class="sidebar-action" onclick="addComment()">💬</button>
-                    
-                    <!-- Song Navigation - FIXED ARROW DIRECTIONS -->
-                    <button class="song-nav-btn" onclick="nextSong()">→</button>
-                    <button class="song-nav-btn" onclick="prevSong()">←</button>
-                </div>
             `;
         }
 
-        // Create and position moment cards - FIXED POSITIONING
+        // Create and position moment cards
         function createMomentCards() {
             const container = document.getElementById('momentContainer');
             
@@ -999,21 +977,21 @@
             currentCard = document.createElement('div');
             currentCard.className = 'moment-card current';
             currentCard.innerHTML = createMomentCardHTML(getCurrentMoment());
-            currentCard.style.transform = 'translate3d(0, 0%, 0)'; // Properly positioned
+            currentCard.style.transform = 'translate3d(0, 0%, 0)';
             container.appendChild(currentCard);
             
             // Create next card (starts below, invisible)
             nextCard = document.createElement('div');
             nextCard.className = 'moment-card next-vertical';
             nextCard.innerHTML = createMomentCardHTML(getNextMoment());
-            nextCard.style.transform = 'translate3d(0, 100%, 0)'; // Below current
+            nextCard.style.transform = 'translate3d(0, 100%, 0)';
             container.appendChild(nextCard);
             
             // Create prev card (starts above, invisible)
             prevCard = document.createElement('div');
             prevCard.className = 'moment-card prev-vertical';
             prevCard.innerHTML = createMomentCardHTML(getPrevMoment());
-            prevCard.style.transform = 'translate3d(0, -100%, 0)'; // Above current
+            prevCard.style.transform = 'translate3d(0, -100%, 0)';
             container.appendChild(prevCard);
         }
 
@@ -1024,13 +1002,13 @@
             
             // Generate color based on engagement score and user avatar
             const engagement = topComment.likes + topComment.shares + topComment.plays;
-            const hue = (engagement * 7) % 360; // Varies hue based on engagement
+            const hue = (engagement * 7) % 360;
             const avatar = topComment.avatar;
-            const avatarColor = avatar.charCodeAt(0) + avatar.charCodeAt(1); // Simple hash from avatar
+            const avatarColor = avatar.charCodeAt(0) + avatar.charCodeAt(1);
             
             // Subtle color variations
-            const saturation = 15 + (avatarColor % 20); // 15-35% saturation
-            const lightness = 8 + (engagement % 12); // 8-20% lightness
+            const saturation = 15 + (avatarColor % 20);
+            const lightness = 8 + (engagement % 12);
             
             return {
                 miniPlayer: `hsla(${hue}, ${saturation}%, ${lightness}%, 0.95)`,
@@ -1059,120 +1037,12 @@
             updateSnippetRegion(moment.start, moment.end, 232);
         }
 
-        // SIMPLIFIED WORKING SWIPE LOGIC - FIXED DIRECTIONS
-        document.addEventListener('touchstart', (e) => {
-            const touch = e.touches[0];
-            const windowHeight = window.innerHeight;
-            const touchY = touch.clientY;
-            
-            // Simple zone detection - anywhere below mini-player
-            if (touchY > 55) {
-                startY = touch.clientY;
-                startX = touch.clientX;
-                currentY = startY;
-                currentX = startX;
-                isDragging = false;
-                startTime = Date.now();
-                
-                // Activate swipe detection
-                document.getElementById('swipeZoneUp').classList.add('active');
-            }
-        }, { passive: true });
-
-        document.addEventListener('touchmove', (e) => {
-            const swipeZoneUp = document.getElementById('swipeZoneUp');
-            
-            // Only proceed if we're in an active swipe zone
-            if (!swipeZoneUp.classList.contains('active')) {
-                return;
-            }
-            
-            if (!isDragging && Math.abs(e.touches[0].clientY - startY) > 15) {
-                isDragging = true;
-            }
-            
-            if (isDragging) {
-                currentY = e.touches[0].clientY;
-                const deltaY = currentY - startY;
-                
-                // Simple movement calculation
-                const windowHeight = window.innerHeight - 55;
-                const progress = deltaY / windowHeight;
-                
-                // Enable dragging mode
-                currentCard.classList.add('dragging');
-                nextCard.classList.add('dragging');
-                prevCard.classList.add('dragging');
-                
-                // CORRECT DIRECTIONS: UP = next, DOWN = previous
-                if (deltaY < 0) {
-                    // Swiping UP = NEXT moment (card comes from bottom)
-                    const currentTransform = progress * 100;
-                    const nextTransform = 100 + (progress * 100);
-                    
-                    currentCard.style.transform = `translate3d(0, ${currentTransform}%, 0)`;
-                    nextCard.style.transform = `translate3d(0, ${nextTransform}%, 0)`;
-                    prevCard.style.transform = `translate3d(0, -100%, 0)`;
-                    
-                } else {
-                    // Swiping DOWN = PREVIOUS moment (card comes from top)
-                    const currentTransform = progress * 100;
-                    const prevTransform = -100 + (progress * 100);
-                    
-                    currentCard.style.transform = `translate3d(0, ${currentTransform}%, 0)`;
-                    prevCard.style.transform = `translate3d(0, ${prevTransform}%, 0)`;
-                    nextCard.style.transform = `translate3d(0, 100%, 0)`;
-                }
-                
-                e.preventDefault();
-            }
-        }, { passive: false });
-
-        document.addEventListener('touchend', (e) => {
-            const swipeZoneUp = document.getElementById('swipeZoneUp');
-            
-            if (!swipeZoneUp.classList.contains('active')) {
-                return;
-            }
-            
-            if (isDragging) {
-                const deltaY = currentY - startY;
-                const swipeTime = Date.now() - startTime;
-                const isQuickSwipe = swipeTime < 300;
-                
-                const threshold = isQuickSwipe ? 50 : 80;
-                
-                if (Math.abs(deltaY) > threshold) {
-                    if (deltaY < 0) {
-                        // UP swipe = NEXT moment
-                        nextMoment();
-                        showToast('⬆️ Next moment!');
-                    } else {
-                        // DOWN swipe = PREVIOUS moment
-                        prevMoment();
-                        showToast('⬇️ Previous moment!');
-                    }
-                } else {
-                    resetCardPositions();
-                    showToast('💫 Swipe further');
-                }
-            }
-            
-            // Reset states
-            isDragging = false;
-            swipeZoneUp.classList.remove('active');
-        }, { passive: true });
-
-        // Reset cards to original positions
-        function resetCardPositions() {
-            currentCard.classList.remove('dragging');
-            nextCard.classList.remove('dragging');
-            prevCard.classList.remove('dragging');
-            
-            // Hardware accelerated reset positions
-            currentCard.style.transform = 'translate3d(0, 0%, 0)';
-            nextCard.style.transform = 'translate3d(0, 100%, 0)';
-            prevCard.style.transform = 'translate3d(0, -100%, 0)';
+        // Update center button
+        function updateCenterButton() {
+            const centerBtn = document.getElementById('navCenter');
+            const action = centerActions[centerActionMode];
+            centerBtn.textContent = action.icon;
+            centerBtn.style.background = `rgba(${action.color === '#ff0040' ? '255, 0, 64' : action.color === '#1DB954' ? '29, 185, 84' : action.color === '#f39c12' ? '243, 156, 18' : '102, 126, 234'}, 0.9)`;
         }
 
         // Navigation functions
@@ -1181,7 +1051,7 @@
             if (currentMomentIndex < song.moments.length - 1) {
                 currentMomentIndex++;
             } else {
-                currentMomentIndex = 0; // Loop back to first moment
+                currentMomentIndex = 0;
             }
             updateTopPlayer();
             createMomentCards();
@@ -1192,7 +1062,7 @@
             if (currentMomentIndex > 0) {
                 currentMomentIndex--;
             } else {
-                currentMomentIndex = song.moments.length - 1; // Loop to last moment
+                currentMomentIndex = song.moments.length - 1;
             }
             updateTopPlayer();
             createMomentCards();
@@ -1202,9 +1072,9 @@
             if (currentSongIndex < songsDatabase.length - 1) {
                 currentSongIndex++;
             } else {
-                currentSongIndex = 0; // Loop back to first song
+                currentSongIndex = 0;
             }
-            currentMomentIndex = 0; // Reset to first moment of new song
+            currentMomentIndex = 0;
             updateTopPlayer();
             createMomentCards();
         }
@@ -1213,18 +1083,29 @@
             if (currentSongIndex > 0) {
                 currentSongIndex--;
             } else {
-                currentSongIndex = songsDatabase.length - 1; // Loop to last song
+                currentSongIndex = songsDatabase.length - 1;
             }
-            currentMomentIndex = 0; // Reset to first moment of new song
+            currentMomentIndex = 0;
             updateTopPlayer();
             createMomentCards();
         }
 
-        // Interaction functions
+        // Center action cycling
+        function cycleCenterAction() {
+            const actions = Object.keys(centerActions);
+            const currentIndex = actions.indexOf(centerActionMode);
+            const nextIndex = (currentIndex + 1) % actions.length;
+            centerActionMode = actions[nextIndex];
+            
+            updateCenterButton();
+            showToast(`${centerActions[centerActionMode].icon} ${centerActionMode.charAt(0).toUpperCase() + centerActionMode.slice(1)} mode`);
+        }
+
+        // Action functions
         function toggleLike() {
-            const likeBtn = document.getElementById('likeBtn');
-            likeBtn.classList.toggle('active');
-            showToast(likeBtn.classList.contains('active') ? 'Moment liked! ❤️' : 'Like removed');
+            const centerBtn = document.getElementById('navCenter');
+            centerBtn.classList.toggle('liked');
+            showToast(centerBtn.classList.contains('liked') ? 'Moment liked! ❤️' : 'Like removed');
         }
 
         function shareDiscussion() {
@@ -1232,7 +1113,9 @@
         }
 
         function saveDiscussion() {
-            showToast('Discussion saved! 📚');
+            const centerBtn = document.getElementById('navCenter');
+            centerBtn.classList.toggle('saved');
+            showToast(centerBtn.classList.contains('saved') ? 'Discussion saved! ⭐' : 'Save removed');
         }
 
         function addComment() {
@@ -1280,6 +1163,72 @@
             }, 2000);
         }
 
+        // Event listeners for cross navigation
+        document.getElementById('navUp').addEventListener('click', () => {
+            nextMoment();
+            showToast('⬆️ Next moment');
+        });
+
+        document.getElementById('navDown').addEventListener('click', () => {
+            prevMoment();
+            showToast('⬇️ Previous moment');
+        });
+
+        document.getElementById('navLeft').addEventListener('click', () => {
+            prevSong();
+            showToast('⬅️ Previous song');
+        });
+
+        document.getElementById('navRight').addEventListener('click', () => {
+            nextSong();
+            showToast('➡️ Next song');
+        });
+
+        document.getElementById('navCenter').addEventListener('click', () => {
+            const action = centerActions[centerActionMode].action;
+            switch(action) {
+                case 'toggleLike':
+                    toggleLike();
+                    break;
+                case 'addComment':
+                    addComment();
+                    break;
+                case 'saveDiscussion':
+                    saveDiscussion();
+                    break;
+                case 'shareDiscussion':
+                    shareDiscussion();
+                    break;
+            }
+        });
+
+        // Long press on center to cycle actions
+        let longPressTimer;
+        document.getElementById('navCenter').addEventListener('mousedown', () => {
+            longPressTimer = setTimeout(() => {
+                cycleCenterAction();
+            }, 800);
+        });
+
+        document.getElementById('navCenter').addEventListener('mouseup', () => {
+            clearTimeout(longPressTimer);
+        });
+
+        document.getElementById('navCenter').addEventListener('mouseleave', () => {
+            clearTimeout(longPressTimer);
+        });
+
+        // Touch events for long press
+        document.getElementById('navCenter').addEventListener('touchstart', () => {
+            longPressTimer = setTimeout(() => {
+                cycleCenterAction();
+            }, 800);
+        });
+
+        document.getElementById('navCenter').addEventListener('touchend', () => {
+            clearTimeout(longPressTimer);
+        });
+
         // Keyboard navigation
         document.addEventListener('keydown', (e) => {
             if (e.key === 'ArrowUp') {
@@ -1289,20 +1238,22 @@
                 prevMoment();
                 showToast('⬇️ Previous moment');
             } else if (e.key === 'ArrowLeft') {
-                nextSong();
-                showToast('⬅️ Next song');
-            } else if (e.key === 'ArrowRight') {
                 prevSong();
-                showToast('➡️ Previous song');
+                showToast('⬅️ Previous song');
+            } else if (e.key === 'ArrowRight') {
+                nextSong();
+                showToast('➡️ Next song');
             } else if (e.key === ' ') {
                 e.preventDefault();
-                showToast('Playing moment...');
+                const action = centerActions[centerActionMode].action;
+                eval(action + '()');
             }
         });
 
         // Initialize
         function init() {
             updateTopPlayer();
+            updateCenterButton();
             createMomentCards();
         }
 
@@ -1310,15 +1261,15 @@
 
         // Welcome messages
         setTimeout(() => {
-            showToast('🎵 Instagram-style UI! Everything swipes together');
+            showToast('🎯 Cross navigation! Easy tap control');
         }, 1000);
 
         setTimeout(() => {
-            showToast('⚪ Minimal white icons move with content');
+            showToast('❤️ Long press center button to cycle actions');
         }, 4000);
 
         setTimeout(() => {
-            showToast('📱 Only top player stays fixed - true IG behavior!');
+            showToast('📱 Comments scroll freely - no conflicts!');
         }, 7000);
     </script>
 </body>
