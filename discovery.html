@@ -28,7 +28,7 @@
             overflow: hidden;
         }
 
-        /* Compact Top Player - DYNAMIC BACKGROUND */
+        /* Enhanced Top Player with Song Navigation */
         .top-player {
             position: fixed;
             top: 0;
@@ -49,6 +49,32 @@
             max-width: 430px;
             margin: 0 auto;
             margin-bottom: 6px;
+            position: relative;
+        }
+
+        .song-nav-btn {
+            background: rgba(255, 255, 255, 0.1);
+            border: none;
+            color: rgba(255, 255, 255, 0.8);
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+
+        .song-nav-btn:hover {
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.1);
+        }
+
+        .song-nav-btn:active {
+            transform: scale(0.9);
         }
 
         .mini-art {
@@ -69,6 +95,7 @@
             overflow: hidden;
             white-space: nowrap;
             text-overflow: ellipsis;
+            margin: 0 8px;
         }
 
         .current-region {
@@ -106,7 +133,7 @@
             opacity: 0.8;
         }
 
-        /* MOMENT CONTAINER - FIXED POSITIONING */
+        /* MOMENT CONTAINER - FREE SCROLLING ZONE */
         .moment-container {
             position: absolute;
             top: 55px;
@@ -116,7 +143,7 @@
             overflow: hidden;
         }
 
-        /* Individual moment cards - DYNAMIC BACKGROUND */
+        /* Individual moment cards */
         .moment-card {
             position: absolute;
             top: 0;
@@ -267,12 +294,12 @@
             gap: 3px;
         }
 
-        /* Discussion Thread */
+        /* Discussion Thread - FREE SCROLLING */
         .discussion-thread {
             position: absolute;
             top: 140px;
             left: 0;
-            right: 0;
+            right: 60px; /* Leave space for right sidebar */
             bottom: 0;
             background: rgba(0, 0, 0, 0.95);
             backdrop-filter: blur(20px);
@@ -313,7 +340,7 @@
             color: rgba(255, 255, 255, 0.5);
         }
 
-        /* Scrollable Comments */
+        /* Scrollable Comments - PERFECT SCROLLING */
         .comments-list {
             height: 100%;
             overflow-y: auto;
@@ -440,28 +467,32 @@
             background: rgba(255, 255, 255, 0.05);
         }
 
-        /* CROSS NAVIGATION SYSTEM - Bottom Right */
-        .cross-navigation {
+        /* RIGHT SIDEBAR - TIKTOK STYLE */
+        .right-sidebar {
             position: fixed;
-            bottom: 20px;
-            right: 20px;
-            width: 140px;
-            height: 140px;
-            z-index: 99;
+            right: 8px;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 90;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            align-items: center;
         }
 
-        .nav-cross {
-            position: relative;
-            width: 100%;
-            height: 100%;
-            display: grid;
-            grid-template-columns: 1fr 1fr 1fr;
-            grid-template-rows: 1fr 1fr 1fr;
-            gap: 6px;
+        /* Social Actions - Top Section */
+        .social-actions {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-bottom: 20px;
         }
 
-        .nav-btn {
-            background: rgba(0, 0, 0, 0.85);
+        .social-btn {
+            width: 44px;
+            height: 44px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.8);
             backdrop-filter: blur(15px);
             border: 1px solid rgba(255, 255, 255, 0.15);
             color: white;
@@ -471,68 +502,62 @@
             align-items: center;
             justify-content: center;
             font-size: 18px;
-            font-weight: 600;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
         }
 
-        .nav-btn:hover {
+        .social-btn:hover {
             background: rgba(255, 255, 255, 0.15);
-            transform: scale(1.05);
+            transform: scale(1.1);
             border-color: rgba(255, 255, 255, 0.3);
         }
 
-        .nav-btn:active {
+        .social-btn:active {
             transform: scale(0.95);
         }
 
-        /* Cross positions */
-        .nav-up {
-            grid-column: 2;
-            grid-row: 1;
-            border-radius: 12px 12px 4px 4px;
+        .social-btn.liked {
+            background: rgba(255, 64, 64, 0.9);
+            border-color: rgba(255, 64, 64, 0.6);
         }
 
-        .nav-left {
-            grid-column: 1;
-            grid-row: 2;
-            border-radius: 12px 4px 4px 12px;
+        .social-btn.saved {
+            background: rgba(243, 156, 18, 0.9);
+            border-color: rgba(243, 156, 18, 0.6);
         }
 
-        .nav-center {
-            grid-column: 2;
-            grid-row: 2;
+        /* Moment Navigation - Bottom Section */
+        .moment-nav {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .moment-btn {
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
-            background: rgba(29, 185, 84, 0.9);
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            color: rgba(255, 255, 255, 0.8);
+            cursor: pointer;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 16px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+        }
+
+        .moment-btn:hover {
+            background: rgba(29, 185, 84, 0.8);
             border-color: rgba(29, 185, 84, 0.6);
-            font-size: 20px;
+            transform: scale(1.05);
+            color: white;
         }
 
-        .nav-center:hover {
-            background: rgba(29, 185, 84, 1);
-            transform: scale(1.1);
-        }
-
-        .nav-right {
-            grid-column: 3;
-            grid-row: 2;
-            border-radius: 4px 12px 12px 4px;
-        }
-
-        .nav-down {
-            grid-column: 2;
-            grid-row: 3;
-            border-radius: 4px 4px 12px 12px;
-        }
-
-        /* Action states */
-        .nav-center.liked {
-            background: #ff0040;
-            border-color: #ff0040;
-        }
-
-        .nav-center.saved {
-            background: #f39c12;
-            border-color: #f39c12;
+        .moment-btn:active {
+            transform: scale(0.95);
         }
 
         /* Navigation Hints */
@@ -541,7 +566,7 @@
             bottom: 0;
             left: 0;
             right: 0;
-            height: 80px;
+            height: 60px;
             display: flex;
             align-items: flex-end;
             justify-content: center;
@@ -550,17 +575,17 @@
             color: rgba(255, 255, 255, 0.6);
             z-index: 60;
             pointer-events: none;
-            background: linear-gradient(to top, rgba(0, 0, 0, 0.6) 0%, rgba(0, 0, 0, 0.3) 50%, transparent 100%);
-            padding-bottom: 15px;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.2) 50%, transparent 100%);
+            padding-bottom: 10px;
         }
 
         .nav-hint {
             display: flex;
             align-items: center;
             gap: 3px;
-            padding: 4px 8px;
+            padding: 3px 6px;
             background: rgba(0, 0, 0, 0.6);
-            border-radius: 12px;
+            border-radius: 10px;
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.1);
         }
@@ -587,6 +612,31 @@
         .toast.show {
             opacity: 1;
             transform: translateX(-50%) translateY(8px);
+        }
+
+        /* Horizontal Swipe Indicator */
+        .swipe-indicator {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 25px;
+            font-size: 14px;
+            font-weight: 600;
+            backdrop-filter: blur(10px);
+            opacity: 0;
+            transition: all 0.3s ease;
+            z-index: 150;
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            pointer-events: none;
+        }
+
+        .swipe-indicator.show {
+            opacity: 1;
+            transform: translate(-50%, -50%) scale(1.1);
         }
 
         /* Animations */
@@ -623,12 +673,14 @@
 </head>
 <body>
     <div class="app-container" id="appContainer">
-        <!-- Compact Top Player - STAYS FIXED -->
+        <!-- Enhanced Top Player with Song Navigation -->
         <div class="top-player">
             <div class="player-content">
+                <button class="song-nav-btn" id="prevSongBtn">⬅</button>
                 <div class="mini-art" id="miniArt">🎵</div>
                 <div class="song-meta" id="songInfo">Stronger - Kanye West</div>
                 <div class="current-region" id="currentRegion">1:23 - 1:45</div>
+                <button class="song-nav-btn" id="nextSongBtn">➡</button>
             </div>
             <div class="progress-container">
                 <div class="progress-fill" id="progressFill"></div>
@@ -636,37 +688,46 @@
             </div>
         </div>
 
-        <!-- MOMENT CONTAINER -->
+        <!-- MOMENT CONTAINER - FREE SCROLLING ZONE -->
         <div class="moment-container" id="momentContainer">
             <!-- Individual moment cards will be positioned here -->
         </div>
 
-        <!-- CROSS NAVIGATION SYSTEM -->
-        <div class="cross-navigation">
-            <div class="nav-cross">
-                <button class="nav-btn nav-up" id="navUp">⬆</button>
-                <button class="nav-btn nav-left" id="navLeft">⬅</button>
-                <button class="nav-btn nav-center" id="navCenter">❤</button>
-                <button class="nav-btn nav-right" id="navRight">➡</button>
-                <button class="nav-btn nav-down" id="navDown">⬇</button>
+        <!-- RIGHT SIDEBAR - TIKTOK STYLE -->
+        <div class="right-sidebar">
+            <!-- Social Actions - Top Section -->
+            <div class="social-actions">
+                <button class="social-btn" id="likeBtn">❤</button>
+                <button class="social-btn" id="commentBtn">💬</button>
+                <button class="social-btn" id="saveBtn">⭐</button>
+                <button class="social-btn" id="shareBtn">↗</button>
+            </div>
+
+            <!-- Moment Navigation - Bottom Section -->
+            <div class="moment-nav">
+                <button class="moment-btn" id="nextMomentBtn">⬆</button>
+                <button class="moment-btn" id="prevMomentBtn">⬇</button>
             </div>
         </div>
 
         <!-- Navigation Hints -->
         <div class="nav-hints">
             <div class="nav-hint">
+                <span>↔️</span>
+                <span>Swipe songs</span>
+            </div>
+            <div class="nav-hint">
                 <span>⬆⬇</span>
-                <span>Moments</span>
+                <span>Tap moments</span>
             </div>
             <div class="nav-hint">
-                <span>⬅➡</span>
-                <span>Songs</span>
-            </div>
-            <div class="nav-hint">
-                <span>❤</span>
-                <span>Actions</span>
+                <span>📜</span>
+                <span>Free scroll</span>
             </div>
         </div>
+
+        <!-- Swipe Indicator -->
+        <div class="swipe-indicator" id="swipeIndicator">Next Song</div>
 
         <!-- Toast -->
         <div class="toast" id="toast"></div>
@@ -675,7 +736,13 @@
     <script>
         let currentMomentIndex = 0;
         let currentSongIndex = 0;
-        let centerActionMode = 'like'; // like, comment, save, share
+
+        // Touch/swipe state for horizontal navigation
+        let startX = 0;
+        let startY = 0;
+        let currentX = 0;
+        let isHorizontalSwipe = false;
+        let swipeThreshold = 80;
 
         // Card references
         let currentCard = null;
@@ -843,14 +910,6 @@
                 ]
             }
         ];
-
-        // Center action modes
-        const centerActions = {
-            like: { icon: '❤', color: '#ff0040', action: 'toggleLike' },
-            comment: { icon: '💬', color: '#1DB954', action: 'addComment' },
-            save: { icon: '⭐', color: '#f39c12', action: 'saveDiscussion' },
-            share: { icon: '↗', color: '#667eea', action: 'shareDiscussion' }
-        };
 
         // Format time
         function formatTime(seconds) {
@@ -1037,14 +1096,6 @@
             updateSnippetRegion(moment.start, moment.end, 232);
         }
 
-        // Update center button
-        function updateCenterButton() {
-            const centerBtn = document.getElementById('navCenter');
-            const action = centerActions[centerActionMode];
-            centerBtn.textContent = action.icon;
-            centerBtn.style.background = `rgba(${action.color === '#ff0040' ? '255, 0, 64' : action.color === '#1DB954' ? '29, 185, 84' : action.color === '#f39c12' ? '243, 156, 18' : '102, 126, 234'}, 0.9)`;
-        }
-
         // Navigation functions
         function nextMoment() {
             const song = getCurrentSong();
@@ -1090,36 +1141,25 @@
             createMomentCards();
         }
 
-        // Center action cycling
-        function cycleCenterAction() {
-            const actions = Object.keys(centerActions);
-            const currentIndex = actions.indexOf(centerActionMode);
-            const nextIndex = (currentIndex + 1) % actions.length;
-            centerActionMode = actions[nextIndex];
-            
-            updateCenterButton();
-            showToast(`${centerActions[centerActionMode].icon} ${centerActionMode.charAt(0).toUpperCase() + centerActionMode.slice(1)} mode`);
-        }
-
         // Action functions
         function toggleLike() {
-            const centerBtn = document.getElementById('navCenter');
-            centerBtn.classList.toggle('liked');
-            showToast(centerBtn.classList.contains('liked') ? 'Moment liked! ❤️' : 'Like removed');
-        }
-
-        function shareDiscussion() {
-            showToast('Discussion shared! 📤');
-        }
-
-        function saveDiscussion() {
-            const centerBtn = document.getElementById('navCenter');
-            centerBtn.classList.toggle('saved');
-            showToast(centerBtn.classList.contains('saved') ? 'Discussion saved! ⭐' : 'Save removed');
+            const likeBtn = document.getElementById('likeBtn');
+            likeBtn.classList.toggle('liked');
+            showToast(likeBtn.classList.contains('liked') ? 'Moment liked! ❤️' : 'Like removed');
         }
 
         function addComment() {
             showToast('Add your discovery to this discussion 💬');
+        }
+
+        function saveDiscussion() {
+            const saveBtn = document.getElementById('saveBtn');
+            saveBtn.classList.toggle('saved');
+            showToast(saveBtn.classList.contains('saved') ? 'Discussion saved! ⭐' : 'Save removed');
+        }
+
+        function shareDiscussion() {
+            showToast('Discussion shared! ↗');
         }
 
         function likeComment(btn) {
@@ -1163,71 +1203,103 @@
             }, 2000);
         }
 
-        // Event listeners for cross navigation
-        document.getElementById('navUp').addEventListener('click', () => {
-            nextMoment();
-            showToast('⬆️ Next moment');
-        });
+        // Show swipe indicator
+        function showSwipeIndicator(direction) {
+            const indicator = document.getElementById('swipeIndicator');
+            indicator.textContent = direction === 'left' ? 'Next Song' : 'Previous Song';
+            indicator.classList.add('show');
+            
+            setTimeout(() => {
+                indicator.classList.remove('show');
+            }, 1000);
+        }
 
-        document.getElementById('navDown').addEventListener('click', () => {
-            prevMoment();
-            showToast('⬇️ Previous moment');
-        });
+        // HORIZONTAL SWIPE DETECTION for Song Navigation
+        document.addEventListener('touchstart', (e) => {
+            const touch = e.touches[0];
+            startX = touch.clientX;
+            startY = touch.clientY;
+            isHorizontalSwipe = false;
+        }, { passive: true });
 
-        document.getElementById('navLeft').addEventListener('click', () => {
+        document.addEventListener('touchmove', (e) => {
+            if (!startX) return;
+            
+            const touch = e.touches[0];
+            currentX = touch.clientX;
+            const currentY = touch.clientY;
+            
+            const deltaX = Math.abs(currentX - startX);
+            const deltaY = Math.abs(currentY - startY);
+            
+            // Determine if this is a horizontal swipe (more horizontal than vertical movement)
+            if (deltaX > deltaY && deltaX > 30) {
+                isHorizontalSwipe = true;
+                
+                // Prevent text selection during horizontal swipe
+                e.preventDefault();
+                
+                // Show swipe indicator
+                if (currentX > startX) {
+                    showSwipeIndicator('right');
+                } else {
+                    showSwipeIndicator('left');
+                }
+            }
+        }, { passive: false });
+
+        document.addEventListener('touchend', (e) => {
+            if (!startX || !isHorizontalSwipe) {
+                startX = 0;
+                isHorizontalSwipe = false;
+                return;
+            }
+            
+            const deltaX = currentX - startX;
+            
+            // Only trigger if swipe is significant enough
+            if (Math.abs(deltaX) > swipeThreshold) {
+                if (deltaX > 0) {
+                    // Swipe right = previous song
+                    prevSong();
+                    showToast('⬅️ Previous song');
+                } else {
+                    // Swipe left = next song
+                    nextSong();
+                    showToast('➡️ Next song');
+                }
+            }
+            
+            // Reset
+            startX = 0;
+            isHorizontalSwipe = false;
+        }, { passive: true });
+
+        // Button event listeners
+        document.getElementById('prevSongBtn').addEventListener('click', () => {
             prevSong();
             showToast('⬅️ Previous song');
         });
 
-        document.getElementById('navRight').addEventListener('click', () => {
+        document.getElementById('nextSongBtn').addEventListener('click', () => {
             nextSong();
             showToast('➡️ Next song');
         });
 
-        document.getElementById('navCenter').addEventListener('click', () => {
-            const action = centerActions[centerActionMode].action;
-            switch(action) {
-                case 'toggleLike':
-                    toggleLike();
-                    break;
-                case 'addComment':
-                    addComment();
-                    break;
-                case 'saveDiscussion':
-                    saveDiscussion();
-                    break;
-                case 'shareDiscussion':
-                    shareDiscussion();
-                    break;
-            }
+        document.getElementById('nextMomentBtn').addEventListener('click', () => {
+            nextMoment();
+            showToast('⬆️ Next moment');
         });
 
-        // Long press on center to cycle actions
-        let longPressTimer;
-        document.getElementById('navCenter').addEventListener('mousedown', () => {
-            longPressTimer = setTimeout(() => {
-                cycleCenterAction();
-            }, 800);
+        document.getElementById('prevMomentBtn').addEventListener('click', () => {
+            prevMoment();
+            showToast('⬇️ Previous moment');
         });
 
-        document.getElementById('navCenter').addEventListener('mouseup', () => {
-            clearTimeout(longPressTimer);
-        });
-
-        document.getElementById('navCenter').addEventListener('mouseleave', () => {
-            clearTimeout(longPressTimer);
-        });
-
-        // Touch events for long press
-        document.getElementById('navCenter').addEventListener('touchstart', () => {
-            longPressTimer = setTimeout(() => {
-                cycleCenterAction();
-            }, 800);
-        });
-
-        document.getElementById('navCenter').addEventListener('touchend', () => {
-            clearTimeout(longPressTimer);
-        });
+        document.getElementById('likeBtn').addEventListener('click', toggleLike);
+        document.getElementById('commentBtn').addEventListener('click', addComment);
+        document.getElementById('saveBtn').addEventListener('click', saveDiscussion);
+        document.getElementById('shareBtn').addEventListener('click', shareDiscussion);
 
         // Keyboard navigation
         document.addEventListener('keydown', (e) => {
@@ -1245,15 +1317,13 @@
                 showToast('➡️ Next song');
             } else if (e.key === ' ') {
                 e.preventDefault();
-                const action = centerActions[centerActionMode].action;
-                eval(action + '()');
+                toggleLike();
             }
         });
 
         // Initialize
         function init() {
             updateTopPlayer();
-            updateCenterButton();
             createMomentCards();
         }
 
@@ -1261,15 +1331,15 @@
 
         // Welcome messages
         setTimeout(() => {
-            showToast('🎯 Cross navigation! Easy tap control');
+            showToast('🎯 Perfect hybrid! Swipe songs, tap moments');
         }, 1000);
 
         setTimeout(() => {
-            showToast('❤️ Long press center button to cycle actions');
+            showToast('📱 Comments scroll freely - zero conflicts!');
         }, 4000);
 
         setTimeout(() => {
-            showToast('📱 Comments scroll freely - no conflicts!');
+            showToast('✨ TikTok-style sidebar for social actions');
         }, 7000);
     </script>
 </body>
