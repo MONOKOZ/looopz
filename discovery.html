@@ -119,16 +119,17 @@
             right: 0;
             bottom: 0;
             overflow: hidden;
-            touch-action: pan-y;
+            touch-action: pan-x;
         }
 
         .moments-wrapper {
             position: relative;
-            width: 500%; /* Hold 5 cards: prev2, prev1, current, next1, next2 */
-            height: 100%;
+            width: 100%;
+            height: 500%; /* Hold 5 cards vertically: prev2, prev1, current, next1, next2 */
             display: flex;
+            flex-direction: column;
             transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-            transform: translateX(-40%); /* Start at middle card (current) */
+            transform: translateY(-40%); /* Start at middle card (current) */
         }
 
         .moments-wrapper.dragging {
@@ -136,8 +137,8 @@
         }
 
         .moment-card {
-            width: 20%; /* Each card is 1/5 of wrapper width */
-            height: 100%;
+            width: 100%;
+            height: 20%; /* Each card is 1/5 of wrapper height */
             position: relative;
             overflow: hidden;
             flex-shrink: 0;
@@ -584,12 +585,12 @@
                 <span>Next moment</span>
             </div>
             <div class="nav-hint">
-                <span>⬅️</span>
-                <span>Next song</span>
+                <span>⬇️</span>
+                <span>Prev moment</span>
             </div>
             <div class="nav-hint">
-                <span>➡️</span>
-                <span>Prev song</span>
+                <span>⬅️➡️</span>
+                <span>Change song</span>
             </div>
             <div class="nav-hint">
                 <span>📜</span>
@@ -905,7 +906,7 @@
         // Apply transform to wrapper
         function applyTransform(percent, instant = false) {
             const wrapper = document.getElementById('momentsWrapper');
-            wrapper.style.transform = `translateX(${percent}%)`;
+            wrapper.style.transform = `translateY(${percent}%)`;
             
             if (instant) {
                 wrapper.classList.add('dragging');
@@ -940,11 +941,8 @@
                 const deltaY = currentY - startY;
                 const deltaX = currentX - startX;
                 
-                // Check if this is horizontal (song change) or vertical (moment change)
-                if (Math.abs(deltaX) > Math.abs(deltaY)) {
-                    // Horizontal swipe - song change (not implemented in this version)
-                    // You can add horizontal sliding between songs here
-                } else {
+                // Check if this is vertical (moment change) or horizontal (song change)
+                if (Math.abs(deltaY) > Math.abs(deltaX)) {
                     // Vertical swipe - moment change
                     // Convert touch delta to transform percentage
                     const windowHeight = window.innerHeight - 55; // Account for top player
@@ -952,12 +950,11 @@
                     const newTransform = baseTransform + swipePercent;
                     
                     applyTransform(newTransform, true);
-                }
-                
-                // Prevent scrolling during moment swiping
-                if (Math.abs(deltaY) > 30) {
+                    
+                    // Prevent scrolling during moment swiping
                     e.preventDefault();
                 }
+                // Note: Horizontal song swiping would go here in future versions
             }
         }, { passive: false });
 
@@ -971,23 +968,27 @@
                 // Determine if swipe should complete
                 const threshold = isQuickSwipe ? 50 : 100;
                 
-                if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > threshold) {
-                    // Horizontal song change
-                    if (deltaX > 0) {
-                        prevSong();
-                        showToast('➡️ Previous song');
-                    } else {
-                        nextSong();
-                        showToast('⬅️ Next song');
-                    }
-                } else if (Math.abs(deltaY) > threshold) {
+                if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > threshold) {
                     // Vertical moment change
                     if (deltaY > 0) {
+                        // Swiped DOWN = Previous moment
                         prevMoment();
                         showToast('⬇️ Previous moment');
                     } else {
+                        // Swiped UP = Next moment  
                         nextMoment();
                         showToast('⬆️ Next moment');
+                    }
+                } else if (Math.abs(deltaX) > threshold) {
+                    // Horizontal song change
+                    if (deltaX > 0) {
+                        // Swiped RIGHT = Previous song
+                        prevSong();
+                        showToast('➡️ Previous song');
+                    } else {
+                        // Swiped LEFT = Next song
+                        nextSong();
+                        showToast('⬅️ Next song');
                     }
                 } else {
                     // Snap back to original position
@@ -1132,7 +1133,7 @@
 
         // Welcome messages
         setTimeout(() => {
-            showToast('🎵 TikTok-style swiping! Drag to see previews');
+            showToast('🎵 Swipe UP for next moment, DOWN for previous!');
         }, 1000);
 
         setTimeout(() => {
@@ -1140,7 +1141,7 @@
         }, 4000);
 
         setTimeout(() => {
-            showToast('💡 Swipe ← → for songs, ↑ ↓ for moments');
+            showToast('💡 Swipe ⬆️ ⬇️ for moments, ⬅️ ➡️ for songs');
         }, 7000);
     </script>
 </body>
