@@ -1101,24 +1101,25 @@
                 nextCard.classList.add('dragging');
                 prevCard.classList.add('dragging');
                 
-                // REVERSED: Swipe UP = Previous moment, Swipe DOWN = Next moment
                 if (deltaY < 0) {
-                    // Swiping UP - Previous moment comes from top
-                    const currentTransform = progress * 100;
-                    const prevTransform = -100 + (progress * 100);
+                    // Swiping UP - Previous moment comes from TOP (BOTH CARDS VISIBLE)
+                    const currentTransform = progress * 100; // Current card moves up (negative)
+                    const prevTransform = -100 + (progress * 100); // Previous card follows from top
                     
+                    // BOTH CARDS VISIBLE: Current moving up, Previous sliding down from top
                     currentCard.style.transform = `translate3d(0, ${currentTransform}%, 0)`;
                     prevCard.style.transform = `translate3d(0, ${prevTransform}%, 0)`;
-                    nextCard.style.transform = `translate3d(0, 100%, 0)`;
+                    nextCard.style.transform = `translate3d(0, 100%, 0)`; // Keep next card hidden below
                     
                 } else {
-                    // Swiping DOWN - Next moment comes from bottom
-                    const currentTransform = progress * 100;
-                    const nextTransform = 100 + (progress * 100);
+                    // Swiping DOWN - Next moment comes from BOTTOM (BOTH CARDS VISIBLE)
+                    const currentTransform = progress * 100; // Current card moves down (positive)
+                    const nextTransform = 100 + (progress * 100); // Next card follows from bottom
                     
+                    // BOTH CARDS VISIBLE: Current moving down, Next sliding up from bottom
                     currentCard.style.transform = `translate3d(0, ${currentTransform}%, 0)`;
                     nextCard.style.transform = `translate3d(0, ${nextTransform}%, 0)`;
-                    prevCard.style.transform = `translate3d(0, -100%, 0)`;
+                    prevCard.style.transform = `translate3d(0, -100%, 0)`; // Keep prev card hidden above
                 }
                 
                 e.preventDefault();
@@ -1140,19 +1141,18 @@
                 const threshold = isQuickSwipe ? 50 : 80;
                 
                 if (Math.abs(deltaY) > threshold) {
-                    // REVERSED LOGIC
                     if (deltaY < 0) {
-                        // Swiped UP = Previous moment
+                        // Swiped UP = Previous moment (card came from top)
                         prevMoment();
                         showToast('⬆️ Previous moment!');
                     } else {
-                        // Swiped DOWN = Next moment
+                        // Swiped DOWN = Next moment (card came from bottom)
                         nextMoment();
                         showToast('⬇️ Next moment!');
                     }
                 } else {
                     resetCardPositions();
-                    showToast('💫 Snap back');
+                    showToast('💫 Swipe further to switch');
                 }
             }
             
