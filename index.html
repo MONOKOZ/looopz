@@ -1210,8 +1210,14 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
                 <div class="nav-label">Library</div>
                 <span class="loop-count-badge" id="loop-count-badge">0</span>
             </button>
+            <button class="nav-btn" id="nav-discovery">
+            <div class="nav-icon">💬</div>
+            <div class="nav-label">Discovery</div>
+            </button>
         </div>
     </div>
+
+
 
     <script src="https://sdk.scdn.co/spotify-player.js"></script>
     <script>
@@ -2773,6 +2779,11 @@ function setupEventListeners() {
         e.preventDefault();
         showView('library');
     });
+    
+    els.navDiscovery.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.location.href = 'discovery.html';
+    });
 
     // Main event delegation
     document.addEventListener('click', async (e) => {
@@ -3062,6 +3073,7 @@ function init() {
         navSearch: document.getElementById('nav-search'),
         navPlayer: document.getElementById('nav-player'),
         navLibrary: document.getElementById('nav-library')
+        navDiscovery: document.getElementById('nav-discovery')
     };
 
     setupEventListeners();
