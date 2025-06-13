@@ -130,6 +130,7 @@
             flex-direction: column;
             transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
             transform: translateY(-40%); /* Start at middle card (current) */
+            will-change: transform; /* Optimize for transforms */
         }
 
         .moments-wrapper.dragging {
@@ -142,6 +143,11 @@
             position: relative;
             overflow: hidden;
             flex-shrink: 0;
+            border-bottom: 2px solid rgba(29, 185, 84, 0.1); /* Visual separator */
+        }
+
+        .moment-card:last-child {
+            border-bottom: none;
         }
 
         /* Moment Header with Background */
@@ -944,17 +950,27 @@
                 // Check if this is vertical (moment change) or horizontal (song change)
                 if (Math.abs(deltaY) > Math.abs(deltaX)) {
                     // Vertical swipe - moment change
-                    // Convert touch delta to transform percentage
+                    // Convert touch delta to transform percentage - INSTAGRAM STYLE
                     const windowHeight = window.innerHeight - 55; // Account for top player
-                    const swipePercent = (deltaY / windowHeight) * 20; // 20% per full swipe
+                    
+                    // Key fix: Swipe direction matches content movement
+                    // Swipe UP (negative deltaY) → content moves UP (more negative transform)
+                    // Swipe DOWN (positive deltaY) → content moves DOWN (less negative transform)
+                    const swipePercent = (-deltaY / windowHeight) * 20; // Note the negative!
                     const newTransform = baseTransform + swipePercent;
                     
-                    applyTransform(newTransform, true);
+                    // Limit the transform to show adjacent cards only
+                    const limitedTransform = Math.max(-60, Math.min(-20, newTransform));
+                    
+                    applyTransform(limitedTransform, true);
                     
                     // Prevent scrolling during moment swiping
                     e.preventDefault();
+                } else if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                    // Horizontal swipe - song change (visual feedback for future implementation)
+                    // For now, just provide visual feedback that horizontal swipe is detected
+                    e.preventDefault();
                 }
-                // Note: Horizontal song swiping would go here in future versions
             }
         }, { passive: false });
 
@@ -969,30 +985,31 @@
                 const threshold = isQuickSwipe ? 50 : 100;
                 
                 if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > threshold) {
-                    // Vertical moment change
-                    if (deltaY > 0) {
-                        // Swiped DOWN = Previous moment
-                        prevMoment();
-                        showToast('⬇️ Previous moment');
-                    } else {
-                        // Swiped UP = Next moment  
+                    // Vertical moment change - INSTAGRAM STYLE
+                    if (deltaY < 0) {
+                        // Swiped UP = Next moment (content slides UP from bottom)
                         nextMoment();
                         showToast('⬆️ Next moment');
-                    }
-                } else if (Math.abs(deltaX) > threshold) {
-                    // Horizontal song change
-                    if (deltaX > 0) {
-                        // Swiped RIGHT = Previous song
-                        prevSong();
-                        showToast('➡️ Previous song');
                     } else {
-                        // Swiped LEFT = Next song
+                        // Swiped DOWN = Previous moment (content slides DOWN from top)
+                        prevMoment();
+                        showToast('⬇️ Previous moment');
+                    }
+                } else if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > threshold) {
+                    // Horizontal song change - INSTAGRAM STYLE
+                    if (deltaX < 0) {
+                        // Swiped LEFT = Next song (content slides LEFT from right)
                         nextSong();
                         showToast('⬅️ Next song');
+                    } else {
+                        // Swiped RIGHT = Previous song (content slides RIGHT from left)
+                        prevSong();
+                        showToast('➡️ Previous song');
                     }
                 } else {
-                    // Snap back to original position
+                    // Didn't meet threshold - snap back to original position
                     applyTransform(baseTransform, false);
+                    showToast('💫 Snap back');
                 }
             }
             
@@ -1133,15 +1150,15 @@
 
         // Welcome messages
         setTimeout(() => {
-            showToast('🎵 Swipe UP for next moment, DOWN for previous!');
+            showToast('🎵 Instagram-style swiping! Drag to see content slide');
         }, 1000);
 
         setTimeout(() => {
-            showToast('👑 Titles change as new comments get more engagement');
+            showToast('⬆️ Swipe UP → Next moment slides up from bottom');
         }, 4000);
 
         setTimeout(() => {
-            showToast('💡 Swipe ⬆️ ⬇️ for moments, ⬅️ ➡️ for songs');
+            showToast('⬅️➡️ Swipe LEFT/RIGHT → Songs slide horizontally');
         }, 7000);
     </script>
 </body>
