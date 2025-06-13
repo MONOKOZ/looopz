@@ -289,13 +289,13 @@
             gap: 3px;
         }
 
-        /* Discussion Thread */
+        /* Discussion Thread - STOPS BEFORE SWIPE ZONE */
         .discussion-thread {
             position: absolute;
             top: 140px;
             left: 0;
             right: 0;
-            bottom: 0;
+            bottom: 220px; /* Stops 220px from bottom to avoid swipe zone */
             background: rgba(0, 0, 0, 0.95);
             backdrop-filter: blur(20px);
         }
@@ -656,11 +656,11 @@
             
             <!-- Song Navigation - Bottom Position -->
             <button class="song-nav-btn" onclick="nextSong()" id="nextSongBtn">
-                 <div class="nav-icon">➡️</div>            
+                <div class="nav-icon">⬆️</div>
                 <div class="nav-text">Next Song</div>
             </button>
             <button class="song-nav-btn" onclick="prevSong()" id="prevSongBtn">
-                <div class="nav-icon">⬅️</div>
+                <div class="nav-icon">⬇️</div>
                 <div class="nav-text">Prev Song</div>
             </button>
         </div>
@@ -730,15 +730,24 @@
                             { user: "SampleHunter", avatar: "SH", timing: "1:23.0 - 1:45.1", text: "Found the original sample - it's from a 1970s soul track!", likes: 189, shares: 28, plays: 67, replies: 23 },
                             { user: "VocalAnalyst", avatar: "VA", timing: "1:23.5 - 1:44.2", text: "The way he pitched and chopped this is pure genius", likes: 156, shares: 19, plays: 45, replies: 12 },
                             { user: "ChillVibes", avatar: "CV", timing: "1:23.0 - 1:45.2", text: "This part hits different when you're studying at 2AM", likes: 134, shares: 45, plays: 78, replies: 9 },
-                            { user: "ProducerEars", avatar: "PE", timing: "1:23.2 - 1:44.8", text: "This vocal chop gives me chills every single time 🔥", likes: 247, shares: 34, plays: 89, replies: 8, isTopTake: true },
-                            { user: "SampleHunter", avatar: "SH", timing: "1:23.0 - 1:45.1", text: "Found the original sample - it's from a 1970s soul track!", likes: 189, shares: 28, plays: 67, replies: 23 },
-                            { user: "VocalAnalyst", avatar: "VA", timing: "1:23.5 - 1:44.2", text: "The way he pitched and chopped this is pure genius", likes: 156, shares: 19, plays: 45, replies: 12 },
-                            { user: "ProducerEars", avatar: "PE", timing: "1:23.2 - 1:44.8", text: "This vocal chop gives me chills every single time 🔥", likes: 247, shares: 34, plays: 89, replies: 8, isTopTake: true },
-                            { user: "SampleHunter", avatar: "SH", timing: "1:23.0 - 1:45.1", text: "Found the original sample - it's from a 1970s soul track!", likes: 189, shares: 28, plays: 67, replies: 23 },
-                            { user: "VocalAnalyst", avatar: "VA", timing: "1:23.5 - 1:44.2", text: "The way he pitched and chopped this is pure genius", likes: 156, shares: 19, plays: 45, replies: 12 },
-                            { user: "ChillVibes", avatar: "CV", timing: "1:23.0 - 1:45.2", text: "This part hits different when you're studying at 2AM", likes: 134, shares: 45, plays: 78, replies: 9 },
-                            { user: "ChillVibes", avatar: "CV", timing: "1:23.0 - 1:45.2", text: "This part hits different when you're studying at 2AM", likes: 134, shares: 45, plays: 78, replies: 9 },
-                            { user: "BeatMaker", avatar: "BM", timing: "1:23.1 - 1:45.0", text: "I've been trying to recreate this chop for months", likes: 78, shares: 12, plays: 34, replies: 15 }
+                            { user: "BeatMaker", avatar: "BM", timing: "1:23.1 - 1:45.0", text: "I've been trying to recreate this chop for months", likes: 78, shares: 12, plays: 34, replies: 15 },
+                            { user: "AudioEngineer", avatar: "AE", timing: "1:23.3 - 1:44.9", text: "The stereo imaging on this vocal is incredible", likes: 92, shares: 8, plays: 23, replies: 6 },
+                            { user: "WorkoutMotivation", avatar: "WM", timing: "1:23.4 - 1:44.6", text: "Perfect for that final gym rep energy boost", likes: 89, shares: 23, plays: 56, replies: 4 },
+                            { user: "NightOwl", avatar: "NO", timing: "1:23.2 - 1:44.7", text: "3AM vibes when this comes on shuffle", likes: 45, shares: 8, plays: 19, replies: 3 },
+                            { user: "EmotionalListener", avatar: "EL", timing: "1:23.0 - 1:45.0", text: "Literally gives me goosebumps every single time", likes: 56, shares: 12, plays: 28, replies: 7 },
+                            { user: "CasualFan", avatar: "CF", timing: "1:23.4 - 1:44.5", text: "Don't understand music theory but this just hits", likes: 89, shares: 22, plays: 41, replies: 6 },
+                            { user: "VintageCollector", avatar: "VC", timing: "1:23.1 - 1:44.9", text: "The original track this samples from is a masterpiece", likes: 67, shares: 15, plays: 32, replies: 11 },
+                            { user: "MoodBooster", avatar: "MB", timing: "1:23.2 - 1:45.0", text: "Instant serotonin boost whenever I hear this", likes: 98, shares: 31, plays: 54, replies: 8 },
+                            { user: "StudioSession", avatar: "SS", timing: "1:23.0 - 1:44.8", text: "We played this loop for 3 hours straight in our session", likes: 76, shares: 19, plays: 43, replies: 13 },
+                            { user: "DanceFloorKing", avatar: "DK", timing: "1:23.3 - 1:44.7", text: "The club goes absolutely insane when this drops", likes: 112, shares: 27, plays: 68, replies: 16 },
+                            { user: "MelodyMaker", avatar: "MM", timing: "1:23.1 - 1:45.1", text: "That chord progression underneath is so underrated", likes: 54, shares: 9, plays: 26, replies: 7 },
+                            { user: "RetroVibes", avatar: "RV", timing: "1:23.2 - 1:44.6", text: "Takes me back to the golden era of hip-hop production", likes: 83, shares: 18, plays: 39, replies: 12 },
+                            { user: "EarTraining", avatar: "ET", timing: "1:23.4 - 1:44.9", text: "Perfect example of how to use vocal samples as percussion", likes: 91, shares: 14, plays: 35, replies: 9 },
+                            { user: "CommuteChill", avatar: "CC", timing: "1:23.0 - 1:45.0", text: "My daily commute anthem right here", likes: 42, shares: 11, plays: 28, replies: 5 },
+                            { user: "ProductionTips", avatar: "PT", timing: "1:23.3 - 1:44.8", text: "The compression on this vocal is teaching me so much", likes: 68, shares: 16, plays: 31, replies: 14 },
+                            { user: "FrequencyFan", avatar: "FF", timing: "1:23.1 - 1:44.7", text: "Those high frequencies cut through the mix perfectly", likes: 59, shares: 7, plays: 22, replies: 6 },
+                            { user: "RepeatListener", avatar: "RL", timing: "1:23.2 - 1:45.2", text: "Been replaying this exact moment for the past hour", likes: 127, shares: 39, plays: 71, replies: 18 },
+                            { user: "SoulSearcher", avatar: "SR", timing: "1:23.0 - 1:44.5", text: "This sample carries so much soul and emotion", likes: 94, shares: 21, plays: 47, replies: 10 }
                         ]
                     },
                     {
@@ -759,7 +768,16 @@
                         comments: [
                             { user: "TensionMaster", avatar: "TM", timing: "0:14.8 - 0:34.9", text: "This is how you create anticipation in music", likes: 142, shares: 23, plays: 45, replies: 19, isTopTake: true },
                             { user: "IntroExpert", avatar: "IE", timing: "0:15.0 - 0:34.5", text: "The way this builds tension is absolutely perfect 🚀", likes: 89, shares: 12, plays: 34, replies: 12 },
-                            { user: "DrumProgrammer", avatar: "DP", timing: "0:15.2 - 0:35.1", text: "That kick pattern in the build is so simple but effective", likes: 67, shares: 10, plays: 28, replies: 8 }
+                            { user: "DrumProgrammer", avatar: "DP", timing: "0:15.2 - 0:35.1", text: "That kick pattern in the build is so simple but effective", likes: 67, shares: 10, plays: 28, replies: 8 },
+                            { user: "BuildupKing", avatar: "BK", timing: "0:15.1 - 0:34.8", text: "Every producer should study this intro sequence", likes: 78, shares: 18, plays: 39, replies: 14 },
+                            { user: "ClubDJ", avatar: "CD", timing: "0:15.0 - 0:35.0", text: "The perfect intro for mixing into this track", likes: 92, shares: 24, plays: 51, replies: 11 },
+                            { user: "FilmScore", avatar: "FS", timing: "0:14.9 - 0:34.7", text: "This could be in a movie trailer, so cinematic", likes: 73, shares: 16, plays: 37, replies: 9 },
+                            { user: "AnxietyRelief", avatar: "AR", timing: "0:15.2 - 0:34.6", text: "Weirdly calming despite the tension building", likes: 56, shares: 8, plays: 23, replies: 6 },
+                            { user: "ProductionClass", avatar: "PC", timing: "0:15.1 - 0:35.0", text: "Teaching this exact technique in my course", likes: 84, shares: 19, plays: 42, replies: 17 },
+                            { user: "MinimalLover", avatar: "ML", timing: "0:14.8 - 0:34.9", text: "Less elements but maximum impact", likes: 91, shares: 22, plays: 49, replies: 13 },
+                            { user: "HeartRateUp", avatar: "HR", timing: "0:15.0 - 0:34.8", text: "My pulse literally syncs with this buildup", likes: 68, shares: 15, plays: 31, replies: 8 },
+                            { user: "SilenceGuru", avatar: "SG", timing: "0:15.3 - 0:34.5", text: "The use of silence here is masterful", likes: 79, shares: 13, plays: 26, replies: 10 },
+                            { user: "EnergyBuilder", avatar: "EB", timing: "0:15.1 - 0:35.1", text: "From zero to hero in 20 seconds", likes: 103, shares: 28, plays: 55, replies: 15 }
                         ]
                     },
                     {
@@ -779,7 +797,19 @@
                         description: "Most viral moment • Peak energy discussion",
                         comments: [
                             { user: "EnergyGuru", avatar: "EG", timing: "2:15.3 - 2:30.0", text: "This drop hits harder than any gym pre-workout", likes: 203, shares: 56, plays: 123, replies: 31, isTopTake: true },
-                            { user: "BeatHunter", avatar: "BH", timing: "2:15.0 - 2:29.8", text: "The way the beat drops here... pure energy ⚡", likes: 156, shares: 34, plays: 89, replies: 24 }
+                            { user: "BeatHunter", avatar: "BH", timing: "2:15.0 - 2:29.8", text: "The way the beat drops here... pure energy ⚡", likes: 156, shares: 34, plays: 89, replies: 24 },
+                            { user: "BassMaster", avatar: "BM", timing: "2:15.1 - 2:30.2", text: "That sub-bass frequency here is insane 🔊", likes: 179, shares: 28, plays: 67, replies: 15 },
+                            { user: "MotivationMode", avatar: "MM", timing: "2:15.2 - 2:29.9", text: "This moment = instant confidence boost", likes: 167, shares: 43, plays: 78, replies: 21 },
+                            { user: "CarStereo", avatar: "CS", timing: "2:15.0 - 2:30.1", text: "My subwoofers can't handle this section", likes: 134, shares: 29, plays: 61, replies: 18 },
+                            { user: "AdrenalineRush", avatar: "AR", timing: "2:15.3 - 2:29.7", text: "Literally feel my heart rate spike every time", likes: 142, shares: 31, plays: 72, replies: 14 },
+                            { user: "ClubNights", avatar: "CN", timing: "2:15.1 - 2:30.0", text: "The entire club loses their minds at this drop", likes: 189, shares: 47, plays: 96, replies: 27 },
+                            { user: "WorkoutPump", avatar: "WP", timing: "2:15.2 - 2:29.8", text: "PRs happen when this drop hits during deadlifts", likes: 157, shares: 38, plays: 84, replies: 19 },
+                            { user: "SonicBoom", avatar: "SB", timing: "2:15.0 - 2:30.2", text: "The sound design here is absolutely mental", likes: 123, shares: 22, plays: 53, replies: 12 },
+                            { user: "EardrumTest", avatar: "ET", timing: "2:15.3 - 2:29.9", text: "Warning: may cause permanent smile syndrome", likes: 178, shares: 42, plays: 87, replies: 23 },
+                            { user: "AdrenalGlands", avatar: "AG", timing: "2:15.1 - 2:30.1", text: "My fight or flight response activates instantly", likes: 91, shares: 18, plays: 45, replies: 11 },
+                            { user: "PowerLifter", avatar: "PL", timing: "2:15.2 - 2:29.8", text: "This is what peak performance sounds like", likes: 164, shares: 35, plays: 79, replies: 16 },
+                            { user: "NeighborApology", avatar: "NA", timing: "2:15.0 - 2:30.0", text: "Sorry neighbors, but this NEEDS to be loud", likes: 201, shares: 51, plays: 102, replies: 29 },
+                            { user: "PureBass", avatar: "PB", timing: "2:15.3 - 2:29.7", text: "This frequency literally moves furniture", likes: 146, shares: 26, plays: 58, replies: 13 }
                         ]
                     }
                 ]
@@ -992,13 +1022,13 @@
             updateSnippetRegion(moment.start, moment.end, 232);
         }
 
-        // TIKTOK-STYLE TOUCH HANDLERS - LIMITED TO BOTTOM ZONE
+        // TIKTOK-STYLE TOUCH HANDLERS - LIMITED TO BOTTOM ZONE ONLY
         document.addEventListener('touchstart', (e) => {
             const touch = e.touches[0];
             const windowHeight = window.innerHeight;
             const touchY = touch.clientY;
             
-            // Only detect swipes in bottom 200px
+            // Only detect swipes in bottom 200px - be very strict about this
             if (touchY > windowHeight - 200) {
                 startY = touch.clientY;
                 startX = touch.clientX;
@@ -1014,7 +1044,23 @@
 
         document.addEventListener('touchmove', (e) => {
             const swipeZone = document.getElementById('swipeZone');
-            if (!swipeZone.classList.contains('active')) return; // Not in swipe zone
+            
+            // STRICT CHECK: Only proceed if we're in active swipe zone
+            if (!swipeZone.classList.contains('active')) {
+                return; // Let comments scroll normally
+            }
+            
+            // Additional check: make sure we're still in the bottom area
+            const touch = e.touches[0];
+            const windowHeight = window.innerHeight;
+            const touchY = touch.clientY;
+            
+            // If touch moved out of swipe zone, deactivate
+            if (touchY <= windowHeight - 200) {
+                swipeZone.classList.remove('active');
+                isDragging = false;
+                return;
+            }
             
             if (!isDragging && Math.abs(e.touches[0].clientY - startY) > 10) {
                 isDragging = true;
@@ -1025,8 +1071,7 @@
                 const deltaY = currentY - startY;
                 
                 // TIKTOK VERTICAL SWIPE - Both cards move together
-                const windowHeight = window.innerHeight - 55;
-                const progress = deltaY / windowHeight; // Percentage of swipe
+                const progress = deltaY / (windowHeight - 55); // Percentage of swipe
                 
                 // Enable dragging mode
                 currentCard.classList.add('dragging');
@@ -1050,13 +1095,17 @@
                     prevCard.style.transform = `translateY(${prevY}%)`;
                 }
                 
-                e.preventDefault();
+                e.preventDefault(); // Only prevent default in swipe zone
             }
         }, { passive: false });
 
         document.addEventListener('touchend', (e) => {
             const swipeZone = document.getElementById('swipeZone');
-            if (!swipeZone.classList.contains('active')) return; // Not in swipe zone
+            
+            // Only handle end if we were in swipe zone
+            if (!swipeZone.classList.contains('active')) {
+                return;
+            }
             
             if (isDragging) {
                 const deltaY = currentY - startY;
@@ -1079,11 +1128,11 @@
                 } else {
                     // Didn't meet threshold - snap back
                     resetCardPositions();
-                    showToast('💫 Swipe further in bottom area!');
+                    showToast('💫 Swipe further to switch!');
                 }
             }
             
-            // Reset drag state
+            // Always reset drag state and deactivate swipe zone
             isDragging = false;
             swipeZone.classList.remove('active');
         }, { passive: true });
