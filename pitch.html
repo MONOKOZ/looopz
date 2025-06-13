@@ -868,6 +868,16 @@
             max-width: 100%;
         }
 
+        /* Enhanced old control styling */
+        .old-control {
+            border: 2px solid transparent !important;
+        }
+
+        .old-control:hover {
+            border-color: var(--accent) !important;
+            background: rgba(255, 69, 0, 0.1) !important;
+        }
+
         /* Mobile Responsive - Fixed */
         @media (max-width: 768px) {
             .container {
@@ -959,6 +969,19 @@
                 max-width: 320px;
             }
 
+            .old-control {
+                padding: 16px 12px;
+            }
+
+            /* Emotional section mobile */
+            #moment-text {
+                font-size: 28px !important;
+            }
+
+            #moment-text span:last-child {
+                font-size: 18px !important;
+            }
+
             .section {
                 padding: 60px 0;
             }
@@ -1035,6 +1058,19 @@
 
             .playlist-concepts {
                 grid-template-columns: 1fr;
+            }
+
+            .old-control {
+                padding: 16px 12px;
+            }
+
+            /* Emotional section mobile adjustments */
+            #moment-text {
+                font-size: 24px !important;
+            }
+
+            #moment-text span:last-child {
+                font-size: 16px !important;
             }
 
             .demo-timing {
@@ -1163,6 +1199,62 @@
                     <strong>Every generation</strong> demands precision control over their media<br><br>
                     <span style="color: var(--accent); font-weight: 700; font-size: 24px;">Except music platforms</span>
                 </p>
+            </div>
+        </div>
+    </section>
+
+    <!-- Emotional Connection - Personal Experience -->
+    <section class="section" style="background: linear-gradient(145deg, rgba(29, 185, 84, 0.05), rgba(153, 69, 219, 0.05));">
+        <div class="container">
+            <div style="background: linear-gradient(145deg, var(--medium), rgba(42, 42, 42, 0.3)); border: 3px solid var(--primary); border-radius: 24px; padding: 50px; margin: 40px 0; text-align: center;">
+                <h3 style="font-size: 36px; color: var(--lime); margin-bottom: 30px; font-weight: 800; text-transform: uppercase;">💭 Remember That One Moment</h3>
+                
+                <div style="margin: 40px 0;">
+                    <div style="font-size: 42px; font-weight: 800; color: var(--light); margin-bottom: 20px; line-height: 1.2;" id="moment-text">
+                        That one <span style="color: var(--primary);">guitar solo</span> <span style="color: var(--light-gray); font-size: 24px;">that gave you chills</span>
+                    </div>
+                </div>
+
+                <div style="background: rgba(0, 0, 0, 0.3); padding: 40px; border-radius: 20px; margin: 40px 0;">
+                    <div style="font-size: 24px; color: var(--accent); margin-bottom: 30px; font-weight: 700;">All you could do was:</div>
+                    
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr)); gap: 16px; margin: 30px 0;">
+                        <div style="background: var(--gray); padding: 20px 16px; border-radius: 12px; text-align: center; transition: all 0.3s ease;" class="old-control">
+                            <span style="font-size: 32px; margin-bottom: 12px; display: block;">⏯</span>
+                            <div style="font-size: 14px; font-weight: 600;">Play/Pause</div>
+                        </div>
+                        <div style="background: var(--gray); padding: 20px 16px; border-radius: 12px; text-align: center; transition: all 0.3s ease;" class="old-control">
+                            <span style="font-size: 32px; margin-bottom: 12px; display: block;">⏪</span>
+                            <div style="font-size: 14px; font-weight: 600;">Rewind</div>
+                        </div>
+                        <div style="background: var(--gray); padding: 20px 16px; border-radius: 12px; text-align: center; transition: all 0.3s ease;" class="old-control">
+                            <span style="font-size: 32px; margin-bottom: 12px; display: block;">⏩</span>
+                            <div style="font-size: 14px; font-weight: 600;">Forward</div>
+                        </div>
+                        <div style="background: var(--gray); padding: 20px 16px; border-radius: 12px; text-align: center; transition: all 0.3s ease;" class="old-control">
+                            <span style="font-size: 32px; margin-bottom: 12px; display: block;">🔄</span>
+                            <div style="font-size: 14px; font-weight: 600;">Restart</div>
+                        </div>
+                        <div style="background: var(--gray); padding: 20px 16px; border-radius: 12px; text-align: center; transition: all 0.3s ease;" class="old-control">
+                            <span style="font-size: 32px; margin-bottom: 12px; display: block;">😤</span>
+                            <div style="font-size: 14px; font-weight: 600;">Give Up</div>
+                        </div>
+                    </div>
+                    
+                    <div style="font-size: 20px; color: var(--light-gray); margin-top: 30px; font-style: italic;">
+                        Over and over again... desperately trying to catch that exact moment
+                    </div>
+                </div>
+
+                <div style="margin-top: 40px;">
+                    <p style="font-size: 20px; color: var(--light); line-height: 1.5; margin-bottom: 16px;">
+                        Modern platforms like YouTube chapters and TikTok have caught onto moment-driven consumption,<br>
+                        <strong>but the music industry is still thinking linear.</strong>
+                    </p>
+                    <p style="font-size: 28px; color: var(--primary); font-weight: 800; text-transform: uppercase; letter-spacing: 1px;">
+                        We're here to change that.
+                    </p>
+                </div>
             </div>
         </div>
     </section>
@@ -1363,46 +1455,106 @@
             <h2 class="section-title discovery-title">🏛️ Community-Driven Discovery</h2>
             
             <div class="reddit-factor">
-                <div class="reddit-title">The Reddit Factor for Music</div>
+                <div class="reddit-title">Beyond Reddit: Emotional Storytelling with Soundtrack</div>
                 
                 <div style="text-align: center; margin: 30px 0;">
                     <p style="font-size: 20px; color: var(--light); line-height: 1.5;">
-                        Just like Reddit transformed how we discover and discuss content,<br>
-                        <strong>LOOOPZ transforms how we discover and discuss music moments</strong>
+                        This isn't just discussion - it's <strong>reading while the exact moment plays</strong><br>
+                        <span style="color: var(--secondary); font-weight: 700;">Something completely new in human communication</span>
                     </p>
+                </div>
+
+                <!-- Emotional Stories Examples -->
+                <div style="background: rgba(153, 69, 219, 0.05); padding: 30px; border-radius: 16px; margin: 30px 0; border: 1px solid rgba(153, 69, 219, 0.2);">
+                    <h4 style="color: var(--secondary); font-size: 20px; margin-bottom: 20px; text-align: center; font-weight: 700;">Real Human Stories on Musical Moments</h4>
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 20px;">
+                        <div style="background: var(--medium); padding: 20px; border-radius: 12px; border-left: 3px solid var(--secondary);">
+                            <div style="color: var(--light); font-size: 14px; line-height: 1.5; margin-bottom: 8px;">
+                                <strong>"This guitar solo at 2:34 helped me through my last operation..."</strong>
+                            </div>
+                            <div style="color: var(--light-gray); font-size: 12px;">🎸 *plays exact 12-second loop while you read*</div>
+                        </div>
+                        <div style="background: var(--medium); padding: 20px; border-radius: 12px; border-left: 3px solid var(--accent);">
+                            <div style="color: var(--light); font-size: 14px; line-height: 1.5; margin-bottom: 8px;">
+                                <strong>"I can't hear this part anymore... reminds me when dad passed"</strong>
+                            </div>
+                            <div style="color: var(--light-gray); font-size: 12px;">💔 *gentle 8-second moment loops as you read the thread*</div>
+                        </div>
+                        <div style="background: var(--medium); padding: 20px; border-radius: 12px; border-left: 3px solid var(--lime);">
+                            <div style="color: var(--light); font-size: 14px; line-height: 1.5; margin-bottom: 8px;">
+                                <strong>"Did anyone else hear that 'oooh' sounds like me after too much pizza? 😂"</strong>
+                            </div>
+                            <div style="color: var(--light-gray); font-size: 12px;">😂 *2-second vocal loop becomes instant meme*</div>
+                        </div>
+                    </div>
                 </div>
                 
                 <div class="discovery-features">
                     <div class="discovery-feature">
-                        <div class="discovery-feature-title">🔥 Moment Validation</div>
+                        <div class="discovery-feature-title">🎭 Memeification Culture</div>
                         <div class="discovery-feature-desc">
-                            Community upvotes the best moments. Cream rises to the top. Discover which 8-second section 
-                            of a 4-minute song actually creates cultural impact.
+                            People don't just discuss music - they memeify moments. "That oooh sounds like me on the toilet" becomes viral culture. 
+                            Unexpected humor emerges from the most serious songs.
                         </div>
                     </div>
                     
                     <div class="discovery-feature">
-                        <div class="discovery-feature-title">💬 Deep Discussion</div>
+                        <div class="discovery-feature-title">💭 Reading + Listening</div>
                         <div class="discovery-feature-desc">
-                            Comment on specific moments, not just entire songs. "That guitar tone at 2:34 is perfect" 
-                            becomes a searchable, shareable insight.
+                            Revolutionary communication: read emotional stories while the exact musical moment plays on loop. 
+                            Deeper empathy through synchronized audio-text experience.
                         </div>
                     </div>
                     
                     <div class="discovery-feature">
-                        <div class="discovery-feature-title">🎯 Precision Sharing</div>
+                        <div class="discovery-feature-title">🔗 Thread-to-Moment Jumping</div>
                         <div class="discovery-feature-desc">
-                            Share exactly what you mean. No more "skip to 1:23" - send the exact loop with 
-                            millisecond precision and community context.
+                            Jump from discussing a guitar solo at 2:34 to a bass line at 1:45 to vocals at 3:12. 
+                            Each thread has its own soundtrack. Navigation becomes musical storytelling.
                         </div>
                     </div>
                     
                     <div class="discovery-feature">
-                        <div class="discovery-feature-title">📈 Trend Spotting</div>
+                        <div class="discovery-feature-title">🎨 Creative Response Loops</div>
                         <div class="discovery-feature-desc">
-                            Identify trending moments before they explode. Track engagement patterns and discover 
-                            which musical moments are gaining cultural momentum.
+                            People respond to moments with other moments. Someone shares a sad piano part, 
+                            others reply with uplifting guitar loops. Conversations become musical collages.
                         </div>
+                    </div>
+
+                    <div class="discovery-feature">
+                        <div class="discovery-feature-title">📝 Poetic Expression</div>
+                        <div class="discovery-feature-desc">
+                            Some write poems to 8-second moments. Others share life stories triggered by specific vocals. 
+                            Music unlocks deeper human expression than text alone ever could.
+                        </div>
+                    </div>
+                    
+                    <div class="discovery-feature">
+                        <div class="discovery-feature-title">🌊 Emotional Bonding Layer</div>
+                        <div class="discovery-feature-desc">
+                            Unlike Reddit's intellectual discussions, this has music's emotional foundation. 
+                            Deeper connections form because music opens people up, creates vulnerability, enables profound sharing.
+                        </div>
+                    </div>
+                </div>
+
+                <!-- What Makes This Revolutionary -->
+                <div style="background: linear-gradient(135deg, rgba(153, 69, 219, 0.1), rgba(29, 185, 84, 0.1)); padding: 40px; border-radius: 20px; margin: 40px 0; border: 2px solid var(--secondary);">
+                    <h4 style="color: var(--secondary); font-size: 24px; margin-bottom: 20px; text-align: center; font-weight: 800;">Why This Is Completely New</h4>
+                    <div style="color: var(--light); font-size: 18px; line-height: 1.6; text-align: center;">
+                        <p style="margin-bottom: 16px;">
+                            <strong>It's not just Reddit with music.</strong> It's the first platform where 
+                            <span style="color: var(--secondary);">human stories have synchronized soundtracks</span>.
+                        </p>
+                        <p style="margin-bottom: 16px;">
+                            Reading "this helped me through surgery" while hearing the exact 8 seconds they mean? 
+                            <strong>That's never existed before.</strong>
+                        </p>
+                        <p style="color: var(--primary); font-weight: 700; font-size: 20px;">
+                            We're creating a new form of human communication: 
+                            <br><span style="color: var(--lime);">Emotional storytelling with precision musical context</span>
+                        </p>
                     </div>
                 </div>
             </div>
@@ -1581,6 +1733,52 @@
     </section>
 
     <script>
+        // Moment cycling for emotional connection
+        const moments = [
+            { word: "drop", context: "that pushed you to the last rep at 5:30 AM before work." },
+            { word: "refrain", context: "that made a stranger's voice on stage sound like they'd read your diary" },
+            { word: "outro", context: "that made you sit in the driveway, engine off, just staring into the dark because the song wasn't *done* with you yet" }, 
+            { word: "beat switch", context: "made you dance in your kitchen like no one was watching." },
+            { word: "voice", context: "— broken, perfect, real — that made you tear up in the grocery store aisle" },
+            { word: "melody", context: "that somehow knew exactly how you felt... even when you couldn't find the words" },
+            { word: "bridge", context: "that felt like flying — heart wide open, wind in your face, no ground beneath" },
+            { word: "riff", context: "that made you late for work because you *had* to finish air-guitaring in the mirror" },
+            { word: "harmony", context: "that felt like someone wrapping a blanket around your chest on a cold, lonely night" }
+        ];
+
+        let currentMomentIndex = 0;
+
+        function cycleMoments() {
+            const momentText = document.getElementById('moment-text');
+            if (momentText) {
+                const moment = moments[currentMomentIndex];
+                momentText.innerHTML = `That one <span style="color: var(--primary);">${moment.word}</span> <span style="color: var(--light-gray); font-size: 24px;">${moment.context}</span>`;
+                currentMomentIndex = (currentMomentIndex + 1) % moments.length;
+            }
+        }
+
+        // Start cycling after page loads
+        setTimeout(() => {
+            setInterval(cycleMoments, 3000);
+        }, 2000);
+
+        // Enhanced old control hover effects
+        document.addEventListener('DOMContentLoaded', function() {
+            document.querySelectorAll('.old-control').forEach(control => {
+                control.addEventListener('mouseenter', () => {
+                    control.style.background = 'rgba(255, 69, 0, 0.1)';
+                    control.style.borderColor = 'var(--accent)';
+                    control.style.transform = 'scale(1.05)';
+                });
+                
+                control.addEventListener('mouseleave', () => {
+                    control.style.background = 'var(--gray)';
+                    control.style.borderColor = 'transparent';
+                    control.style.transform = 'scale(1)';
+                });
+            });
+        });
+
         // Smooth scroll for internal links
         document.querySelectorAll('a[href^="#"]').forEach(anchor => {
             anchor.addEventListener('click', function (e) {
