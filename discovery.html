@@ -352,7 +352,7 @@
         }
 
         .comment {
-            padding: 12px 16px 12px 36px;
+            padding: 12px 16px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.02);
             transition: background 0.2s ease;
             position: relative;
@@ -374,30 +374,6 @@
             justify-content: space-between;
             margin-bottom: 6px;
             position: relative;
-        }
-
-        .comment-rank {
-            position: absolute;
-            left: -28px;
-            top: 50%;
-            transform: translateY(-50%);
-            min-width: 22px;
-            height: 16px;
-            border-radius: 6px;
-            background: linear-gradient(135deg, #1DB954, #1ed760);
-            color: white;
-            font-size: 9px;
-            font-weight: 700;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            box-shadow: 0 2px 8px rgba(29, 185, 84, 0.3);
-            padding: 0 4px;
-        }
-
-        .comment-rank.top-3 {
-            background: linear-gradient(135deg, #FFD700, #FFA500);
-            box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
         }
 
         .comment-user {
@@ -951,9 +927,9 @@
             return song.moments[prevIndex];
         }
 
-        // Create moment card HTML with enhanced comment actions
+        // Create moment card HTML with enhanced comment actions (NO RANKING)
         function createMomentCardHTML(moment) {
-            // Calculate comment rankings based on engagement score
+            // Calculate comment rankings based on engagement score but don't show ranks
             const rankedComments = moment.comments.map((comment, index) => ({
                 ...comment,
                 originalIndex: index,
@@ -1003,12 +979,9 @@
                     </div>
                     
                     <div class="comments-list">
-                        ${rankedComments.map((comment, rankIndex) => {
-                            const rank = rankIndex + 1;
-                            const showRank = rank <= 10;
+                        ${rankedComments.map((comment) => {
                             return `
                                 <div class="comment ${comment.isTopTake ? 'top-comment' : ''}">
-                                    ${showRank ? `<div class="comment-rank ${rank <= 3 ? 'top-3' : ''}">${rank}</div>` : ''}
                                     <div class="comment-header">
                                         <div class="comment-user">
                                             <div class="user-avatar">${comment.avatar}</div>
@@ -1347,15 +1320,15 @@
 
         // Welcome messages
         setTimeout(() => {
-            showToast('🎯 Social actions below comments! Rectangle rankings 1-10');
+            showToast('🎯 Social actions below comments! Clean layout design');
         }, 1000);
 
         setTimeout(() => {
-            showToast('🏆 Comments ranked by engagement: likes + replies + shares + plays + playlists');
+            showToast('🏆 Comments sorted by engagement: likes + replies + shares + plays + playlists');
         }, 4000);
 
         setTimeout(() => {
-            showToast('📱 Clean layout: actions where you expect them!');
+            showToast('📱 Simplified design: actions where you expect them!');
         }, 7000);
     </script>
 </body>
