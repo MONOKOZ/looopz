@@ -299,10 +299,12 @@
             position: absolute;
             top: 140px;
             left: 0;
-            right: 60px; /* Leave space for right sidebar */
+            right: 0;
             bottom: 0;
             background: rgba(0, 0, 0, 0.95);
             backdrop-filter: blur(20px);
+            display: flex;
+            flex-direction: column;
         }
 
         .thread-intro {
@@ -342,16 +344,18 @@
 
         /* Scrollable Comments - PERFECT SCROLLING */
         .comments-list {
-            height: 100%;
+            flex: 1;
             overflow-y: auto;
             padding: 8px 0 20px;
             scroll-behavior: smooth;
+            min-height: 0;
         }
 
         .comment {
-            padding: 12px 16px;
+            padding: 12px 16px 12px 36px;
             border-bottom: 1px solid rgba(255, 255, 255, 0.02);
             transition: background 0.2s ease;
+            position: relative;
         }
 
         .comment:hover {
@@ -369,6 +373,31 @@
             align-items: center;
             justify-content: space-between;
             margin-bottom: 6px;
+            position: relative;
+        }
+
+        .comment-rank {
+            position: absolute;
+            left: -28px;
+            top: 50%;
+            transform: translateY(-50%);
+            min-width: 22px;
+            height: 16px;
+            border-radius: 6px;
+            background: linear-gradient(135deg, #1DB954, #1ed760);
+            color: white;
+            font-size: 9px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 8px rgba(29, 185, 84, 0.3);
+            padding: 0 4px;
+        }
+
+        .comment-rank.top-3 {
+            background: linear-gradient(135deg, #FFD700, #FFA500);
+            box-shadow: 0 2px 8px rgba(255, 215, 0, 0.4);
         }
 
         .comment-user {
@@ -410,6 +439,8 @@
             display: flex;
             gap: 4px;
             font-size: 8px;
+            margin-top: 8px;
+            padding-top: 8px;
         }
 
         .comment-btn {
@@ -475,16 +506,13 @@
             gap: 2px;
         }
 
-        .engagement-item:hover {
-            color: rgba(255, 255, 255, 0.7);
-            background: rgba(255, 255, 255, 0.05);
-        }
+
 
         /* RIGHT SIDEBAR - SIMPLIFIED */
         .right-sidebar {
             position: fixed;
             right: 8px;
-            top: 50%;
+            top: 65%;
             transform: translateY(-50%);
             z-index: 90;
             display: flex;
@@ -925,6 +953,13 @@
 
         // Create moment card HTML with enhanced comment actions
         function createMomentCardHTML(moment) {
+            // Calculate comment rankings based on engagement score
+            const rankedComments = moment.comments.map((comment, index) => ({
+                ...comment,
+                originalIndex: index,
+                engagementScore: (comment.likes * 1) + (comment.replies * 2) + (comment.shares * 3) + (comment.plays * 1) + (comment.playlists * 5)
+            })).sort((a, b) => b.engagementScore - a.engagementScore);
+
             return `
                 <div class="moment-header ${moment.bgClass}">
                     <div class="header-overlay"></div>
@@ -968,37 +1003,42 @@
                     </div>
                     
                     <div class="comments-list">
-                        ${moment.comments.map((comment, index) => `
-                            <div class="comment ${comment.isTopTake ? 'top-comment' : ''}">
-                                <div class="comment-header">
-                                    <div class="comment-user">
-                                        <div class="user-avatar">${comment.avatar}</div>
-                                        <div class="user-details">
-                                            <div class="username">@${comment.user} ${comment.isTopTake ? '👑' : ''}</div>
-                                            <div class="user-timing">${comment.timing}</div>
+                        ${rankedComments.map((comment, rankIndex) => {
+                            const rank = rankIndex + 1;
+                            const showRank = rank <= 10;
+                            return `
+                                <div class="comment ${comment.isTopTake ? 'top-comment' : ''}">
+                                    ${showRank ? `<div class="comment-rank ${rank <= 3 ? 'top-3' : ''}">${rank}</div>` : ''}
+                                    <div class="comment-header">
+                                        <div class="comment-user">
+                                            <div class="user-avatar">${comment.avatar}</div>
+                                            <div class="user-details">
+                                                <div class="username">@${comment.user} ${comment.isTopTake ? '👑' : ''}</div>
+                                                <div class="user-timing">${comment.timing}</div>
+                                            </div>
                                         </div>
                                     </div>
+                                    <div class="comment-text">${comment.text}</div>
                                     <div class="comment-actions">
-                                        <button class="comment-btn ${comment.isTopTake ? 'top-btn' : ''}" onclick="likeComment(this, ${index})" title="Like this insight">
+                                        <button class="comment-btn ${comment.isTopTake ? 'top-btn' : ''}" onclick="likeComment(this, ${comment.originalIndex})" title="Like this insight">
                                             ❤️ ${comment.likes}
                                         </button>
-                                        <button class="comment-btn" onclick="replyToComment(${index})" title="Reply to this insight">
+                                        <button class="comment-btn" onclick="replyToComment(${comment.originalIndex})" title="Reply to this insight">
                                             💬 ${comment.replies}
                                         </button>
-                                        <button class="comment-btn" onclick="shareComment(${index})" title="Share this insight">
+                                        <button class="comment-btn" onclick="shareComment(${comment.originalIndex})" title="Share this insight">
                                             ↗ ${comment.shares}
                                         </button>
-                                        <button class="comment-btn" onclick="playSnippet(${index})" title="Play this snippet">
+                                        <button class="comment-btn" onclick="playSnippet(${comment.originalIndex})" title="Play this snippet">
                                             ▶️ ${comment.plays}
                                         </button>
-                                        <button class="comment-btn" onclick="addToPlaylist(this, ${index})" title="Add to playlist">
+                                        <button class="comment-btn" onclick="addToPlaylist(this, ${comment.originalIndex})" title="Add to playlist">
                                             ➕ ${comment.playlists}
                                         </button>
                                     </div>
                                 </div>
-                                <div class="comment-text">${comment.text}</div>
-                            </div>
-                        `).join('')}
+                            `;
+                        }).join('')}
                     </div>
                 </div>
             `;
@@ -1307,15 +1347,15 @@
 
         // Welcome messages
         setTimeout(() => {
-            showToast('🎯 Perfect comment actions! Like, reply, share, play, playlist');
+            showToast('🎯 Social actions below comments! Rectangle rankings 1-10');
         }, 1000);
 
         setTimeout(() => {
-            showToast('🎧 Right sidebar: Song actions for discovery & creation');
+            showToast('🏆 Comments ranked by engagement: likes + replies + shares + plays + playlists');
         }, 4000);
 
         setTimeout(() => {
-            showToast('📱 All interactions drive ranking - best take becomes title!');
+            showToast('📱 Clean layout: actions where you expect them!');
         }, 7000);
     </script>
 </body>
