@@ -121,7 +121,7 @@
             overflow: hidden;
         }
 
-        /* Swipe zone - bottom 200px only */
+        /* Swipe zone - bottom 100px only */
         .swipe-zone {
             position: absolute;
             bottom: 0;
@@ -295,7 +295,7 @@
             top: 140px;
             left: 0;
             right: 0;
-            bottom: 220px; /* Stops 220px from bottom to avoid swipe zone */
+            bottom: 115px; /* Stops 115px from bottom to avoid swipe zone */
             background: rgba(0, 0, 0, 0.95);
             backdrop-filter: blur(20px);
         }
@@ -669,7 +669,7 @@
         <div class="nav-hints">
             <div class="nav-hint">
                 <span>⬆️⬇️</span>
-                <span>Swipe moments (bottom area)</span>
+                <span>Swipe moments (bottom 100px)</span>
             </div>
             <div class="nav-hint">
                 <span>📜</span>
@@ -1028,7 +1028,7 @@
             const windowHeight = window.innerHeight;
             const touchY = touch.clientY;
             
-            // Only detect swipes in bottom 200px - be very strict about this
+            // Only detect swipes in bottom 100px - be very strict about this
             if (touchY > windowHeight - 100) {
                 startY = touch.clientY;
                 startX = touch.clientX;
@@ -1283,11 +1283,11 @@
 
         // Welcome messages
         setTimeout(() => {
-            showToast('🎵 Swipe up/down in bottom area for moments!');
+            showToast('🎵 Swipe up/down in bottom 100px for moments!');
         }, 1000);
 
         setTimeout(() => {
-            showToast('📜 Scroll comments freely in middle area');
+            showToast('📜 More space for scrolling comments now');
         }, 4000);
 
         setTimeout(() => {
