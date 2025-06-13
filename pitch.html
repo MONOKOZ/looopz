@@ -975,7 +975,7 @@
 
             /* Emotional section mobile */
             #moment-text {
-                font-size: 28px !important;
+                font-size: 21px !important;
             }
 
             #moment-text span:last-child {
@@ -1752,7 +1752,7 @@
             const momentText = document.getElementById('moment-text');
             if (momentText) {
                 const moment = moments[currentMomentIndex];
-                momentText.innerHTML = `That one <span style="color: var(--primary);">${moment.word}</span> <span style="color: var(--light-gray); font-size: 16px;">${moment.context}</span>`;
+                momentText.innerHTML = `That one <span style="color: var(--primary);">${moment.word}</span> <span style="color: var(--light-gray); font-size: 18px;">${moment.context}</span>`;
                 currentMomentIndex = (currentMomentIndex + 1) % moments.length;
             }
         }
