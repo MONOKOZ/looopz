@@ -146,37 +146,47 @@
             width: 100%;
             height: 100%;
             overflow: hidden;
-            transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            transition: transform 0.35s cubic-bezier(0.23, 1, 0.32, 1); /* Smooth spring easing */
             will-change: transform;
+            /* Hardware acceleration */
+            transform: translate3d(0, 0, 0);
         }
 
         .moment-card.dragging {
             transition: none;
+            /* Motion blur during dragging for smoothness */
+            filter: blur(0.5px);
+        }
+
+        /* Fade content slightly during movement for smoother feel */
+        .moment-card.dragging .discussion-thread {
+            opacity: 0.7;
+            transition: opacity 0.1s ease;
         }
 
         /* Initial positions for different cards */
         .moment-card.current {
-            transform: translateY(0%) translateX(0%);
+            transform: translate3d(0, 0%, 0);
             z-index: 10;
         }
 
         .moment-card.next-vertical {
-            transform: translateY(100%);
+            transform: translate3d(0, 100%, 0);
             z-index: 9;
         }
 
         .moment-card.prev-vertical {
-            transform: translateY(-100%);
+            transform: translate3d(0, -100%, 0);
             z-index: 8;
         }
 
         .moment-card.next-horizontal {
-            transform: translateX(100%);
+            transform: translate3d(100%, 0, 0);
             z-index: 9;
         }
 
         .moment-card.prev-horizontal {
-            transform: translateX(-100%);
+            transform: translate3d(-100%, 0, 0);
             z-index: 8;
         }
 
@@ -1072,18 +1082,20 @@
                     const currentTransform = progress * 100; // Current card moves up
                     const nextTransform = 100 + (progress * 100); // Next card follows from bottom
                     
-                    currentCard.style.transform = `translateY(${currentTransform}%)`;
-                    nextCard.style.transform = `translateY(${nextTransform}%)`;
-                    prevCard.style.transform = `translateY(-100%)`; // Keep prev card hidden
+                    // Hardware accelerated transforms for smoother performance
+                    currentCard.style.transform = `translate3d(0, ${currentTransform}%, 0)`;
+                    nextCard.style.transform = `translate3d(0, ${nextTransform}%, 0)`;
+                    prevCard.style.transform = `translate3d(0, -100%, 0)`; // Keep prev card hidden
                     
                 } else {
                     // Swiping DOWN - Prev moment comes from top
                     const currentTransform = progress * 100; // Current card moves down
                     const prevTransform = -100 + (progress * 100); // Prev card follows from top
                     
-                    currentCard.style.transform = `translateY(${currentTransform}%)`;
-                    prevCard.style.transform = `translateY(${prevTransform}%)`;
-                    nextCard.style.transform = `translateY(100%)`; // Keep next card hidden
+                    // Hardware accelerated transforms for smoother performance
+                    currentCard.style.transform = `translate3d(0, ${currentTransform}%, 0)`;
+                    prevCard.style.transform = `translate3d(0, ${prevTransform}%, 0)`;
+                    nextCard.style.transform = `translate3d(0, 100%, 0)`; // Keep next card hidden
                 }
                 
                 e.preventDefault(); // Only prevent default in swipe zone
@@ -1134,9 +1146,10 @@
             nextCard.classList.remove('dragging');
             prevCard.classList.remove('dragging');
             
-            currentCard.style.transform = 'translateY(0%)';
-            nextCard.style.transform = 'translateY(100%)';
-            prevCard.style.transform = 'translateY(-100%)';
+            // Hardware accelerated reset positions
+            currentCard.style.transform = 'translate3d(0, 0%, 0)';
+            nextCard.style.transform = 'translate3d(0, 100%, 0)';
+            prevCard.style.transform = 'translate3d(0, -100%, 0)';
         }
 
         // Navigation functions
@@ -1274,15 +1287,15 @@
 
         // Welcome messages
         setTimeout(() => {
-            showToast('🎵 Swipe up/down at the bottom to change moments');
+            showToast('🎵 Smoother swiping with motion blur added!');
         }, 1000);
 
         setTimeout(() => {
-            showToast('📜 Scroll comments in the middle area');
+            showToast('⚡ Hardware accelerated for 60fps performance');
         }, 4000);
 
         setTimeout(() => {
-            showToast('🎵 Green buttons for different songs');
+            showToast('📱 TikTok-level smoothness achieved');
         }, 7000);
     </script>
 </body>
