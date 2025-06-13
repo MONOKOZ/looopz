@@ -352,117 +352,129 @@
         }
 
         .comment {
-            padding: 12px 16px;
-            border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+            padding: 18px 60px 18px 16px;
+            border-bottom: none;
             transition: background 0.2s ease;
             position: relative;
         }
 
         .comment:hover {
-            background: rgba(255, 255, 255, 0.02);
+            background: rgba(255, 255, 255, 0.015);
         }
 
         .comment.top-comment {
-            background: linear-gradient(135deg, rgba(29, 185, 84, 0.08), rgba(29, 185, 84, 0.03));
-            border-left: 2px solid #1DB954;
-            border-bottom: 1px solid rgba(29, 185, 84, 0.1);
+            background: linear-gradient(135deg, rgba(29, 185, 84, 0.06), rgba(29, 185, 84, 0.02));
+            border-left: 2px solid rgba(29, 185, 84, 0.3);
         }
 
         .comment-header {
             display: flex;
-            align-items: center;
-            justify-content: space-between;
-            margin-bottom: 6px;
+            align-items: flex-start;
+            margin-bottom: 10px;
             position: relative;
         }
 
         .comment-user {
             display: flex;
-            align-items: center;
-            gap: 8px;
+            align-items: flex-start;
+            gap: 12px;
+            width: 100%;
         }
 
         .user-avatar {
-            width: 24px;
-            height: 24px;
+            width: 32px;
+            height: 32px;
             border-radius: 50%;
             background: linear-gradient(135deg, #667eea, #764ba2);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 9px;
+            font-size: 11px;
             font-weight: 600;
+            flex-shrink: 0;
+        }
+
+        .user-content {
+            flex: 1;
+            min-width: 0;
         }
 
         .user-details {
             display: flex;
-            flex-direction: column;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
         }
 
         .username {
-            font-size: 11px;
+            font-size: 14px;
             font-weight: 600;
             color: rgba(255, 255, 255, 0.95);
         }
 
         .user-timing {
-            font-size: 8px;
-            color: rgba(29, 185, 84, 0.8);
+            font-size: 12px;
+            color: rgba(255, 255, 255, 0.5);
             font-family: monospace;
+        }
+
+        .crown-indicator {
+            color: #1DB954;
+            font-size: 12px;
+        }
+
+        .comment-text {
+            font-size: 14px;
+            line-height: 1.5;
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 12px;
+            word-wrap: break-word;
         }
 
         .comment-actions {
             display: flex;
-            gap: 4px;
-            font-size: 8px;
+            gap: 16px;
+            font-size: 13px;
             margin-top: 8px;
-            padding-top: 8px;
         }
 
         .comment-btn {
-            background: rgba(255, 255, 255, 0.05);
+            background: none;
             border: none;
-            color: rgba(255, 255, 255, 0.6);
-            font-size: 8px;
+            color: rgba(255, 255, 255, 0.5);
+            font-size: 13px;
             cursor: pointer;
-            padding: 2px 4px;
-            border-radius: 8px;
+            padding: 4px 0;
             transition: all 0.2s ease;
             display: flex;
             align-items: center;
-            gap: 2px;
-            min-width: 24px;
-            height: 20px;
-            justify-content: center;
+            gap: 6px;
+            font-weight: 500;
         }
 
         .comment-btn:hover {
-            background: rgba(255, 255, 255, 0.1);
-            color: white;
-            transform: translateY(-1px);
+            color: rgba(255, 255, 255, 0.8);
         }
 
         .comment-btn.liked {
             color: #ff6b6b;
-            background: rgba(255, 107, 107, 0.15);
         }
 
         .comment-btn.top-btn {
-            background: rgba(29, 185, 84, 0.15);
             color: #1DB954;
-            border: 1px solid rgba(29, 185, 84, 0.3);
         }
 
         .comment-btn.playlist-added {
             color: #f39c12;
-            background: rgba(243, 156, 18, 0.15);
         }
 
-        .comment-text {
-            font-size: 12px;
-            line-height: 1.4;
-            color: rgba(255, 255, 255, 0.9);
-            margin-bottom: 8px;
+        .action-icon {
+            font-size: 14px;
+        }
+
+        .action-text {
+            font-size: 13px;
+            font-weight: 500;
         }
 
         .comment-engagement {
@@ -985,29 +997,37 @@
                                     <div class="comment-header">
                                         <div class="comment-user">
                                             <div class="user-avatar">${comment.avatar}</div>
-                                            <div class="user-details">
-                                                <div class="username">@${comment.user} ${comment.isTopTake ? '👑' : ''}</div>
-                                                <div class="user-timing">${comment.timing}</div>
+                                            <div class="user-content">
+                                                <div class="user-details">
+                                                    <div class="username">@${comment.user}</div>
+                                                    ${comment.isTopTake ? '<span class="crown-indicator">👑</span>' : ''}
+                                                    <div class="user-timing">${comment.timing}</div>
+                                                </div>
+                                                <div class="comment-text">${comment.text}</div>
+                                                <div class="comment-actions">
+                                                    <button class="comment-btn ${comment.isTopTake ? 'top-btn' : ''}" onclick="likeComment(this, ${comment.originalIndex})" title="Like this insight">
+                                                        <span class="action-icon">♥</span>
+                                                        <span class="action-text">${comment.likes}</span>
+                                                    </button>
+                                                    <button class="comment-btn" onclick="replyToComment(${comment.originalIndex})" title="Reply to this insight">
+                                                        <span class="action-text">Reply</span>
+                                                        <span class="action-text">(${comment.replies})</span>
+                                                    </button>
+                                                    <button class="comment-btn" onclick="shareComment(${comment.originalIndex})" title="Share this insight">
+                                                        <span class="action-text">Share</span>
+                                                        <span class="action-text">(${comment.shares})</span>
+                                                    </button>
+                                                    <button class="comment-btn" onclick="playSnippet(${comment.originalIndex})" title="Play this snippet">
+                                                        <span class="action-icon">▶</span>
+                                                        <span class="action-text">${comment.plays}</span>
+                                                    </button>
+                                                    <button class="comment-btn" onclick="addToPlaylist(this, ${comment.originalIndex})" title="Add to playlist">
+                                                        <span class="action-icon">+</span>
+                                                        <span class="action-text">${comment.playlists}</span>
+                                                    </button>
+                                                </div>
                                             </div>
                                         </div>
-                                    </div>
-                                    <div class="comment-text">${comment.text}</div>
-                                    <div class="comment-actions">
-                                        <button class="comment-btn ${comment.isTopTake ? 'top-btn' : ''}" onclick="likeComment(this, ${comment.originalIndex})" title="Like this insight">
-                                            ❤️ ${comment.likes}
-                                        </button>
-                                        <button class="comment-btn" onclick="replyToComment(${comment.originalIndex})" title="Reply to this insight">
-                                            💬 ${comment.replies}
-                                        </button>
-                                        <button class="comment-btn" onclick="shareComment(${comment.originalIndex})" title="Share this insight">
-                                            ↗ ${comment.shares}
-                                        </button>
-                                        <button class="comment-btn" onclick="playSnippet(${comment.originalIndex})" title="Play this snippet">
-                                            ▶️ ${comment.plays}
-                                        </button>
-                                        <button class="comment-btn" onclick="addToPlaylist(this, ${comment.originalIndex})" title="Add to playlist">
-                                            ➕ ${comment.playlists}
-                                        </button>
                                     </div>
                                 </div>
                             `;
@@ -1136,9 +1156,10 @@
         // Comment interaction functions
         function likeComment(btn, commentIndex) {
             btn.classList.toggle('liked');
-            const currentCount = parseInt(btn.textContent.match(/\d+/)[0]);
+            const countSpan = btn.querySelector('.action-text');
+            const currentCount = parseInt(countSpan.textContent);
             const newCount = btn.classList.contains('liked') ? currentCount + 1 : currentCount - 1;
-            btn.innerHTML = btn.innerHTML.replace(/\d+/, newCount);
+            countSpan.textContent = newCount;
             
             showToast(btn.classList.contains('liked') ? 
                 'Comment liked! This affects ranking 👑' : 
@@ -1162,9 +1183,10 @@
 
         function addToPlaylist(btn, commentIndex) {
             btn.classList.toggle('playlist-added');
-            const currentCount = parseInt(btn.textContent.match(/\d+/)[0]);
+            const countSpan = btn.querySelector('.action-text:last-child');
+            const currentCount = parseInt(countSpan.textContent);
             const newCount = btn.classList.contains('playlist-added') ? currentCount + 1 : currentCount - 1;
-            btn.innerHTML = btn.innerHTML.replace(/\d+/, newCount);
+            countSpan.textContent = newCount;
             
             showToast(btn.classList.contains('playlist-added') ? 
                 '➕ Added to playlist! Highest value signal 🎵' : 
@@ -1320,7 +1342,7 @@
 
         // Welcome messages
         setTimeout(() => {
-            showToast('🎯 Social actions below comments! Clean layout design');
+            showToast('🎯 Clean comment design inspired by Instagram! Easy to read');
         }, 1000);
 
         setTimeout(() => {
@@ -1328,7 +1350,7 @@
         }, 4000);
 
         setTimeout(() => {
-            showToast('📱 Simplified design: actions where you expect them!');
+            showToast('📱 Generous spacing and clear actions for comfortable reading');
         }, 7000);
     </script>
 </body>
