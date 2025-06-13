@@ -471,8 +471,8 @@
             background: rgba(255, 255, 255, 0.05);
         }
 
-        /* Right Sidebar - MOVES WITH CONTENT */
-        .right-sidebar {
+        /* Sidebar inside each moment card - MOVES WITH CONTENT */
+        .moment-card .right-sidebar {
             position: absolute;
             right: 8px;
             top: 50%;
@@ -483,7 +483,7 @@
             z-index: 15;
         }
 
-        .sidebar-action {
+        .moment-card .sidebar-action {
             width: 48px;
             height: 48px;
             border-radius: 50%;
@@ -500,19 +500,18 @@
             box-shadow: 0 2px 12px rgba(0, 0, 0, 0.3);
         }
 
-        .sidebar-action:hover {
+        .moment-card .sidebar-action:hover {
             background: rgba(255, 255, 255, 0.1);
             transform: scale(1.1);
             border-color: rgba(255, 255, 255, 0.3);
         }
 
-        .sidebar-action.active {
+        .moment-card .sidebar-action.active {
             background: rgba(255, 255, 255, 0.2);
             color: #ff0040;
         }
 
-        /* Large Song Navigation Buttons - MINIMAL WHITE */
-        .song-nav-btn {
+        .moment-card .song-nav-btn {
             width: 48px;
             height: 48px;
             border-radius: 50%;
@@ -529,7 +528,7 @@
             box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
         }
 
-        .song-nav-btn:hover {
+        .moment-card .song-nav-btn:hover {
             background: rgba(255, 255, 255, 0.15);
             transform: scale(1.1);
             border-color: rgba(255, 255, 255, 0.4);
@@ -982,9 +981,9 @@
                     <button class="sidebar-action" onclick="saveDiscussion()">⭐</button>
                     <button class="sidebar-action" onclick="addComment()">💬</button>
                     
-                    <!-- Song Navigation - Minimal White -->
-                    <button class="song-nav-btn" onclick="nextSong()">↑</button>
-                    <button class="song-nav-btn" onclick="prevSong()">↓</button>
+                    <!-- Song Navigation - FIXED ARROW DIRECTIONS -->
+                    <button class="song-nav-btn" onclick="nextSong()">→</button>
+                    <button class="song-nav-btn" onclick="prevSong()">←</button>
                 </div>
             `;
         }
