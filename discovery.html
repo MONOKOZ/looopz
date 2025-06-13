@@ -111,7 +111,7 @@
             opacity: 0.8;
         }
 
-        /* SWIPEABLE MOMENT CONTAINER */
+        /* TIKTOK-STYLE MOMENT CONTAINER */
         .moment-container {
             position: absolute;
             top: 55px;
@@ -119,35 +119,50 @@
             right: 0;
             bottom: 0;
             overflow: hidden;
-            touch-action: pan-x;
         }
 
-        .moments-wrapper {
-            position: relative;
-            width: 100%;
-            height: 500%; /* Hold 5 cards vertically: prev2, prev1, current, next1, next2 */
-            display: flex;
-            flex-direction: column;
-            transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
-            transform: translateY(-40%); /* Start at middle card (current) */
-            will-change: transform; /* Optimize for transforms */
-        }
-
-        .moments-wrapper.dragging {
-            transition: none; /* Disable transition during drag for real-time feel */
-        }
-
+        /* Individual moment cards that can slide independently */
         .moment-card {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
             width: 100%;
-            height: 20%; /* Each card is 1/5 of wrapper height */
-            position: relative;
+            height: 100%;
             overflow: hidden;
-            flex-shrink: 0;
-            border-bottom: 2px solid rgba(29, 185, 84, 0.1); /* Visual separator */
+            transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            will-change: transform;
         }
 
-        .moment-card:last-child {
-            border-bottom: none;
+        .moment-card.dragging {
+            transition: none;
+        }
+
+        /* Initial positions for different cards */
+        .moment-card.current {
+            transform: translateY(0%) translateX(0%);
+            z-index: 10;
+        }
+
+        .moment-card.next-vertical {
+            transform: translateY(100%);
+            z-index: 9;
+        }
+
+        .moment-card.prev-vertical {
+            transform: translateY(-100%);
+            z-index: 8;
+        }
+
+        .moment-card.next-horizontal {
+            transform: translateX(100%);
+            z-index: 9;
+        }
+
+        .moment-card.prev-horizontal {
+            transform: translateX(-100%);
+            z-index: 8;
         }
 
         /* Moment Header with Background */
@@ -432,7 +447,7 @@
             background: rgba(255, 255, 255, 0.05);
         }
 
-        /* Enhanced Right Sidebar - MORE VISIBLE */
+        /* Enhanced Right Sidebar */
         .right-sidebar {
             position: fixed;
             right: 8px;
@@ -569,14 +584,12 @@
             </div>
         </div>
 
-        <!-- SWIPEABLE MOMENT CONTAINER -->
-        <div class="moment-container">
-            <div class="moments-wrapper" id="momentsWrapper">
-                <!-- Multiple moment cards will be here for smooth swiping -->
-            </div>
+        <!-- TIKTOK-STYLE MOMENT CONTAINER -->
+        <div class="moment-container" id="momentContainer">
+            <!-- Individual moment cards will be positioned here -->
         </div>
 
-        <!-- Enhanced Right Sidebar - MORE VISIBLE -->
+        <!-- Enhanced Right Sidebar -->
         <div class="right-sidebar">
             <button class="sidebar-action" onclick="toggleLike()" id="likeBtn">❤️</button>
             <button class="sidebar-action" onclick="shareDiscussion()">📤</button>
@@ -588,19 +601,15 @@
         <div class="nav-hints">
             <div class="nav-hint">
                 <span>⬆️</span>
-                <span>Next moment</span>
+                <span>Next moment from bottom</span>
             </div>
             <div class="nav-hint">
                 <span>⬇️</span>
-                <span>Prev moment</span>
+                <span>Prev moment from top</span>
             </div>
             <div class="nav-hint">
                 <span>⬅️➡️</span>
-                <span>Change song</span>
-            </div>
-            <div class="nav-hint">
-                <span>📜</span>
-                <span>Scroll comments</span>
+                <span>Songs slide horizontally</span>
             </div>
         </div>
 
@@ -619,9 +628,14 @@
         let currentX = 0;
         let isDragging = false;
         let startTime = 0;
-        let baseTransform = -40; // Start at middle card (-40% = middle of 5 cards)
+        let swipeDirection = null; // 'vertical' or 'horizontal'
 
-        // Songs database with background themes and moment backgrounds
+        // Card references
+        let currentCard = null;
+        let nextCard = null;
+        let prevCard = null;
+
+        // Songs database
         const songsDatabase = [
             {
                 title: "Stronger",
@@ -649,12 +663,7 @@
                             { user: "SampleHunter", avatar: "SH", timing: "1:23.0 - 1:45.1", text: "Found the original sample - it's from a 1970s soul track!", likes: 189, shares: 28, plays: 67, replies: 23 },
                             { user: "VocalAnalyst", avatar: "VA", timing: "1:23.5 - 1:44.2", text: "The way he pitched and chopped this is pure genius", likes: 156, shares: 19, plays: 45, replies: 12 },
                             { user: "ChillVibes", avatar: "CV", timing: "1:23.0 - 1:45.2", text: "This part hits different when you're studying at 2AM", likes: 134, shares: 45, plays: 78, replies: 9 },
-                            { user: "BeatMaker", avatar: "BM", timing: "1:23.1 - 1:45.0", text: "I've been trying to recreate this chop for months", likes: 78, shares: 12, plays: 34, replies: 15 },
-                            { user: "AudioEngineer", avatar: "AE", timing: "1:23.3 - 1:44.9", text: "The stereo imaging on this vocal is incredible", likes: 92, shares: 8, plays: 23, replies: 6 },
-                            { user: "WorkoutMotivation", avatar: "WM", timing: "1:23.4 - 1:44.6", text: "Perfect for that final gym rep energy boost", likes: 89, shares: 23, plays: 56, replies: 4 },
-                            { user: "NightOwl", avatar: "NO", timing: "1:23.2 - 1:44.7", text: "3AM vibes when this comes on shuffle", likes: 45, shares: 8, plays: 19, replies: 3 },
-                            { user: "EmotionalListener", avatar: "EL", timing: "1:23.0 - 1:45.0", text: "Literally gives me goosebumps every single time", likes: 56, shares: 12, plays: 28, replies: 7 },
-                            { user: "CasualFan", avatar: "CF", timing: "1:23.4 - 1:44.5", text: "Don't understand music theory but this just hits", likes: 89, shares: 22, plays: 41, replies: 6 }
+                            { user: "BeatMaker", avatar: "BM", timing: "1:23.1 - 1:45.0", text: "I've been trying to recreate this chop for months", likes: 78, shares: 12, plays: 34, replies: 15 }
                         ]
                     },
                     {
@@ -675,8 +684,7 @@
                         comments: [
                             { user: "TensionMaster", avatar: "TM", timing: "0:14.8 - 0:34.9", text: "This is how you create anticipation in music", likes: 142, shares: 23, plays: 45, replies: 19, isTopTake: true },
                             { user: "IntroExpert", avatar: "IE", timing: "0:15.0 - 0:34.5", text: "The way this builds tension is absolutely perfect 🚀", likes: 89, shares: 12, plays: 34, replies: 12 },
-                            { user: "DrumProgrammer", avatar: "DP", timing: "0:15.2 - 0:35.1", text: "That kick pattern in the build is so simple but effective", likes: 67, shares: 10, plays: 28, replies: 8 },
-                            { user: "BuildupKing", avatar: "BK", timing: "0:15.1 - 0:34.8", text: "Every producer should study this intro sequence", likes: 78, shares: 18, plays: 39, replies: 14 }
+                            { user: "DrumProgrammer", avatar: "DP", timing: "0:15.2 - 0:35.1", text: "That kick pattern in the build is so simple but effective", likes: 67, shares: 10, plays: 28, replies: 8 }
                         ]
                     },
                     {
@@ -696,9 +704,7 @@
                         description: "Most viral moment • Peak energy discussion",
                         comments: [
                             { user: "EnergyGuru", avatar: "EG", timing: "2:15.3 - 2:30.0", text: "This drop hits harder than any gym pre-workout", likes: 203, shares: 56, plays: 123, replies: 31, isTopTake: true },
-                            { user: "BeatHunter", avatar: "BH", timing: "2:15.0 - 2:29.8", text: "The way the beat drops here... pure energy ⚡", likes: 156, shares: 34, plays: 89, replies: 24 },
-                            { user: "BassMaster", avatar: "BM", timing: "2:15.1 - 2:30.2", text: "That sub-bass frequency here is insane 🔊", likes: 179, shares: 28, plays: 67, replies: 15 },
-                            { user: "MotivationMode", avatar: "MM", timing: "2:15.2 - 2:29.9", text: "This moment = instant confidence boost", likes: 167, shares: 43, plays: 78, replies: 21 }
+                            { user: "BeatHunter", avatar: "BH", timing: "2:15.0 - 2:29.8", text: "The way the beat drops here... pure energy ⚡", likes: 156, shares: 34, plays: 89, replies: 24 }
                         ]
                     }
                 ]
@@ -726,8 +732,7 @@
                         description: "Kendrick's most discussed flow pattern change",
                         comments: [
                             { user: "FlowMaster", avatar: "FM", timing: "0:22.1 - 0:37.9", text: "This flow switch is absolutely INSANE 🎤", likes: 289, shares: 45, plays: 123, replies: 45, isTopTake: true },
-                            { user: "RapAnalyst", avatar: "RA", timing: "0:22.0 - 0:38.0", text: "The way he breaks rhythm here is pure artistry", likes: 267, shares: 32, plays: 89, replies: 32 },
-                            { user: "LyricNerd", avatar: "LN", timing: "0:22.2 - 0:37.8", text: "This is why Kendrick is the GOAT", likes: 267, shares: 57, plays: 134, replies: 58 }
+                            { user: "RapAnalyst", avatar: "RA", timing: "0:22.0 - 0:38.0", text: "The way he breaks rhythm here is pure artistry", likes: 267, shares: 32, plays: 89, replies: 32 }
                         ]
                     },
                     {
@@ -747,8 +752,7 @@
                         description: "Simple but incredibly effective piano foundation",
                         comments: [
                             { user: "PianoSimple", avatar: "PS", timing: "0:08.0 - 0:23.8", text: "That piano loop is so simple but so effective 🎹", likes: 156, shares: 23, plays: 67, replies: 23, isTopTake: true },
-                            { user: "MinimalBeat", avatar: "MB", timing: "0:08.2 - 0:24.0", text: "Less is more - perfect example", likes: 134, shares: 18, plays: 45, replies: 18 },
-                            { user: "KeyboardWiz", avatar: "KW", timing: "0:07.9 - 0:23.9", text: "This simplicity is genius level production", likes: 155, shares: 26, plays: 78, replies: 21 }
+                            { user: "MinimalBeat", avatar: "MB", timing: "0:08.2 - 0:24.0", text: "Less is more - perfect example", likes: 134, shares: 18, plays: 45, replies: 18 }
                         ]
                     }
                 ]
@@ -782,18 +786,16 @@
             return song.moments[currentMomentIndex];
         }
 
-        // Get adjacent moments for smooth swiping
-        function getAdjacentMoments() {
+        function getNextMoment() {
             const song = getCurrentSong();
-            const totalMoments = song.moments.length;
-            
-            return {
-                prev2: song.moments[(currentMomentIndex - 2 + totalMoments) % totalMoments],
-                prev1: song.moments[(currentMomentIndex - 1 + totalMoments) % totalMoments],
-                current: song.moments[currentMomentIndex],
-                next1: song.moments[(currentMomentIndex + 1) % totalMoments],
-                next2: song.moments[(currentMomentIndex + 2) % totalMoments]
-            };
+            const nextIndex = (currentMomentIndex + 1) % song.moments.length;
+            return song.moments[nextIndex];
+        }
+
+        function getPrevMoment() {
+            const song = getCurrentSong();
+            const prevIndex = (currentMomentIndex - 1 + song.moments.length) % song.moments.length;
+            return song.moments[prevIndex];
         }
 
         // Create moment card HTML
@@ -871,18 +873,30 @@
             `;
         }
 
-        // Render all moment cards for smooth swiping
-        function renderMomentCards() {
-            const adjacentMoments = getAdjacentMoments();
-            const momentsWrapper = document.getElementById('momentsWrapper');
+        // Create and position moment cards - TIKTOK STYLE
+        function createMomentCards() {
+            const container = document.getElementById('momentContainer');
             
-            momentsWrapper.innerHTML = `
-                <div class="moment-card">${createMomentCardHTML(adjacentMoments.prev2)}</div>
-                <div class="moment-card">${createMomentCardHTML(adjacentMoments.prev1)}</div>
-                <div class="moment-card">${createMomentCardHTML(adjacentMoments.current)}</div>
-                <div class="moment-card">${createMomentCardHTML(adjacentMoments.next1)}</div>
-                <div class="moment-card">${createMomentCardHTML(adjacentMoments.next2)}</div>
-            `;
+            // Clear existing cards
+            container.innerHTML = '';
+            
+            // Create current card
+            currentCard = document.createElement('div');
+            currentCard.className = 'moment-card current';
+            currentCard.innerHTML = createMomentCardHTML(getCurrentMoment());
+            container.appendChild(currentCard);
+            
+            // Create next card (starts below, invisible)
+            nextCard = document.createElement('div');
+            nextCard.className = 'moment-card next-vertical';
+            nextCard.innerHTML = createMomentCardHTML(getNextMoment());
+            container.appendChild(nextCard);
+            
+            // Create prev card (starts above, invisible)
+            prevCard = document.createElement('div');
+            prevCard.className = 'moment-card prev-vertical';
+            prevCard.innerHTML = createMomentCardHTML(getPrevMoment());
+            container.appendChild(prevCard);
         }
 
         // Update top player and theme
@@ -903,24 +917,6 @@
             updateSnippetRegion(moment.start, moment.end, 232);
         }
 
-        // Full render (for moment/song changes)
-        function renderCurrentView() {
-            updateTopPlayer();
-            renderMomentCards();
-        }
-
-        // Apply transform to wrapper
-        function applyTransform(percent, instant = false) {
-            const wrapper = document.getElementById('momentsWrapper');
-            wrapper.style.transform = `translateY(${percent}%)`;
-            
-            if (instant) {
-                wrapper.classList.add('dragging');
-            } else {
-                wrapper.classList.remove('dragging');
-            }
-        }
-
         // TIKTOK-STYLE TOUCH HANDLERS
         document.addEventListener('touchstart', (e) => {
             startY = e.touches[0].clientY;
@@ -929,15 +925,22 @@
             currentX = startX;
             isDragging = false;
             startTime = Date.now();
-            
-            // Prepare for real-time dragging
-            const wrapper = document.getElementById('momentsWrapper');
-            wrapper.classList.add('dragging');
+            swipeDirection = null;
         }, { passive: true });
 
         document.addEventListener('touchmove', (e) => {
             if (!isDragging && (Math.abs(e.touches[0].clientY - startY) > 10 || Math.abs(e.touches[0].clientX - startX) > 10)) {
                 isDragging = true;
+                
+                // Determine swipe direction
+                const deltaY = e.touches[0].clientY - startY;
+                const deltaX = e.touches[0].clientX - startX;
+                
+                if (Math.abs(deltaY) > Math.abs(deltaX)) {
+                    swipeDirection = 'vertical';
+                } else {
+                    swipeDirection = 'horizontal';
+                }
             }
             
             if (isDragging) {
@@ -947,28 +950,43 @@
                 const deltaY = currentY - startY;
                 const deltaX = currentX - startX;
                 
-                // Check if this is vertical (moment change) or horizontal (song change)
-                if (Math.abs(deltaY) > Math.abs(deltaX)) {
-                    // Vertical swipe - moment change
-                    // Convert touch delta to transform percentage - INSTAGRAM STYLE
-                    const windowHeight = window.innerHeight - 55; // Account for top player
+                if (swipeDirection === 'vertical') {
+                    // TIKTOK VERTICAL SWIPE - Both cards move together
+                    const windowHeight = window.innerHeight - 55;
+                    const progress = deltaY / windowHeight; // Percentage of swipe
                     
-                    // Key fix: Swipe direction matches content movement
-                    // Swipe UP (negative deltaY) → content moves UP (more negative transform)
-                    // Swipe DOWN (positive deltaY) → content moves DOWN (less negative transform)
-                    const swipePercent = (-deltaY / windowHeight) * 20; // Note the negative!
-                    const newTransform = baseTransform + swipePercent;
+                    // Enable dragging mode
+                    currentCard.classList.add('dragging');
+                    nextCard.classList.add('dragging');
+                    prevCard.classList.add('dragging');
                     
-                    // Limit the transform to show adjacent cards only
-                    const limitedTransform = Math.max(-60, Math.min(-20, newTransform));
+                    if (deltaY < 0) {
+                        // Swiping UP - Next card comes from bottom
+                        const currentY = progress * 100; // Current card moves up
+                        const nextY = 100 + (progress * 100); // Next card follows from bottom
+                        
+                        currentCard.style.transform = `translateY(${currentY}%)`;
+                        nextCard.style.transform = `translateY(${nextY}%)`;
+                        
+                    } else {
+                        // Swiping DOWN - Prev card comes from top
+                        const currentY = progress * 100; // Current card moves down
+                        const prevY = -100 + (progress * 100); // Prev card follows from top
+                        
+                        currentCard.style.transform = `translateY(${currentY}%)`;
+                        prevCard.style.transform = `translateY(${prevY}%)`;
+                    }
                     
-                    applyTransform(limitedTransform, true);
-                    
-                    // Prevent scrolling during moment swiping
                     e.preventDefault();
-                } else if (Math.abs(deltaX) > Math.abs(deltaY)) {
-                    // Horizontal swipe - song change (visual feedback for future implementation)
-                    // For now, just provide visual feedback that horizontal swipe is detected
+                    
+                } else if (swipeDirection === 'horizontal') {
+                    // TIKTOK HORIZONTAL SWIPE - Songs (for future implementation)
+                    const windowWidth = window.innerWidth;
+                    const progress = deltaX / windowWidth;
+                    
+                    // For now, just show visual feedback
+                    currentCard.style.transform = `translateX(${progress * 20}%)`;
+                    
                     e.preventDefault();
                 }
             }
@@ -984,42 +1002,50 @@
                 // Determine if swipe should complete
                 const threshold = isQuickSwipe ? 50 : 100;
                 
-                if (Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > threshold) {
-                    // Vertical moment change - INSTAGRAM STYLE
+                if (swipeDirection === 'vertical' && Math.abs(deltaY) > threshold) {
                     if (deltaY < 0) {
-                        // Swiped UP = Next moment (content slides UP from bottom)
+                        // Completed UP swipe - Go to next moment
                         nextMoment();
-                        showToast('⬆️ Next moment');
+                        showToast('⬆️ Next moment from bottom!');
                     } else {
-                        // Swiped DOWN = Previous moment (content slides DOWN from top)
+                        // Completed DOWN swipe - Go to prev moment
                         prevMoment();
-                        showToast('⬇️ Previous moment');
+                        showToast('⬇️ Previous moment from top!');
                     }
-                } else if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > threshold) {
-                    // Horizontal song change - INSTAGRAM STYLE
+                } else if (swipeDirection === 'horizontal' && Math.abs(deltaX) > threshold) {
                     if (deltaX < 0) {
-                        // Swiped LEFT = Next song (content slides LEFT from right)
+                        // Completed LEFT swipe - Next song
                         nextSong();
-                        showToast('⬅️ Next song');
+                        showToast('⬅️ Next song from right!');
                     } else {
-                        // Swiped RIGHT = Previous song (content slides RIGHT from left)
+                        // Completed RIGHT swipe - Previous song
                         prevSong();
-                        showToast('➡️ Previous song');
+                        showToast('➡️ Previous song from left!');
                     }
                 } else {
-                    // Didn't meet threshold - snap back to original position
-                    applyTransform(baseTransform, false);
-                    showToast('💫 Snap back');
+                    // Didn't meet threshold - snap back
+                    resetCardPositions();
+                    showToast('💫 Snap back - swipe further!');
                 }
             }
             
             // Reset drag state
             isDragging = false;
-            const wrapper = document.getElementById('momentsWrapper');
-            wrapper.classList.remove('dragging');
+            swipeDirection = null;
         }, { passive: true });
 
-        // Navigation functions with smooth transitions
+        // Reset cards to original positions
+        function resetCardPositions() {
+            currentCard.classList.remove('dragging');
+            nextCard.classList.remove('dragging');
+            prevCard.classList.remove('dragging');
+            
+            currentCard.style.transform = 'translateY(0%) translateX(0%)';
+            nextCard.style.transform = 'translateY(100%)';
+            prevCard.style.transform = 'translateY(-100%)';
+        }
+
+        // Navigation functions
         function nextMoment() {
             const song = getCurrentSong();
             if (currentMomentIndex < song.moments.length - 1) {
@@ -1027,8 +1053,8 @@
             } else {
                 currentMomentIndex = 0; // Loop back to first moment
             }
-            renderCurrentView();
-            applyTransform(baseTransform, false);
+            updateTopPlayer();
+            createMomentCards();
         }
 
         function prevMoment() {
@@ -1038,8 +1064,8 @@
             } else {
                 currentMomentIndex = song.moments.length - 1; // Loop to last moment
             }
-            renderCurrentView();
-            applyTransform(baseTransform, false);
+            updateTopPlayer();
+            createMomentCards();
         }
 
         function nextSong() {
@@ -1049,8 +1075,8 @@
                 currentSongIndex = 0; // Loop back to first song
             }
             currentMomentIndex = 0; // Reset to first moment of new song
-            renderCurrentView();
-            applyTransform(baseTransform, false);
+            updateTopPlayer();
+            createMomentCards();
         }
 
         function prevSong() {
@@ -1060,8 +1086,8 @@
                 currentSongIndex = songsDatabase.length - 1; // Loop to last song
             }
             currentMomentIndex = 0; // Reset to first moment of new song
-            renderCurrentView();
-            applyTransform(baseTransform, false);
+            updateTopPlayer();
+            createMomentCards();
         }
 
         // Interaction functions
@@ -1145,12 +1171,16 @@
         });
 
         // Initialize
-        renderCurrentView();
-        applyTransform(baseTransform, true);
+        function init() {
+            updateTopPlayer();
+            createMomentCards();
+        }
+
+        init();
 
         // Welcome messages
         setTimeout(() => {
-            showToast('🎵 Instagram-style swiping! Drag to see content slide');
+            showToast('🎵 Real TikTok-style swiping! Next card slides from bottom');
         }, 1000);
 
         setTimeout(() => {
@@ -1158,7 +1188,7 @@
         }, 4000);
 
         setTimeout(() => {
-            showToast('⬅️➡️ Swipe LEFT/RIGHT → Songs slide horizontally');
+            showToast('💡 Both cards visible during swipe - just like TikTok!');
         }, 7000);
     </script>
 </body>
