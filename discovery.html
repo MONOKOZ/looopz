@@ -1070,8 +1070,9 @@
                 currentY = e.touches[0].clientY;
                 const deltaY = currentY - startY;
                 
-                // TIKTOK VERTICAL SWIPE - Both cards move together
-                const progress = deltaY / (windowHeight - 55); // Percentage of swipe
+                // FIXED: Progress calculation relative to swipe zone (100px), not full window
+                const swipeZoneHeight = 100;
+                const progress = deltaY / swipeZoneHeight; // Percentage relative to swipe zone
                 
                 // Enable dragging mode
                 currentCard.classList.add('dragging');
@@ -1112,8 +1113,8 @@
                 const swipeTime = Date.now() - startTime;
                 const isQuickSwipe = swipeTime < 300;
                 
-                // Determine if swipe should complete
-                const threshold = isQuickSwipe ? 50 : 100;
+                // FIXED: Smaller threshold for smaller swipe zone
+                const threshold = isQuickSwipe ? 25 : 40; // Reduced from 50/100 to 25/40
                 
                 if (Math.abs(deltaY) > threshold) {
                     if (deltaY < 0) {
@@ -1283,15 +1284,15 @@
 
         // Welcome messages
         setTimeout(() => {
-            showToast('🎵 Swipe up/down in bottom 100px for moments!');
+            showToast('🎵 Swipe in the very bottom area for moments!');
         }, 1000);
 
         setTimeout(() => {
-            showToast('📜 More space for scrolling comments now');
+            showToast('📜 Comments now have much more scroll space');
         }, 4000);
 
         setTimeout(() => {
-            showToast('🎵 Use green buttons for song navigation');
+            showToast('👆 Try swiping at the very bottom edge');
         }, 7000);
     </script>
 </body>
