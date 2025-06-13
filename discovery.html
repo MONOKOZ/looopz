@@ -1050,18 +1050,6 @@
                 return; // Let comments scroll normally
             }
             
-            // Additional check: make sure we're still in the bottom area
-            const touch = e.touches[0];
-            const windowHeight = window.innerHeight;
-            const touchY = touch.clientY;
-            
-            // If touch moved out of swipe zone, deactivate
-            if (touchY <= windowHeight - 100) {
-                swipeZone.classList.remove('active');
-                isDragging = false;
-                return;
-            }
-            
             if (!isDragging && Math.abs(e.touches[0].clientY - startY) > 10) {
                 isDragging = true;
             }
@@ -1070,9 +1058,9 @@
                 currentY = e.touches[0].clientY;
                 const deltaY = currentY - startY;
                 
-                // FIXED: Progress calculation relative to swipe zone (100px), not full window
-                const swipeZoneHeight = 100;
-                const progress = deltaY / swipeZoneHeight; // Percentage relative to swipe zone
+                // SIMPLE: Just use the actual finger movement distance
+                const windowHeight = window.innerHeight;
+                const progress = deltaY / windowHeight; // Simple percentage based on finger movement
                 
                 // Enable dragging mode
                 currentCard.classList.add('dragging');
@@ -1081,19 +1069,21 @@
                 
                 if (deltaY < 0) {
                     // Swiping UP - Next moment comes from bottom
-                    const currentY = progress * 100; // Current card moves up
-                    const nextY = 100 + (progress * 100); // Next card follows from bottom
+                    const currentTransform = progress * 100; // Current card moves up
+                    const nextTransform = 100 + (progress * 100); // Next card follows from bottom
                     
-                    currentCard.style.transform = `translateY(${currentY}%)`;
-                    nextCard.style.transform = `translateY(${nextY}%)`;
+                    currentCard.style.transform = `translateY(${currentTransform}%)`;
+                    nextCard.style.transform = `translateY(${nextTransform}%)`;
+                    prevCard.style.transform = `translateY(-100%)`; // Keep prev card hidden
                     
                 } else {
                     // Swiping DOWN - Prev moment comes from top
-                    const currentY = progress * 100; // Current card moves down
-                    const prevY = -100 + (progress * 100); // Prev card follows from top
+                    const currentTransform = progress * 100; // Current card moves down
+                    const prevTransform = -100 + (progress * 100); // Prev card follows from top
                     
-                    currentCard.style.transform = `translateY(${currentY}%)`;
-                    prevCard.style.transform = `translateY(${prevY}%)`;
+                    currentCard.style.transform = `translateY(${currentTransform}%)`;
+                    prevCard.style.transform = `translateY(${prevTransform}%)`;
+                    nextCard.style.transform = `translateY(100%)`; // Keep next card hidden
                 }
                 
                 e.preventDefault(); // Only prevent default in swipe zone
@@ -1113,23 +1103,23 @@
                 const swipeTime = Date.now() - startTime;
                 const isQuickSwipe = swipeTime < 300;
                 
-                // FIXED: Smaller threshold for smaller swipe zone
-                const threshold = isQuickSwipe ? 25 : 40; // Reduced from 50/100 to 25/40
+                // SIMPLE: Use reasonable thresholds for any swipe
+                const threshold = isQuickSwipe ? 50 : 80;
                 
                 if (Math.abs(deltaY) > threshold) {
                     if (deltaY < 0) {
                         // Completed UP swipe - Go to next moment
                         nextMoment();
-                        showToast('⬆️ Next moment from bottom!');
+                        showToast('⬆️ Next moment!');
                     } else {
                         // Completed DOWN swipe - Go to prev moment
                         prevMoment();
-                        showToast('⬇️ Previous moment from top!');
+                        showToast('⬇️ Previous moment!');
                     }
                 } else {
                     // Didn't meet threshold - snap back
                     resetCardPositions();
-                    showToast('💫 Swipe further to switch!');
+                    showToast('💫 Snap back');
                 }
             }
             
@@ -1284,15 +1274,15 @@
 
         // Welcome messages
         setTimeout(() => {
-            showToast('🎵 Swipe in the very bottom area for moments!');
+            showToast('🎵 Swipe up/down at the bottom to change moments');
         }, 1000);
 
         setTimeout(() => {
-            showToast('📜 Comments now have much more scroll space');
+            showToast('📜 Scroll comments in the middle area');
         }, 4000);
 
         setTimeout(() => {
-            showToast('👆 Try swiping at the very bottom edge');
+            showToast('🎵 Green buttons for different songs');
         }, 7000);
     </script>
 </body>
