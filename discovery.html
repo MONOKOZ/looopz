@@ -1058,9 +1058,9 @@
                 currentY = e.touches[0].clientY;
                 const deltaY = currentY - startY;
                 
-                // SIMPLE: Just use the actual finger movement distance
-                const windowHeight = window.innerHeight;
-                const progress = deltaY / windowHeight; // Simple percentage based on finger movement
+                // FIXED: Account for top player (55px) in the movement calculation
+                const availableHeight = window.innerHeight - 55; // Subtract top player height
+                const progress = deltaY / availableHeight; // Movement relative to available space
                 
                 // Enable dragging mode
                 currentCard.classList.add('dragging');
