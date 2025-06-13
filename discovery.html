@@ -34,7 +34,7 @@
         .song-kendrick { --song-bg: linear-gradient(135deg, #667eea, #764ba2); }
         .song-weeknd { --song-bg: linear-gradient(135deg, #f093fb, #f5576c); }
 
-        /* Compact Top Player */
+        /* Compact Top Player - FIXED */
         .top-player {
             position: fixed;
             top: 0;
@@ -111,7 +111,7 @@
             opacity: 0.8;
         }
 
-        /* Full Screen Moment Card */
+        /* SWIPEABLE MOMENT CONTAINER */
         .moment-container {
             position: absolute;
             top: 55px;
@@ -119,24 +119,28 @@
             right: 0;
             bottom: 0;
             overflow: hidden;
+            touch-action: pan-y;
+        }
+
+        .moments-wrapper {
+            position: relative;
+            width: 500%; /* Hold 5 cards: prev2, prev1, current, next1, next2 */
+            height: 100%;
+            display: flex;
+            transition: transform 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+            transform: translateX(-40%); /* Start at middle card (current) */
+        }
+
+        .moments-wrapper.dragging {
+            transition: none; /* Disable transition during drag for real-time feel */
         }
 
         .moment-card {
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            bottom: 0;
-            transition: transform 0.3s ease;
+            width: 20%; /* Each card is 1/5 of wrapper width */
+            height: 100%;
+            position: relative;
             overflow: hidden;
-        }
-
-        .moment-card.next {
-            transform: translateY(100%);
-        }
-
-        .moment-card.prev {
-            transform: translateY(-100%);
+            flex-shrink: 0;
         }
 
         /* Moment Header with Background */
@@ -254,7 +258,7 @@
             top: 140px;
             left: 0;
             right: 0;
-            bottom: 100px;
+            bottom: 0;
             background: rgba(0, 0, 0, 0.95);
             backdrop-filter: blur(20px);
         }
@@ -421,63 +425,46 @@
             background: rgba(255, 255, 255, 0.05);
         }
 
-        /* Navigation Zone */
-        .nav-zone {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 100px;
-            background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
-            pointer-events: none;
-            z-index: 50;
-        }
-
-        .swipe-area {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 80px;
-            pointer-events: all;
-            z-index: 51;
-        }
-
-        /* Right Sidebar */
+        /* Enhanced Right Sidebar - MORE VISIBLE */
         .right-sidebar {
             position: fixed;
-            right: 10px;
+            right: 8px;
             top: 50%;
             transform: translateY(-50%);
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 12px;
             z-index: 99;
         }
 
         .sidebar-action {
-            width: 36px;
-            height: 36px;
+            width: 44px;
+            height: 44px;
             border-radius: 50%;
-            background: rgba(0, 0, 0, 0.7);
-            backdrop-filter: blur(10px);
-            border: 1px solid rgba(255, 255, 255, 0.15);
+            background: rgba(0, 0, 0, 0.85);
+            backdrop-filter: blur(15px);
+            border: 2px solid rgba(255, 255, 255, 0.25);
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 12px;
+            font-size: 16px;
             color: white;
             cursor: pointer;
             transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
         }
 
         .sidebar-action:hover {
-            background: rgba(255, 255, 255, 0.15);
-            transform: scale(1.1);
+            background: rgba(255, 255, 255, 0.2);
+            transform: scale(1.15);
+            border-color: rgba(255, 255, 255, 0.4);
+            box-shadow: 0 6px 25px rgba(0, 0, 0, 0.6);
         }
 
         .sidebar-action.active {
-            background: rgba(29, 185, 84, 0.8);
+            background: rgba(29, 185, 84, 0.9);
+            border-color: #1DB954;
+            transform: scale(1.1);
         }
 
         /* Navigation Hints */
@@ -562,7 +549,7 @@
 </head>
 <body>
     <div class="app-container" id="appContainer">
-        <!-- Compact Top Player -->
+        <!-- Compact Top Player - STAYS FIXED -->
         <div class="top-player">
             <div class="player-content">
                 <div class="mini-art" id="miniArt">🎵</div>
@@ -575,18 +562,14 @@
             </div>
         </div>
 
-        <!-- Full Screen Moment Container -->
+        <!-- SWIPEABLE MOMENT CONTAINER -->
         <div class="moment-container">
-            <div class="moment-card" id="momentCard">
-                <!-- Moment content will be loaded here -->
+            <div class="moments-wrapper" id="momentsWrapper">
+                <!-- Multiple moment cards will be here for smooth swiping -->
             </div>
         </div>
 
-        <!-- Navigation Zone -->
-        <div class="nav-zone"></div>
-        <div class="swipe-area" id="swipeArea"></div>
-
-        <!-- Right Sidebar -->
+        <!-- Enhanced Right Sidebar - MORE VISIBLE -->
         <div class="right-sidebar">
             <button class="sidebar-action" onclick="toggleLike()" id="likeBtn">❤️</button>
             <button class="sidebar-action" onclick="shareDiscussion()">📤</button>
@@ -597,20 +580,20 @@
         <!-- Navigation Hints -->
         <div class="nav-hints">
             <div class="nav-hint">
-                <span>↑</span>
+                <span>⬆️</span>
                 <span>Next moment</span>
             </div>
             <div class="nav-hint">
-                <span>←</span>
+                <span>⬅️</span>
                 <span>Next song</span>
             </div>
             <div class="nav-hint">
-                <span>→</span>
+                <span>➡️</span>
                 <span>Prev song</span>
             </div>
             <div class="nav-hint">
-                <span>Scroll</span>
-                <span>Comments</span>
+                <span>📜</span>
+                <span>Scroll comments</span>
             </div>
         </div>
 
@@ -621,6 +604,15 @@
     <script>
         let currentMomentIndex = 0;
         let currentSongIndex = 0;
+
+        // Touch/swipe state
+        let startY = 0;
+        let startX = 0;
+        let currentY = 0;
+        let currentX = 0;
+        let isDragging = false;
+        let startTime = 0;
+        let baseTransform = -40; // Start at middle card (-40% = middle of 5 cards)
 
         // Songs database with background themes and moment backgrounds
         const songsDatabase = [
@@ -783,26 +775,23 @@
             return song.moments[currentMomentIndex];
         }
 
-        // Render current moment
-        function renderMoment() {
-            const moment = getCurrentMoment();
+        // Get adjacent moments for smooth swiping
+        function getAdjacentMoments() {
             const song = getCurrentSong();
+            const totalMoments = song.moments.length;
             
-            // Update app container theme
-            const appContainer = document.getElementById('appContainer');
-            appContainer.className = `app-container ${song.themeClass}`;
-            
-            // Update top player
-            document.getElementById('songInfo').textContent = `${song.title} - ${song.artist}`;
-            document.getElementById('currentRegion').textContent = `${formatTime(moment.start)} - ${formatTime(moment.end)}`;
-            document.getElementById('miniArt').textContent = song.albumArt;
-            
-            // Update progress bar region (assuming 3:52 song duration for demo)
-            updateSnippetRegion(moment.start, moment.end, 232);
+            return {
+                prev2: song.moments[(currentMomentIndex - 2 + totalMoments) % totalMoments],
+                prev1: song.moments[(currentMomentIndex - 1 + totalMoments) % totalMoments],
+                current: song.moments[currentMomentIndex],
+                next1: song.moments[(currentMomentIndex + 1) % totalMoments],
+                next2: song.moments[(currentMomentIndex + 2) % totalMoments]
+            };
+        }
 
-            // Render moment card
-            const momentCard = document.getElementById('momentCard');
-            momentCard.innerHTML = `
+        // Create moment card HTML
+        function createMomentCardHTML(moment) {
+            return `
                 <div class="moment-header ${moment.bgClass}">
                     <div class="header-overlay"></div>
                     <div class="header-content">
@@ -875,7 +864,144 @@
             `;
         }
 
-        // Navigation functions
+        // Render all moment cards for smooth swiping
+        function renderMomentCards() {
+            const adjacentMoments = getAdjacentMoments();
+            const momentsWrapper = document.getElementById('momentsWrapper');
+            
+            momentsWrapper.innerHTML = `
+                <div class="moment-card">${createMomentCardHTML(adjacentMoments.prev2)}</div>
+                <div class="moment-card">${createMomentCardHTML(adjacentMoments.prev1)}</div>
+                <div class="moment-card">${createMomentCardHTML(adjacentMoments.current)}</div>
+                <div class="moment-card">${createMomentCardHTML(adjacentMoments.next1)}</div>
+                <div class="moment-card">${createMomentCardHTML(adjacentMoments.next2)}</div>
+            `;
+        }
+
+        // Update top player and theme
+        function updateTopPlayer() {
+            const moment = getCurrentMoment();
+            const song = getCurrentSong();
+            
+            // Update app container theme
+            const appContainer = document.getElementById('appContainer');
+            appContainer.className = `app-container ${song.themeClass}`;
+            
+            // Update top player
+            document.getElementById('songInfo').textContent = `${song.title} - ${song.artist}`;
+            document.getElementById('currentRegion').textContent = `${formatTime(moment.start)} - ${formatTime(moment.end)}`;
+            document.getElementById('miniArt').textContent = song.albumArt;
+            
+            // Update progress bar region (assuming 3:52 song duration for demo)
+            updateSnippetRegion(moment.start, moment.end, 232);
+        }
+
+        // Full render (for moment/song changes)
+        function renderCurrentView() {
+            updateTopPlayer();
+            renderMomentCards();
+        }
+
+        // Apply transform to wrapper
+        function applyTransform(percent, instant = false) {
+            const wrapper = document.getElementById('momentsWrapper');
+            wrapper.style.transform = `translateX(${percent}%)`;
+            
+            if (instant) {
+                wrapper.classList.add('dragging');
+            } else {
+                wrapper.classList.remove('dragging');
+            }
+        }
+
+        // TIKTOK-STYLE TOUCH HANDLERS
+        document.addEventListener('touchstart', (e) => {
+            startY = e.touches[0].clientY;
+            startX = e.touches[0].clientX;
+            currentY = startY;
+            currentX = startX;
+            isDragging = false;
+            startTime = Date.now();
+            
+            // Prepare for real-time dragging
+            const wrapper = document.getElementById('momentsWrapper');
+            wrapper.classList.add('dragging');
+        }, { passive: true });
+
+        document.addEventListener('touchmove', (e) => {
+            if (!isDragging && (Math.abs(e.touches[0].clientY - startY) > 10 || Math.abs(e.touches[0].clientX - startX) > 10)) {
+                isDragging = true;
+            }
+            
+            if (isDragging) {
+                currentY = e.touches[0].clientY;
+                currentX = e.touches[0].clientX;
+                
+                const deltaY = currentY - startY;
+                const deltaX = currentX - startX;
+                
+                // Check if this is horizontal (song change) or vertical (moment change)
+                if (Math.abs(deltaX) > Math.abs(deltaY)) {
+                    // Horizontal swipe - song change (not implemented in this version)
+                    // You can add horizontal sliding between songs here
+                } else {
+                    // Vertical swipe - moment change
+                    // Convert touch delta to transform percentage
+                    const windowHeight = window.innerHeight - 55; // Account for top player
+                    const swipePercent = (deltaY / windowHeight) * 20; // 20% per full swipe
+                    const newTransform = baseTransform + swipePercent;
+                    
+                    applyTransform(newTransform, true);
+                }
+                
+                // Prevent scrolling during moment swiping
+                if (Math.abs(deltaY) > 30) {
+                    e.preventDefault();
+                }
+            }
+        }, { passive: false });
+
+        document.addEventListener('touchend', (e) => {
+            if (isDragging) {
+                const deltaY = currentY - startY;
+                const deltaX = currentX - startX;
+                const swipeTime = Date.now() - startTime;
+                const isQuickSwipe = swipeTime < 300;
+                
+                // Determine if swipe should complete
+                const threshold = isQuickSwipe ? 50 : 100;
+                
+                if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > threshold) {
+                    // Horizontal song change
+                    if (deltaX > 0) {
+                        prevSong();
+                        showToast('➡️ Previous song');
+                    } else {
+                        nextSong();
+                        showToast('⬅️ Next song');
+                    }
+                } else if (Math.abs(deltaY) > threshold) {
+                    // Vertical moment change
+                    if (deltaY > 0) {
+                        prevMoment();
+                        showToast('⬇️ Previous moment');
+                    } else {
+                        nextMoment();
+                        showToast('⬆️ Next moment');
+                    }
+                } else {
+                    // Snap back to original position
+                    applyTransform(baseTransform, false);
+                }
+            }
+            
+            // Reset drag state
+            isDragging = false;
+            const wrapper = document.getElementById('momentsWrapper');
+            wrapper.classList.remove('dragging');
+        }, { passive: true });
+
+        // Navigation functions with smooth transitions
         function nextMoment() {
             const song = getCurrentSong();
             if (currentMomentIndex < song.moments.length - 1) {
@@ -883,8 +1009,8 @@
             } else {
                 currentMomentIndex = 0; // Loop back to first moment
             }
-            renderMoment();
-            showToast(`Next moment: ${getCurrentMoment().topTake.text.substring(0, 30)}...`);
+            renderCurrentView();
+            applyTransform(baseTransform, false);
         }
 
         function prevMoment() {
@@ -894,8 +1020,8 @@
             } else {
                 currentMomentIndex = song.moments.length - 1; // Loop to last moment
             }
-            renderMoment();
-            showToast(`Previous moment: ${getCurrentMoment().topTake.text.substring(0, 30)}...`);
+            renderCurrentView();
+            applyTransform(baseTransform, false);
         }
 
         function nextSong() {
@@ -905,9 +1031,8 @@
                 currentSongIndex = 0; // Loop back to first song
             }
             currentMomentIndex = 0; // Reset to first moment of new song
-            renderMoment();
-            const song = getCurrentSong();
-            showToast(`Next song: ${song.title} by ${song.artist}`);
+            renderCurrentView();
+            applyTransform(baseTransform, false);
         }
 
         function prevSong() {
@@ -917,9 +1042,8 @@
                 currentSongIndex = songsDatabase.length - 1; // Loop to last song
             }
             currentMomentIndex = 0; // Reset to first moment of new song
-            renderMoment();
-            const song = getCurrentSong();
-            showToast(`Previous song: ${song.title} by ${song.artist}`);
+            renderCurrentView();
+            applyTransform(baseTransform, false);
         }
 
         // Interaction functions
@@ -982,62 +1106,20 @@
             }, 2000);
         }
 
-        // Enhanced touch navigation with separate zones
-        let startY = 0;
-        let startX = 0;
-        let isInSwipeZone = false;
-
-        // Track touches in swipe area vs comment area
-        document.addEventListener('touchstart', (e) => {
-            startY = e.touches[0].clientY;
-            startX = e.touches[0].clientX;
-            
-            // Check if touch started in bottom swipe zone
-            const windowHeight = window.innerHeight;
-            isInSwipeZone = startY > windowHeight - 100;
-        });
-
-        document.addEventListener('touchend', (e) => {
-            const endY = e.changedTouches[0].clientY;
-            const endX = e.changedTouches[0].clientX;
-            
-            const deltaY = startY - endY;
-            const deltaX = startX - endX;
-            
-            // Horizontal swipes (song switching) work from anywhere
-            if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
-                if (deltaX > 0) {
-                    nextSong();
-                    showToast('⬅️ Swiped left - Next song');
-                } else {
-                    prevSong();
-                    showToast('➡️ Swiped right - Previous song');
-                }
-                return; // Don't process vertical swipes if horizontal detected
-            }
-            
-            // Vertical swipes (moment switching) only work in bottom swipe zone
-            if (isInSwipeZone && Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > 50) {
-                if (deltaY > 0) {
-                    nextMoment();
-                    showToast('⬆️ Swiped up - Next moment');
-                } else {
-                    prevMoment();
-                    showToast('⬇️ Swiped down - Previous moment');
-                }
-            }
-        });
-
         // Keyboard navigation
         document.addEventListener('keydown', (e) => {
             if (e.key === 'ArrowUp') {
                 nextMoment();
+                showToast('⬆️ Next moment');
             } else if (e.key === 'ArrowDown') {
                 prevMoment();
+                showToast('⬇️ Previous moment');
             } else if (e.key === 'ArrowLeft') {
                 nextSong();
+                showToast('⬅️ Next song');
             } else if (e.key === 'ArrowRight') {
                 prevSong();
+                showToast('➡️ Previous song');
             } else if (e.key === ' ') {
                 e.preventDefault();
                 showToast('Playing moment...');
@@ -1045,11 +1127,12 @@
         });
 
         // Initialize
-        renderMoment();
+        renderCurrentView();
+        applyTransform(baseTransform, true);
 
         // Welcome messages
         setTimeout(() => {
-            showToast('🎵 Each title = top community take on that moment');
+            showToast('🎵 TikTok-style swiping! Drag to see previews');
         }, 1000);
 
         setTimeout(() => {
@@ -1057,7 +1140,7 @@
         }, 4000);
 
         setTimeout(() => {
-            showToast('💡 Swipe ← → for songs, ↑ from bottom for moments');
+            showToast('💡 Swipe ← → for songs, ↑ ↓ for moments');
         }, 7000);
     </script>
 </body>
