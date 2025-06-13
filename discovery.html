@@ -367,13 +367,6 @@
             border-left: 2px solid rgba(29, 185, 84, 0.3);
         }
 
-        .comment-header {
-            display: flex;
-            align-items: flex-start;
-            margin-bottom: 10px;
-            position: relative;
-        }
-
         .comment-user {
             display: flex;
             align-items: flex-start;
@@ -994,40 +987,36 @@
                         ${rankedComments.map((comment) => {
                             return `
                                 <div class="comment ${comment.isTopTake ? 'top-comment' : ''}">
-                                    <div class="comment-header">
-                                        <div class="comment-user">
-                                            <div class="user-avatar">${comment.avatar}</div>
-                                            <div class="user-content">
-                                                <div class="user-details">
-                                                    <div class="username">@${comment.user}</div>
-                                                    ${comment.isTopTake ? '<span class="crown-indicator">👑</span>' : ''}
-                                                    <div class="user-timing">${comment.timing}</div>
-                                                </div>
-                                                <div class="comment-text">${comment.text}</div>
-                                                <div class="comment-actions">
-                                                    <button class="comment-btn ${comment.isTopTake ? 'top-btn' : ''}" onclick="likeComment(this, ${comment.originalIndex})" title="Like this insight">
-                                                        <span class="action-icon">♥</span>
-                                                        <span class="action-text">${comment.likes}</span>
-                                                    </button>
-                                                    <button class="comment-btn" onclick="replyToComment(${comment.originalIndex})" title="Reply to this insight">
-                                                        <span class="action-text">Reply</span>
-                                                        <span class="action-text">(${comment.replies})</span>
-                                                    </button>
-                                                    <button class="comment-btn" onclick="shareComment(${comment.originalIndex})" title="Share this insight">
-                                                        <span class="action-text">Share</span>
-                                                        <span class="action-text">(${comment.shares})</span>
-                                                    </button>
-                                                    <button class="comment-btn" onclick="playSnippet(${comment.originalIndex})" title="Play this snippet">
-                                                        <span class="action-icon">▶</span>
-                                                        <span class="action-text">${comment.plays}</span>
-                                                    </button>
-                                                    <button class="comment-btn" onclick="addToPlaylist(this, ${comment.originalIndex})" title="Add to playlist">
-                                                        <span class="action-icon">+</span>
-                                                        <span class="action-text">${comment.playlists}</span>
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
+                                    <div class="user-avatar-section">
+                                        <div class="user-avatar">${comment.avatar}</div>
+                                    </div>
+                                    <div class="user-details">
+                                        <div class="username">@${comment.user}</div>
+                                        ${comment.isTopTake ? '<span class="crown-indicator">👑</span>' : ''}
+                                        <div class="user-timing">${comment.timing}</div>
+                                    </div>
+                                    <div class="comment-text">${comment.text}</div>
+                                    <div class="comment-actions">
+                                        <button class="comment-btn ${comment.isTopTake ? 'top-btn' : ''}" onclick="likeComment(this, ${comment.originalIndex})" title="Like this insight">
+                                            <span class="action-icon">♥</span>
+                                            <span class="action-text">${comment.likes}</span>
+                                        </button>
+                                        <button class="comment-btn" onclick="replyToComment(${comment.originalIndex})" title="Reply to this insight">
+                                            <span class="action-text">Reply</span>
+                                            <span class="action-text">(${comment.replies})</span>
+                                        </button>
+                                        <button class="comment-btn" onclick="shareComment(${comment.originalIndex})" title="Share this insight">
+                                            <span class="action-text">Share</span>
+                                            <span class="action-text">(${comment.shares})</span>
+                                        </button>
+                                        <button class="comment-btn" onclick="playSnippet(${comment.originalIndex})" title="Play this snippet">
+                                            <span class="action-icon">▶</span>
+                                            <span class="action-text">${comment.plays}</span>
+                                        </button>
+                                        <button class="comment-btn" onclick="addToPlaylist(this, ${comment.originalIndex})" title="Add to playlist">
+                                            <span class="action-icon">+</span>
+                                            <span class="action-text">${comment.playlists}</span>
+                                        </button>
                                     </div>
                                 </div>
                             `;
