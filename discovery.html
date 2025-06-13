@@ -118,18 +118,29 @@
             overflow: hidden;
         }
 
-        /* Swipe zone - TOP AREA (comments section) */
-        .swipe-zone {
+        /* Swipe zones - SPLIT: top for down swipe, bottom for up swipe */
+        .swipe-zone-up {
             position: absolute;
-            top: 140px; /* Start after header */
+            bottom: 0;
             left: 0;
             right: 0;
-            bottom: 115px; /* End before nav hints */
+            height: 150px; /* Bottom area for UP swipes */
             z-index: 50;
             pointer-events: none;
         }
 
-        .swipe-zone.active {
+        .swipe-zone-down {
+            position: absolute;
+            top: 140px; /* After header */
+            left: 0;
+            right: 0;
+            height: 80px; /* Only until "title updates" line */
+            z-index: 50;
+            pointer-events: none;
+        }
+
+        .swipe-zone-up.active,
+        .swipe-zone-down.active {
             pointer-events: all;
         }
 
@@ -693,6 +704,7 @@
         let currentX = 0;
         let isDragging = false;
         let startTime = 0;
+        let swipeDirection = null; // 'up' or 'down'
 
         // Card references
         let currentCard = null;
@@ -1056,31 +1068,44 @@
             updateSnippetRegion(moment.start, moment.end, 232);
         }
 
-        // REVERSED SWIPE LOGIC - COMMENTS AREA
+        // FIXED SWIPE ZONES AND DIRECTIONS
         document.addEventListener('touchstart', (e) => {
             const touch = e.touches[0];
             const windowHeight = window.innerHeight;
             const touchY = touch.clientY;
             
-            // Detect swipes in comments area (140px from top to 115px from bottom)
-            if (touchY > 140 && touchY < windowHeight - 115) {
+            // BOTTOM ZONE for UP swipes (like TikTok)
+            if (touchY > windowHeight - 150) {
                 startY = touch.clientY;
                 startX = touch.clientX;
                 currentY = startY;
                 currentX = startX;
                 isDragging = false;
                 startTime = Date.now();
+                swipeDirection = 'up';
                 
-                // Activate swipe zone
-                document.getElementById('swipeZone').classList.add('active');
+                document.getElementById('swipeZoneUp').classList.add('active');
+            }
+            // TOP ZONE for DOWN swipes (until "title updates" line)
+            else if (touchY > 140 && touchY < 220) {
+                startY = touch.clientY;
+                startX = touch.clientX;
+                currentY = startY;
+                currentX = startX;
+                isDragging = false;
+                startTime = Date.now();
+                swipeDirection = 'down';
+                
+                document.getElementById('swipeZoneDown').classList.add('active');
             }
         }, { passive: true });
 
         document.addEventListener('touchmove', (e) => {
-            const swipeZone = document.getElementById('swipeZone');
+            const swipeZoneUp = document.getElementById('swipeZoneUp');
+            const swipeZoneDown = document.getElementById('swipeZoneDown');
             
-            // STRICT CHECK: Only proceed if we're in active swipe zone
-            if (!swipeZone.classList.contains('active')) {
+            // Only proceed if we're in an active swipe zone
+            if (!swipeZoneUp.classList.contains('active') && !swipeZoneDown.classList.contains('active')) {
                 return; // Let comments scroll normally
             }
             
@@ -1092,8 +1117,8 @@
                 currentY = e.touches[0].clientY;
                 const deltaY = currentY - startY;
                 
-                // Movement calculation for comments area
-                const availableHeight = window.innerHeight - 55 - 140 - 115; // Subtract top player, header, and nav
+                // Movement calculation
+                const availableHeight = window.innerHeight - 55;
                 const progress = deltaY / availableHeight;
                 
                 // Enable dragging mode
@@ -1101,25 +1126,24 @@
                 nextCard.classList.add('dragging');
                 prevCard.classList.add('dragging');
                 
-                if (deltaY < 0) {
-                    // Swiping UP - Previous moment comes from TOP (BOTH CARDS VISIBLE)
-                    const currentTransform = progress * 100; // Current card moves up (negative)
-                    const prevTransform = -100 + (progress * 100); // Previous card follows from top
+                // FIXED DIRECTIONS: UP = next, DOWN = previous
+                if (swipeDirection === 'up' && deltaY < 0) {
+                    // UP SWIPE from bottom = NEXT moment (card comes from bottom)
+                    const currentTransform = progress * 100;
+                    const nextTransform = 100 + (progress * 100);
                     
-                    // BOTH CARDS VISIBLE: Current moving up, Previous sliding down from top
-                    currentCard.style.transform = `translate3d(0, ${currentTransform}%, 0)`;
-                    prevCard.style.transform = `translate3d(0, ${prevTransform}%, 0)`;
-                    nextCard.style.transform = `translate3d(0, 100%, 0)`; // Keep next card hidden below
-                    
-                } else {
-                    // Swiping DOWN - Next moment comes from BOTTOM (BOTH CARDS VISIBLE)
-                    const currentTransform = progress * 100; // Current card moves down (positive)
-                    const nextTransform = 100 + (progress * 100); // Next card follows from bottom
-                    
-                    // BOTH CARDS VISIBLE: Current moving down, Next sliding up from bottom
                     currentCard.style.transform = `translate3d(0, ${currentTransform}%, 0)`;
                     nextCard.style.transform = `translate3d(0, ${nextTransform}%, 0)`;
-                    prevCard.style.transform = `translate3d(0, -100%, 0)`; // Keep prev card hidden above
+                    prevCard.style.transform = `translate3d(0, -100%, 0)`;
+                    
+                } else if (swipeDirection === 'down' && deltaY > 0) {
+                    // DOWN SWIPE from top = PREVIOUS moment (card comes from top)
+                    const currentTransform = progress * 100;
+                    const prevTransform = -100 + (progress * 100);
+                    
+                    currentCard.style.transform = `translate3d(0, ${currentTransform}%, 0)`;
+                    prevCard.style.transform = `translate3d(0, ${prevTransform}%, 0)`;
+                    nextCard.style.transform = `translate3d(0, 100%, 0)`;
                 }
                 
                 e.preventDefault();
@@ -1127,9 +1151,10 @@
         }, { passive: false });
 
         document.addEventListener('touchend', (e) => {
-            const swipeZone = document.getElementById('swipeZone');
+            const swipeZoneUp = document.getElementById('swipeZoneUp');
+            const swipeZoneDown = document.getElementById('swipeZoneDown');
             
-            if (!swipeZone.classList.contains('active')) {
+            if (!swipeZoneUp.classList.contains('active') && !swipeZoneDown.classList.contains('active')) {
                 return;
             }
             
@@ -1141,23 +1166,26 @@
                 const threshold = isQuickSwipe ? 50 : 80;
                 
                 if (Math.abs(deltaY) > threshold) {
-                    if (deltaY < 0) {
-                        // Swiped UP = Previous moment (card came from top)
-                        prevMoment();
-                        showToast('⬆️ Previous moment!');
-                    } else {
-                        // Swiped DOWN = Next moment (card came from bottom)
+                    if (swipeDirection === 'up' && deltaY < 0) {
+                        // UP swipe = NEXT moment
                         nextMoment();
-                        showToast('⬇️ Next moment!');
+                        showToast('⬆️ Next moment!');
+                    } else if (swipeDirection === 'down' && deltaY > 0) {
+                        // DOWN swipe = PREVIOUS moment
+                        prevMoment();
+                        showToast('⬇️ Previous moment!');
                     }
                 } else {
                     resetCardPositions();
-                    showToast('💫 Swipe further to switch');
+                    showToast('💫 Swipe further');
                 }
             }
             
+            // Reset all states
             isDragging = false;
-            swipeZone.classList.remove('active');
+            swipeDirection = null;
+            swipeZoneUp.classList.remove('active');
+            swipeZoneDown.classList.remove('active');
         }, { passive: true });
 
         // Reset cards to original positions
