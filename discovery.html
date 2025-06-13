@@ -1,0 +1,1064 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Musical Moment Discussions</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Arial, sans-serif;
+            background: #0f0f23;
+            color: white;
+            overflow: hidden;
+            height: 100vh;
+        }
+
+        .app-container {
+            position: relative;
+            height: 100vh;
+            max-width: 430px;
+            margin: 0 auto;
+            background: var(--song-bg, linear-gradient(135deg, #0f0f23, #1a1a2e));
+            overflow: hidden;
+            transition: background 0.5s ease;
+        }
+
+        /* Song Themes */
+        .song-kanye { --song-bg: linear-gradient(135deg, #ff6b6b, #4ecdc4); }
+        .song-kendrick { --song-bg: linear-gradient(135deg, #667eea, #764ba2); }
+        .song-weeknd { --song-bg: linear-gradient(135deg, #f093fb, #f5576c); }
+
+        /* Compact Top Player */
+        .top-player {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: rgba(0, 0, 0, 0.95);
+            backdrop-filter: blur(20px);
+            padding: 25px 12px 4px;
+            z-index: 100;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .player-content {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            max-width: 430px;
+            margin: 0 auto;
+            margin-bottom: 6px;
+        }
+
+        .mini-art {
+            width: 18px;
+            height: 18px;
+            border-radius: 3px;
+            background: var(--song-bg);
+            font-size: 9px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .song-meta {
+            flex: 1;
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.7);
+            overflow: hidden;
+            white-space: nowrap;
+            text-overflow: ellipsis;
+        }
+
+        .current-region {
+            font-size: 11px;
+            font-weight: 600;
+            color: #1DB954;
+            font-family: monospace;
+            flex-shrink: 0;
+        }
+
+        /* Progress Bar with Region */
+        .progress-container {
+            height: 3px;
+            background: rgba(255, 255, 255, 0.15);
+            border-radius: 2px;
+            position: relative;
+            margin-bottom: 3px;
+        }
+
+        .progress-fill {
+            height: 100%;
+            background: rgba(255, 255, 255, 0.3);
+            border-radius: 2px;
+            width: 35%;
+            transition: width 0.1s linear;
+        }
+
+        .snippet-region {
+            position: absolute;
+            top: 0;
+            height: 100%;
+            background: #1DB954;
+            border-radius: 2px;
+            transition: all 0.3s ease;
+            opacity: 0.8;
+        }
+
+        /* Full Screen Moment Card */
+        .moment-container {
+            position: absolute;
+            top: 55px;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            overflow: hidden;
+        }
+
+        .moment-card {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            transition: transform 0.3s ease;
+            overflow: hidden;
+        }
+
+        .moment-card.next {
+            transform: translateY(100%);
+        }
+
+        .moment-card.prev {
+            transform: translateY(-100%);
+        }
+
+        /* Moment Header with Background */
+        .moment-header {
+            position: relative;
+            height: 140px;
+            background: var(--moment-bg, var(--song-bg));
+            background-size: cover;
+            background-position: center;
+            overflow: hidden;
+        }
+
+        .header-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background: linear-gradient(135deg, rgba(0, 0, 0, 0.7), rgba(0, 0, 0, 0.4));
+            backdrop-filter: blur(1px);
+        }
+
+        .header-content {
+            position: relative;
+            z-index: 2;
+            padding: 12px 16px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+
+        .moment-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: white;
+            line-height: 1.3;
+            text-shadow: 0 1px 3px rgba(0, 0, 0, 0.8);
+            margin-bottom: 4px;
+        }
+
+        .title-badge {
+            background: linear-gradient(135deg, #1DB954, #1ed760);
+            color: white;
+            font-size: 7px;
+            padding: 2px 5px;
+            border-radius: 6px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.3px;
+            display: inline-block;
+            margin-bottom: 4px;
+        }
+
+        .title-author {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.8);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .title-user-avatar {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 7px;
+            font-weight: 600;
+            flex-shrink: 0;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+
+        .engagement-score {
+            color: #1DB954;
+            font-weight: 600;
+        }
+
+        .moment-meta {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .moment-timing {
+            font-size: 14px;
+            font-weight: 600;
+            color: #1DB954;
+            font-family: monospace;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+        }
+
+        .moment-stats {
+            display: flex;
+            gap: 10px;
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.9);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+        }
+
+        .stat-item {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        /* Discussion Thread */
+        .discussion-thread {
+            position: absolute;
+            top: 140px;
+            left: 0;
+            right: 0;
+            bottom: 100px;
+            background: rgba(0, 0, 0, 0.95);
+            backdrop-filter: blur(20px);
+        }
+
+        .thread-intro {
+            padding: 8px 16px;
+            background: rgba(29, 185, 84, 0.06);
+            border-bottom: 1px solid rgba(29, 185, 84, 0.15);
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            backdrop-filter: blur(10px);
+        }
+
+        .top-take-indicator {
+            font-size: 9px;
+            color: #1DB954;
+            margin-bottom: 3px;
+            display: flex;
+            align-items: center;
+            gap: 3px;
+        }
+
+        .crown-icon {
+            font-size: 8px;
+            animation: glow 2s ease-in-out infinite;
+        }
+
+        .thread-description {
+            font-size: 10px;
+            color: rgba(255, 255, 255, 0.7);
+            margin-bottom: 3px;
+        }
+
+        .thread-participants {
+            font-size: 9px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+
+        /* Scrollable Comments */
+        .comments-list {
+            height: 100%;
+            overflow-y: auto;
+            padding: 8px 0 20px;
+            scroll-behavior: smooth;
+        }
+
+        .comment {
+            padding: 12px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.02);
+            transition: background 0.2s ease;
+        }
+
+        .comment:hover {
+            background: rgba(255, 255, 255, 0.02);
+        }
+
+        .comment.top-comment {
+            background: linear-gradient(135deg, rgba(29, 185, 84, 0.08), rgba(29, 185, 84, 0.03));
+            border-left: 2px solid #1DB954;
+            border-bottom: 1px solid rgba(29, 185, 84, 0.1);
+        }
+
+        .comment-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+
+        .comment-user {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .user-avatar {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 9px;
+            font-weight: 600;
+        }
+
+        .user-details {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .username {
+            font-size: 11px;
+            font-weight: 600;
+            color: rgba(255, 255, 255, 0.95);
+        }
+
+        .user-timing {
+            font-size: 8px;
+            color: rgba(29, 185, 84, 0.8);
+            font-family: monospace;
+        }
+
+        .comment-actions {
+            display: flex;
+            gap: 6px;
+        }
+
+        .comment-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: none;
+            color: rgba(255, 255, 255, 0.6);
+            font-size: 9px;
+            cursor: pointer;
+            padding: 3px 6px;
+            border-radius: 10px;
+            transition: all 0.2s ease;
+            display: flex;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .comment-btn:hover {
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+        }
+
+        .comment-btn.liked {
+            color: #ff6b6b;
+            background: rgba(255, 107, 107, 0.1);
+        }
+
+        .comment-btn.top-btn {
+            background: rgba(29, 185, 84, 0.15);
+            color: #1DB954;
+            border: 1px solid rgba(29, 185, 84, 0.3);
+        }
+
+        .comment-text {
+            font-size: 12px;
+            line-height: 1.4;
+            color: rgba(255, 255, 255, 0.9);
+            margin-bottom: 6px;
+        }
+
+        .comment-engagement {
+            display: flex;
+            gap: 10px;
+            font-size: 9px;
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .engagement-item {
+            cursor: pointer;
+            transition: color 0.2s ease;
+            padding: 2px 4px;
+            border-radius: 8px;
+        }
+
+        .engagement-item:hover {
+            color: rgba(255, 255, 255, 0.7);
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        /* Navigation Zone */
+        .nav-zone {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 100px;
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.8), transparent);
+            pointer-events: none;
+            z-index: 50;
+        }
+
+        .swipe-area {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 80px;
+            pointer-events: all;
+            z-index: 51;
+        }
+
+        /* Right Sidebar */
+        .right-sidebar {
+            position: fixed;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            z-index: 99;
+        }
+
+        .sidebar-action {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.15);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .sidebar-action:hover {
+            background: rgba(255, 255, 255, 0.15);
+            transform: scale(1.1);
+        }
+
+        .sidebar-action.active {
+            background: rgba(29, 185, 84, 0.8);
+        }
+
+        /* Navigation Hints */
+        .nav-hints {
+            position: fixed;
+            bottom: 10px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 12px;
+            font-size: 8px;
+            color: rgba(255, 255, 255, 0.3);
+            z-index: 60;
+            pointer-events: none;
+        }
+
+        .nav-hint {
+            display: flex;
+            align-items: center;
+            gap: 3px;
+            padding: 4px 8px;
+            background: rgba(0, 0, 0, 0.6);
+            border-radius: 12px;
+            backdrop-filter: blur(10px);
+        }
+
+        /* Toast */
+        .toast {
+            position: fixed;
+            top: 65px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 8px 14px;
+            border-radius: 18px;
+            font-size: 11px;
+            font-weight: 500;
+            backdrop-filter: blur(10px);
+            opacity: 0;
+            transition: all 0.3s ease;
+            z-index: 200;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .toast.show {
+            opacity: 1;
+            transform: translateX(-50%) translateY(8px);
+        }
+
+        /* Animations */
+        @keyframes glow {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        /* Scrollbar */
+        .comments-list::-webkit-scrollbar {
+            width: 2px;
+        }
+
+        .comments-list::-webkit-scrollbar-track {
+            background: rgba(255, 255, 255, 0.05);
+        }
+
+        .comments-list::-webkit-scrollbar-thumb {
+            background: rgba(29, 185, 84, 0.3);
+            border-radius: 2px;
+        }
+
+        .comments-list::-webkit-scrollbar-thumb:hover {
+            background: rgba(29, 185, 84, 0.5);
+        }
+
+        /* Background Images for Moments */
+        .bg-vocal { background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200"><defs><linearGradient id="a" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%23ff6b6b"/><stop offset="100%" style="stop-color:%234ecdc4"/></linearGradient></defs><rect width="400" height="200" fill="url(%23a)"/><circle cx="100" cy="60" r="30" fill="rgba(255,255,255,0.1)"/><circle cx="300" cy="140" r="40" fill="rgba(255,255,255,0.05)"/></svg>'); }
+        .bg-intro { background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200"><defs><linearGradient id="b" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%236a5acd"/><stop offset="100%" style="stop-color:%2320b2aa"/></linearGradient></defs><rect width="400" height="200" fill="url(%23b)"/><polygon points="50,150 150,50 250,100 350,20" fill="rgba(255,255,255,0.1)"/></svg>'); }
+        .bg-drop { background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200"><defs><linearGradient id="c" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%23ff4757"/><stop offset="100%" style="stop-color:%23ffa502"/></linearGradient></defs><rect width="400" height="200" fill="url(%23c)"/><path d="M0,100 Q100,50 200,100 T400,100 L400,200 L0,200 Z" fill="rgba(255,255,255,0.1)"/></svg>'); }
+        .bg-flow { background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200"><defs><linearGradient id="d" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%237b68ee"/><stop offset="100%" style="stop-color:%23da70d6"/></linearGradient></defs><rect width="400" height="200" fill="url(%23d)"/><ellipse cx="200" cy="100" rx="150" ry="60" fill="rgba(255,255,255,0.08)"/></svg>'); }
+        .bg-piano { background-image: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200"><defs><linearGradient id="e" x1="0%" y1="0%" x2="100%" y2="100%"><stop offset="0%" style="stop-color:%23667eea"/><stop offset="100%" style="stop-color:%23764ba2"/></linearGradient></defs><rect width="400" height="200" fill="url(%23e)"/><rect x="50" y="50" width="300" height="100" rx="10" fill="rgba(255,255,255,0.1)"/></svg>'); }
+    </style>
+</head>
+<body>
+    <div class="app-container" id="appContainer">
+        <!-- Compact Top Player -->
+        <div class="top-player">
+            <div class="player-content">
+                <div class="mini-art" id="miniArt">🎵</div>
+                <div class="song-meta" id="songInfo">Stronger - Kanye West</div>
+                <div class="current-region" id="currentRegion">1:23 - 1:45</div>
+            </div>
+            <div class="progress-container">
+                <div class="progress-fill" id="progressFill"></div>
+                <div class="snippet-region" id="snippetRegion"></div>
+            </div>
+        </div>
+
+        <!-- Full Screen Moment Container -->
+        <div class="moment-container">
+            <div class="moment-card" id="momentCard">
+                <!-- Moment content will be loaded here -->
+            </div>
+        </div>
+
+        <!-- Navigation Zone -->
+        <div class="nav-zone"></div>
+        <div class="swipe-area" id="swipeArea"></div>
+
+        <!-- Right Sidebar -->
+        <div class="right-sidebar">
+            <button class="sidebar-action" onclick="toggleLike()" id="likeBtn">❤️</button>
+            <button class="sidebar-action" onclick="shareDiscussion()">📤</button>
+            <button class="sidebar-action" onclick="saveDiscussion()">📚</button>
+            <button class="sidebar-action" onclick="addComment()">💬</button>
+        </div>
+
+        <!-- Navigation Hints -->
+        <div class="nav-hints">
+            <div class="nav-hint">
+                <span>↑</span>
+                <span>Next moment</span>
+            </div>
+            <div class="nav-hint">
+                <span>←</span>
+                <span>Next song</span>
+            </div>
+            <div class="nav-hint">
+                <span>→</span>
+                <span>Prev song</span>
+            </div>
+            <div class="nav-hint">
+                <span>Scroll</span>
+                <span>Comments</span>
+            </div>
+        </div>
+
+        <!-- Toast -->
+        <div class="toast" id="toast"></div>
+    </div>
+
+    <script>
+        let currentMomentIndex = 0;
+        let currentSongIndex = 0;
+
+        // Songs database with background themes and moment backgrounds
+        const songsDatabase = [
+            {
+                title: "Stronger",
+                artist: "Kanye West",
+                albumArt: "🎵",
+                themeClass: "song-kanye",
+                moments: [
+                    {
+                        start: 83, // 1:23
+                        end: 105, // 1:45
+                        bgClass: "bg-vocal",
+                        topTake: {
+                            text: "This vocal chop gives me chills every single time 🔥",
+                            author: "ProducerEars",
+                            avatar: "PE",
+                            engagementScore: 547
+                        },
+                        discoveredBy: 15,
+                        totalLikes: 547,
+                        totalShares: 89,
+                        totalPlays: 1203,
+                        description: "Title changes based on highest engagement • Live community ranking",
+                        comments: [
+                            { user: "ProducerEars", avatar: "PE", timing: "1:23.2 - 1:44.8", text: "This vocal chop gives me chills every single time 🔥", likes: 247, shares: 34, plays: 89, replies: 8, isTopTake: true },
+                            { user: "SampleHunter", avatar: "SH", timing: "1:23.0 - 1:45.1", text: "Found the original sample - it's from a 1970s soul track!", likes: 189, shares: 28, plays: 67, replies: 23 },
+                            { user: "VocalAnalyst", avatar: "VA", timing: "1:23.5 - 1:44.2", text: "The way he pitched and chopped this is pure genius", likes: 156, shares: 19, plays: 45, replies: 12 },
+                            { user: "ChillVibes", avatar: "CV", timing: "1:23.0 - 1:45.2", text: "This part hits different when you're studying at 2AM", likes: 134, shares: 45, plays: 78, replies: 9 },
+                            { user: "BeatMaker", avatar: "BM", timing: "1:23.1 - 1:45.0", text: "I've been trying to recreate this chop for months", likes: 78, shares: 12, plays: 34, replies: 15 },
+                            { user: "AudioEngineer", avatar: "AE", timing: "1:23.3 - 1:44.9", text: "The stereo imaging on this vocal is incredible", likes: 92, shares: 8, plays: 23, replies: 6 },
+                            { user: "WorkoutMotivation", avatar: "WM", timing: "1:23.4 - 1:44.6", text: "Perfect for that final gym rep energy boost", likes: 89, shares: 23, plays: 56, replies: 4 },
+                            { user: "NightOwl", avatar: "NO", timing: "1:23.2 - 1:44.7", text: "3AM vibes when this comes on shuffle", likes: 45, shares: 8, plays: 19, replies: 3 },
+                            { user: "EmotionalListener", avatar: "EL", timing: "1:23.0 - 1:45.0", text: "Literally gives me goosebumps every single time", likes: 56, shares: 12, plays: 28, replies: 7 },
+                            { user: "CasualFan", avatar: "CF", timing: "1:23.4 - 1:44.5", text: "Don't understand music theory but this just hits", likes: 89, shares: 22, plays: 41, replies: 6 }
+                        ]
+                    },
+                    {
+                        start: 15, // 0:15
+                        end: 35, // 0:35
+                        bgClass: "bg-intro",
+                        topTake: {
+                            text: "This is how you create anticipation in music",
+                            author: "TensionMaster",
+                            avatar: "TM",
+                            engagementScore: 298
+                        },
+                        discoveredBy: 8,
+                        totalLikes: 298,
+                        totalShares: 45,
+                        totalPlays: 567,
+                        description: "Community agrees: perfect tension building technique",
+                        comments: [
+                            { user: "TensionMaster", avatar: "TM", timing: "0:14.8 - 0:34.9", text: "This is how you create anticipation in music", likes: 142, shares: 23, plays: 45, replies: 19, isTopTake: true },
+                            { user: "IntroExpert", avatar: "IE", timing: "0:15.0 - 0:34.5", text: "The way this builds tension is absolutely perfect 🚀", likes: 89, shares: 12, plays: 34, replies: 12 },
+                            { user: "DrumProgrammer", avatar: "DP", timing: "0:15.2 - 0:35.1", text: "That kick pattern in the build is so simple but effective", likes: 67, shares: 10, plays: 28, replies: 8 },
+                            { user: "BuildupKing", avatar: "BK", timing: "0:15.1 - 0:34.8", text: "Every producer should study this intro sequence", likes: 78, shares: 18, plays: 39, replies: 14 }
+                        ]
+                    },
+                    {
+                        start: 135, // 2:15
+                        end: 150, // 2:30
+                        bgClass: "bg-drop",
+                        topTake: {
+                            text: "This drop hits harder than any gym pre-workout",
+                            author: "EnergyGuru",
+                            avatar: "EG",
+                            engagementScore: 672
+                        },
+                        discoveredBy: 15,
+                        totalLikes: 672,
+                        totalShares: 98,
+                        totalPlays: 1456,
+                        description: "Most viral moment • Peak energy discussion",
+                        comments: [
+                            { user: "EnergyGuru", avatar: "EG", timing: "2:15.3 - 2:30.0", text: "This drop hits harder than any gym pre-workout", likes: 203, shares: 56, plays: 123, replies: 31, isTopTake: true },
+                            { user: "BeatHunter", avatar: "BH", timing: "2:15.0 - 2:29.8", text: "The way the beat drops here... pure energy ⚡", likes: 156, shares: 34, plays: 89, replies: 24 },
+                            { user: "BassMaster", avatar: "BM", timing: "2:15.1 - 2:30.2", text: "That sub-bass frequency here is insane 🔊", likes: 179, shares: 28, plays: 67, replies: 15 },
+                            { user: "MotivationMode", avatar: "MM", timing: "2:15.2 - 2:29.9", text: "This moment = instant confidence boost", likes: 167, shares: 43, plays: 78, replies: 21 }
+                        ]
+                    }
+                ]
+            },
+            {
+                title: "HUMBLE.",
+                artist: "Kendrick Lamar",
+                albumArt: "🔥",
+                themeClass: "song-kendrick",
+                moments: [
+                    {
+                        start: 22, // 0:22
+                        end: 38, // 0:38
+                        bgClass: "bg-flow",
+                        topTake: {
+                            text: "This flow switch is absolutely INSANE 🎤",
+                            author: "FlowMaster",
+                            avatar: "FM",
+                            engagementScore: 823
+                        },
+                        discoveredBy: 18,
+                        totalLikes: 823,
+                        totalShares: 134,
+                        totalPlays: 1876,
+                        description: "Kendrick's most discussed flow pattern change",
+                        comments: [
+                            { user: "FlowMaster", avatar: "FM", timing: "0:22.1 - 0:37.9", text: "This flow switch is absolutely INSANE 🎤", likes: 289, shares: 45, plays: 123, replies: 45, isTopTake: true },
+                            { user: "RapAnalyst", avatar: "RA", timing: "0:22.0 - 0:38.0", text: "The way he breaks rhythm here is pure artistry", likes: 267, shares: 32, plays: 89, replies: 32 },
+                            { user: "LyricNerd", avatar: "LN", timing: "0:22.2 - 0:37.8", text: "This is why Kendrick is the GOAT", likes: 267, shares: 57, plays: 134, replies: 58 }
+                        ]
+                    },
+                    {
+                        start: 8, // 0:08
+                        end: 24, // 0:24
+                        bgClass: "bg-piano",
+                        topTake: {
+                            text: "That piano loop is so simple but so effective 🎹",
+                            author: "PianoSimple",
+                            avatar: "PS",
+                            engagementScore: 445
+                        },
+                        discoveredBy: 11,
+                        totalLikes: 445,
+                        totalShares: 67,
+                        totalPlays: 892,
+                        description: "Simple but incredibly effective piano foundation",
+                        comments: [
+                            { user: "PianoSimple", avatar: "PS", timing: "0:08.0 - 0:23.8", text: "That piano loop is so simple but so effective 🎹", likes: 156, shares: 23, plays: 67, replies: 23, isTopTake: true },
+                            { user: "MinimalBeat", avatar: "MB", timing: "0:08.2 - 0:24.0", text: "Less is more - perfect example", likes: 134, shares: 18, plays: 45, replies: 18 },
+                            { user: "KeyboardWiz", avatar: "KW", timing: "0:07.9 - 0:23.9", text: "This simplicity is genius level production", likes: 155, shares: 26, plays: 78, replies: 21 }
+                        ]
+                    }
+                ]
+            }
+        ];
+
+        // Format time
+        function formatTime(seconds) {
+            const minutes = Math.floor(seconds / 60);
+            const remainingSeconds = seconds % 60;
+            return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+        }
+
+        // Update snippet region on progress bar
+        function updateSnippetRegion(start, end, duration) {
+            const snippetRegion = document.getElementById('snippetRegion');
+            const startPercent = (start / duration) * 100;
+            const widthPercent = ((end - start) / duration) * 100;
+            
+            snippetRegion.style.left = startPercent + '%';
+            snippetRegion.style.width = widthPercent + '%';
+        }
+
+        // Get current song and moment
+        function getCurrentSong() {
+            return songsDatabase[currentSongIndex];
+        }
+
+        function getCurrentMoment() {
+            const song = getCurrentSong();
+            return song.moments[currentMomentIndex];
+        }
+
+        // Render current moment
+        function renderMoment() {
+            const moment = getCurrentMoment();
+            const song = getCurrentSong();
+            
+            // Update app container theme
+            const appContainer = document.getElementById('appContainer');
+            appContainer.className = `app-container ${song.themeClass}`;
+            
+            // Update top player
+            document.getElementById('songInfo').textContent = `${song.title} - ${song.artist}`;
+            document.getElementById('currentRegion').textContent = `${formatTime(moment.start)} - ${formatTime(moment.end)}`;
+            document.getElementById('miniArt').textContent = song.albumArt;
+            
+            // Update progress bar region (assuming 3:52 song duration for demo)
+            updateSnippetRegion(moment.start, moment.end, 232);
+
+            // Render moment card
+            const momentCard = document.getElementById('momentCard');
+            momentCard.innerHTML = `
+                <div class="moment-header ${moment.bgClass}">
+                    <div class="header-overlay"></div>
+                    <div class="header-content">
+                        <div>
+                            <div class="title-badge">TOP TAKE</div>
+                            <div class="moment-title">${moment.topTake.text}</div>
+                            <div class="title-author">
+                                <div class="title-user-avatar">${moment.topTake.avatar}</div>
+                                <span>by @${moment.topTake.author} <span class="engagement-score">• ${moment.topTake.engagementScore} engagement</span></span>
+                            </div>
+                        </div>
+                        <div class="moment-meta">
+                            <div class="moment-timing">${formatTime(moment.start)} - ${formatTime(moment.end)}</div>
+                            <div class="moment-stats">
+                                <div class="stat-item">
+                                    <span>👥</span>
+                                    <span>${moment.discoveredBy}</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span>❤️</span>
+                                    <span>${moment.totalLikes}</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span>📤</span>
+                                    <span>${moment.totalShares}</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="discussion-thread">
+                    <div class="thread-intro">
+                        <div class="top-take-indicator">
+                            <span class="crown-icon">👑</span>
+                            <span>Title updates with highest engagement</span>
+                        </div>
+                        <div class="thread-description">${moment.description}</div>
+                        <div class="thread-participants">${moment.comments.length} participants • ${moment.totalPlays} total plays</div>
+                    </div>
+                    
+                    <div class="comments-list">
+                        ${moment.comments.map(comment => `
+                            <div class="comment ${comment.isTopTake ? 'top-comment' : ''}">
+                                <div class="comment-header">
+                                    <div class="comment-user">
+                                        <div class="user-avatar">${comment.avatar}</div>
+                                        <div class="user-details">
+                                            <div class="username">@${comment.user} ${comment.isTopTake ? '👑' : ''}</div>
+                                            <div class="user-timing">${comment.timing}</div>
+                                        </div>
+                                    </div>
+                                    <div class="comment-actions">
+                                        <button class="comment-btn ${comment.isTopTake ? 'top-btn' : ''}" onclick="likeComment(this)">❤️ ${comment.likes}</button>
+                                        <button class="comment-btn">📤 ${comment.shares}</button>
+                                        <button class="comment-btn">▶️ ${comment.plays}</button>
+                                    </div>
+                                </div>
+                                <div class="comment-text">${comment.text}</div>
+                                <div class="comment-engagement">
+                                    <span class="engagement-item" onclick="engageComment(this, 'like')">Like</span>
+                                    <span class="engagement-item" onclick="engageComment(this, 'reply')">Reply</span>
+                                    <span class="engagement-item" onclick="engageComment(this, 'share')">Share</span>
+                                    <span class="engagement-item" onclick="engageComment(this, 'play')">Play snippet</span>
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            `;
+        }
+
+        // Navigation functions
+        function nextMoment() {
+            const song = getCurrentSong();
+            if (currentMomentIndex < song.moments.length - 1) {
+                currentMomentIndex++;
+            } else {
+                currentMomentIndex = 0; // Loop back to first moment
+            }
+            renderMoment();
+            showToast(`Next moment: ${getCurrentMoment().topTake.text.substring(0, 30)}...`);
+        }
+
+        function prevMoment() {
+            const song = getCurrentSong();
+            if (currentMomentIndex > 0) {
+                currentMomentIndex--;
+            } else {
+                currentMomentIndex = song.moments.length - 1; // Loop to last moment
+            }
+            renderMoment();
+            showToast(`Previous moment: ${getCurrentMoment().topTake.text.substring(0, 30)}...`);
+        }
+
+        function nextSong() {
+            if (currentSongIndex < songsDatabase.length - 1) {
+                currentSongIndex++;
+            } else {
+                currentSongIndex = 0; // Loop back to first song
+            }
+            currentMomentIndex = 0; // Reset to first moment of new song
+            renderMoment();
+            const song = getCurrentSong();
+            showToast(`Next song: ${song.title} by ${song.artist}`);
+        }
+
+        function prevSong() {
+            if (currentSongIndex > 0) {
+                currentSongIndex--;
+            } else {
+                currentSongIndex = songsDatabase.length - 1; // Loop to last song
+            }
+            currentMomentIndex = 0; // Reset to first moment of new song
+            renderMoment();
+            const song = getCurrentSong();
+            showToast(`Previous song: ${song.title} by ${song.artist}`);
+        }
+
+        // Interaction functions
+        function toggleLike() {
+            const likeBtn = document.getElementById('likeBtn');
+            likeBtn.classList.toggle('active');
+            showToast(likeBtn.classList.contains('active') ? 'Moment liked! ❤️' : 'Like removed');
+        }
+
+        function shareDiscussion() {
+            showToast('Discussion shared! 📤');
+        }
+
+        function saveDiscussion() {
+            showToast('Discussion saved! 📚');
+        }
+
+        function addComment() {
+            showToast('Add your discovery to this discussion 💬');
+        }
+
+        function likeComment(btn) {
+            btn.classList.toggle('liked');
+            const currentCount = parseInt(btn.textContent.match(/\d+/)[0]);
+            const newCount = btn.classList.contains('liked') ? currentCount + 1 : currentCount - 1;
+            btn.innerHTML = btn.innerHTML.replace(/\d+/, newCount);
+            
+            if (btn.classList.contains('liked')) {
+                showToast('Comment liked! This affects ranking 👑');
+            } else {
+                showToast('Like removed');
+            }
+        }
+
+        function engageComment(element, type) {
+            switch(type) {
+                case 'like':
+                    showToast('Liked! Engagement boosts comment ranking');
+                    break;
+                case 'reply':
+                    showToast('Reply to this discovery 💬');
+                    break;
+                case 'share':
+                    showToast('Shared! High shares = title candidate 🏆');
+                    break;
+                case 'play':
+                    showToast('Playing snippet! Plays count toward ranking');
+                    break;
+            }
+        }
+
+        // Show toast
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 2000);
+        }
+
+        // Enhanced touch navigation with separate zones
+        let startY = 0;
+        let startX = 0;
+        let isInSwipeZone = false;
+
+        // Track touches in swipe area vs comment area
+        document.addEventListener('touchstart', (e) => {
+            startY = e.touches[0].clientY;
+            startX = e.touches[0].clientX;
+            
+            // Check if touch started in bottom swipe zone
+            const windowHeight = window.innerHeight;
+            isInSwipeZone = startY > windowHeight - 100;
+        });
+
+        document.addEventListener('touchend', (e) => {
+            const endY = e.changedTouches[0].clientY;
+            const endX = e.changedTouches[0].clientX;
+            
+            const deltaY = startY - endY;
+            const deltaX = startX - endX;
+            
+            // Horizontal swipes (song switching) work from anywhere
+            if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > 50) {
+                if (deltaX > 0) {
+                    nextSong();
+                    showToast('⬅️ Swiped left - Next song');
+                } else {
+                    prevSong();
+                    showToast('➡️ Swiped right - Previous song');
+                }
+                return; // Don't process vertical swipes if horizontal detected
+            }
+            
+            // Vertical swipes (moment switching) only work in bottom swipe zone
+            if (isInSwipeZone && Math.abs(deltaY) > Math.abs(deltaX) && Math.abs(deltaY) > 50) {
+                if (deltaY > 0) {
+                    nextMoment();
+                    showToast('⬆️ Swiped up - Next moment');
+                } else {
+                    prevMoment();
+                    showToast('⬇️ Swiped down - Previous moment');
+                }
+            }
+        });
+
+        // Keyboard navigation
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'ArrowUp') {
+                nextMoment();
+            } else if (e.key === 'ArrowDown') {
+                prevMoment();
+            } else if (e.key === 'ArrowLeft') {
+                nextSong();
+            } else if (e.key === 'ArrowRight') {
+                prevSong();
+            } else if (e.key === ' ') {
+                e.preventDefault();
+                showToast('Playing moment...');
+            }
+        });
+
+        // Initialize
+        renderMoment();
+
+        // Welcome messages
+        setTimeout(() => {
+            showToast('🎵 Each title = top community take on that moment');
+        }, 1000);
+
+        setTimeout(() => {
+            showToast('👑 Titles change as new comments get more engagement');
+        }, 4000);
+
+        setTimeout(() => {
+            showToast('💡 Swipe ← → for songs, ↑ from bottom for moments');
+        }, 7000);
+    </script>
+</body>
+</html>
