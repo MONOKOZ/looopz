@@ -127,7 +127,7 @@
             bottom: 0;
             left: 0;
             right: 0;
-            height: 200px;
+            height: 100px;
             z-index: 50;
             pointer-events: none;
         }
@@ -1029,7 +1029,7 @@
             const touchY = touch.clientY;
             
             // Only detect swipes in bottom 200px - be very strict about this
-            if (touchY > windowHeight - 200) {
+            if (touchY > windowHeight - 100) {
                 startY = touch.clientY;
                 startX = touch.clientX;
                 currentY = startY;
@@ -1056,7 +1056,7 @@
             const touchY = touch.clientY;
             
             // If touch moved out of swipe zone, deactivate
-            if (touchY <= windowHeight - 200) {
+            if (touchY <= windowHeight - 100) {
                 swipeZone.classList.remove('active');
                 isDragging = false;
                 return;
