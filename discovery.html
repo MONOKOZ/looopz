@@ -408,31 +408,36 @@
 
         .comment-actions {
             display: flex;
-            gap: 6px;
+            gap: 4px;
+            font-size: 8px;
         }
 
         .comment-btn {
             background: rgba(255, 255, 255, 0.05);
             border: none;
             color: rgba(255, 255, 255, 0.6);
-            font-size: 9px;
+            font-size: 8px;
             cursor: pointer;
-            padding: 3px 6px;
-            border-radius: 10px;
+            padding: 2px 4px;
+            border-radius: 8px;
             transition: all 0.2s ease;
             display: flex;
             align-items: center;
             gap: 2px;
+            min-width: 24px;
+            height: 20px;
+            justify-content: center;
         }
 
         .comment-btn:hover {
             background: rgba(255, 255, 255, 0.1);
             color: white;
+            transform: translateY(-1px);
         }
 
         .comment-btn.liked {
             color: #ff6b6b;
-            background: rgba(255, 107, 107, 0.1);
+            background: rgba(255, 107, 107, 0.15);
         }
 
         .comment-btn.top-btn {
@@ -441,16 +446,21 @@
             border: 1px solid rgba(29, 185, 84, 0.3);
         }
 
+        .comment-btn.playlist-added {
+            color: #f39c12;
+            background: rgba(243, 156, 18, 0.15);
+        }
+
         .comment-text {
             font-size: 12px;
             line-height: 1.4;
             color: rgba(255, 255, 255, 0.9);
-            margin-bottom: 6px;
+            margin-bottom: 8px;
         }
 
         .comment-engagement {
             display: flex;
-            gap: 10px;
+            gap: 6px;
             font-size: 9px;
             color: rgba(255, 255, 255, 0.4);
         }
@@ -460,6 +470,9 @@
             transition: color 0.2s ease;
             padding: 2px 4px;
             border-radius: 8px;
+            display: flex;
+            align-items: center;
+            gap: 2px;
         }
 
         .engagement-item:hover {
@@ -467,11 +480,11 @@
             background: rgba(255, 255, 255, 0.05);
         }
 
-        /* RIGHT SIDEBAR - TIKTOK STYLE */
+        /* RIGHT SIDEBAR - SIMPLIFIED */
         .right-sidebar {
             position: fixed;
             right: 8px;
-            top: 65%;
+            top: 50%;
             transform: translateY(-50%);
             z-index: 90;
             display: flex;
@@ -480,15 +493,15 @@
             align-items: center;
         }
 
-        /* Social Actions - Top Section */
-        .social-actions {
+        /* Song Actions - Top Section */
+        .song-actions {
             display: flex;
             flex-direction: column;
             gap: 8px;
-            margin-bottom: 40px;
+            margin-bottom: 20px;
         }
 
-        .social-btn {
+        .song-btn {
             width: 44px;
             height: 44px;
             border-radius: 50%;
@@ -501,28 +514,18 @@
             display: flex;
             align-items: center;
             justify-content: center;
-            font-size: 18px;
+            font-size: 16px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3);
         }
 
-        .social-btn:hover {
-            background: rgba(255, 255, 255, 0.15);
+        .song-btn:hover {
+            background: rgba(29, 185, 84, 0.8);
             transform: scale(1.1);
-            border-color: rgba(255, 255, 255, 0.3);
+            border-color: rgba(29, 185, 84, 0.6);
         }
 
-        .social-btn:active {
+        .song-btn:active {
             transform: scale(0.95);
-        }
-
-        .social-btn.liked {
-            background: rgba(255, 64, 64, 0.9);
-            border-color: rgba(255, 64, 64, 0.6);
-        }
-
-        .social-btn.saved {
-            background: rgba(243, 156, 18, 0.9);
-            border-color: rgba(243, 156, 18, 0.6);
         }
 
         /* Moment Navigation - Bottom Section */
@@ -533,8 +536,8 @@
         }
 
         .moment-btn {
-            width: 44px;
-            height: 44px;
+            width: 40px;
+            height: 40px;
             border-radius: 50%;
             background: rgba(0, 0, 0, 0.7);
             backdrop-filter: blur(10px);
@@ -572,10 +575,10 @@
             justify-content: center;
             gap: 12px;
             font-size: 8px;
-            color: rgba(255, 255, 255, 0.65);
+            color: rgba(255, 255, 255, 0.6);
             z-index: 60;
             pointer-events: none;
-            background: linear-gradient(to top, rgba(0, 0, 0, 1.0) 0%, rgba(0, 0, 0, 0.75) 65%, transparent 100%);
+            background: linear-gradient(to top, rgba(0, 0, 0, 0.4) 0%, rgba(0, 0, 0, 0.2) 50%, transparent 100%);
             padding-bottom: 10px;
         }
 
@@ -693,20 +696,18 @@
             <!-- Individual moment cards will be positioned here -->
         </div>
 
-        <!-- RIGHT SIDEBAR - TIKTOK STYLE -->
+        <!-- RIGHT SIDEBAR - SIMPLIFIED SONG ACTIONS -->
         <div class="right-sidebar">
-            <!-- Social Actions - Top Section -->
-            <div class="social-actions">
-                <button class="social-btn" id="likeBtn">❤</button>
-                <button class="social-btn" id="commentBtn">💬</button>
-                <button class="social-btn" id="saveBtn">⭐</button>
-                <button class="social-btn" id="shareBtn">↗</button>
+            <!-- Song Actions - Top Section -->
+            <div class="song-actions">
+                <button class="song-btn" id="listenFullBtn" title="Listen to Full Song">🎧</button>
+                <button class="song-btn" id="createLoopBtn" title="Create Loop-Moment">➕</button>
             </div>
 
             <!-- Moment Navigation - Bottom Section -->
             <div class="moment-nav">
-                <button class="moment-btn" id="nextMomentBtn">↑</button>
-                <button class="moment-btn" id="prevMomentBtn">↓</button>
+                <button class="moment-btn" id="nextMomentBtn">⬆</button>
+                <button class="moment-btn" id="prevMomentBtn">⬇</button>
             </div>
         </div>
 
@@ -721,8 +722,8 @@
                 <span>Tap moments</span>
             </div>
             <div class="nav-hint">
-                <span>📜</span>
-                <span>Free scroll</span>
+                <span>🎧</span>
+                <span>Song actions</span>
             </div>
         </div>
 
@@ -749,7 +750,7 @@
         let nextCard = null;
         let prevCard = null;
 
-        // Songs database
+        // Songs database with enhanced comment actions
         const songsDatabase = [
             {
                 title: "Stronger",
@@ -773,28 +774,16 @@
                         totalPlays: 1203,
                         description: "Title changes based on highest engagement • Live community ranking",
                         comments: [
-                            { user: "ProducerEars", avatar: "PE", timing: "1:23.2 - 1:44.8", text: "This vocal chop gives me chills every single time 🔥", likes: 247, shares: 34, plays: 89, replies: 8, isTopTake: true },
-                            { user: "SampleHunter", avatar: "SH", timing: "1:23.0 - 1:45.1", text: "Found the original sample - it's from a 1970s soul track!", likes: 189, shares: 28, plays: 67, replies: 23 },
-                            { user: "VocalAnalyst", avatar: "VA", timing: "1:23.5 - 1:44.2", text: "The way he pitched and chopped this is pure genius", likes: 156, shares: 19, plays: 45, replies: 12 },
-                            { user: "ChillVibes", avatar: "CV", timing: "1:23.0 - 1:45.2", text: "This part hits different when you're studying at 2AM", likes: 134, shares: 45, plays: 78, replies: 9 },
-                            { user: "BeatMaker", avatar: "BM", timing: "1:23.1 - 1:45.0", text: "I've been trying to recreate this chop for months", likes: 78, shares: 12, plays: 34, replies: 15 },
-                            { user: "AudioEngineer", avatar: "AE", timing: "1:23.3 - 1:44.9", text: "The stereo imaging on this vocal is incredible", likes: 92, shares: 8, plays: 23, replies: 6 },
-                            { user: "WorkoutMotivation", avatar: "WM", timing: "1:23.4 - 1:44.6", text: "Perfect for that final gym rep energy boost", likes: 89, shares: 23, plays: 56, replies: 4 },
-                            { user: "NightOwl", avatar: "NO", timing: "1:23.2 - 1:44.7", text: "3AM vibes when this comes on shuffle", likes: 45, shares: 8, plays: 19, replies: 3 },
-                            { user: "EmotionalListener", avatar: "EL", timing: "1:23.0 - 1:45.0", text: "Literally gives me goosebumps every single time", likes: 56, shares: 12, plays: 28, replies: 7 },
-                            { user: "CasualFan", avatar: "CF", timing: "1:23.4 - 1:44.5", text: "Don't understand music theory but this just hits", likes: 89, shares: 22, plays: 41, replies: 6 },
-                            { user: "VintageCollector", avatar: "VC", timing: "1:23.1 - 1:44.9", text: "The original track this samples from is a masterpiece", likes: 67, shares: 15, plays: 32, replies: 11 },
-                            { user: "MoodBooster", avatar: "MB", timing: "1:23.2 - 1:45.0", text: "Instant serotonin boost whenever I hear this", likes: 98, shares: 31, plays: 54, replies: 8 },
-                            { user: "StudioSession", avatar: "SS", timing: "1:23.0 - 1:44.8", text: "We played this loop for 3 hours straight in our session", likes: 76, shares: 19, plays: 43, replies: 13 },
-                            { user: "DanceFloorKing", avatar: "DK", timing: "1:23.3 - 1:44.7", text: "The club goes absolutely insane when this drops", likes: 112, shares: 27, plays: 68, replies: 16 },
-                            { user: "MelodyMaker", avatar: "MM", timing: "1:23.1 - 1:45.1", text: "That chord progression underneath is so underrated", likes: 54, shares: 9, plays: 26, replies: 7 },
-                            { user: "RetroVibes", avatar: "RV", timing: "1:23.2 - 1:44.6", text: "Takes me back to the golden era of hip-hop production", likes: 83, shares: 18, plays: 39, replies: 12 },
-                            { user: "EarTraining", avatar: "ET", timing: "1:23.4 - 1:44.9", text: "Perfect example of how to use vocal samples as percussion", likes: 91, shares: 14, plays: 35, replies: 9 },
-                            { user: "CommuteChill", avatar: "CC", timing: "1:23.0 - 1:45.0", text: "My daily commute anthem right here", likes: 42, shares: 11, plays: 28, replies: 5 },
-                            { user: "ProductionTips", avatar: "PT", timing: "1:23.3 - 1:44.8", text: "The compression on this vocal is teaching me so much", likes: 68, shares: 16, plays: 31, replies: 14 },
-                            { user: "FrequencyFan", avatar: "FF", timing: "1:23.1 - 1:44.7", text: "Those high frequencies cut through the mix perfectly", likes: 59, shares: 7, plays: 22, replies: 6 },
-                            { user: "RepeatListener", avatar: "RL", timing: "1:23.2 - 1:45.2", text: "Been replaying this exact moment for the past hour", likes: 127, shares: 39, plays: 71, replies: 18 },
-                            { user: "SoulSearcher", avatar: "SR", timing: "1:23.0 - 1:44.5", text: "This sample carries so much soul and emotion", likes: 94, shares: 21, plays: 47, replies: 10 }
+                            { user: "ProducerEars", avatar: "PE", timing: "1:23.2 - 1:44.8", text: "This vocal chop gives me chills every single time 🔥", likes: 247, shares: 34, plays: 89, replies: 8, playlists: 156, isTopTake: true },
+                            { user: "SampleHunter", avatar: "SH", timing: "1:23.0 - 1:45.1", text: "Found the original sample - it's from a 1970s soul track!", likes: 189, shares: 28, plays: 67, replies: 23, playlists: 89 },
+                            { user: "VocalAnalyst", avatar: "VA", timing: "1:23.5 - 1:44.2", text: "The way he pitched and chopped this is pure genius", likes: 156, shares: 19, plays: 45, replies: 12, playlists: 67 },
+                            { user: "ChillVibes", avatar: "CV", timing: "1:23.0 - 1:45.2", text: "This part hits different when you're studying at 2AM", likes: 134, shares: 45, plays: 78, replies: 9, playlists: 134 },
+                            { user: "BeatMaker", avatar: "BM", timing: "1:23.1 - 1:45.0", text: "I've been trying to recreate this chop for months", likes: 78, shares: 12, plays: 34, replies: 15, playlists: 45 },
+                            { user: "AudioEngineer", avatar: "AE", timing: "1:23.3 - 1:44.9", text: "The stereo imaging on this vocal is incredible", likes: 92, shares: 8, plays: 23, replies: 6, playlists: 34 },
+                            { user: "WorkoutMotivation", avatar: "WM", timing: "1:23.4 - 1:44.6", text: "Perfect for that final gym rep energy boost", likes: 89, shares: 23, plays: 56, replies: 4, playlists: 78 },
+                            { user: "NightOwl", avatar: "NO", timing: "1:23.2 - 1:44.7", text: "3AM vibes when this comes on shuffle", likes: 45, shares: 8, plays: 19, replies: 3, playlists: 23 },
+                            { user: "EmotionalListener", avatar: "EL", timing: "1:23.0 - 1:45.0", text: "Literally gives me goosebumps every single time", likes: 56, shares: 12, plays: 28, replies: 7, playlists: 41 },
+                            { user: "CasualFan", avatar: "CF", timing: "1:23.4 - 1:44.5", text: "Don't understand music theory but this just hits", likes: 89, shares: 22, plays: 41, replies: 6, playlists: 67 }
                         ]
                     },
                     {
@@ -813,18 +802,11 @@
                         totalPlays: 567,
                         description: "Community agrees: perfect tension building technique",
                         comments: [
-                            { user: "TensionMaster", avatar: "TM", timing: "0:14.8 - 0:34.9", text: "This is how you create anticipation in music", likes: 142, shares: 23, plays: 45, replies: 19, isTopTake: true },
-                            { user: "IntroExpert", avatar: "IE", timing: "0:15.0 - 0:34.5", text: "The way this builds tension is absolutely perfect 🚀", likes: 89, shares: 12, plays: 34, replies: 12 },
-                            { user: "DrumProgrammer", avatar: "DP", timing: "0:15.2 - 0:35.1", text: "That kick pattern in the build is so simple but effective", likes: 67, shares: 10, plays: 28, replies: 8 },
-                            { user: "BuildupKing", avatar: "BK", timing: "0:15.1 - 0:34.8", text: "Every producer should study this intro sequence", likes: 78, shares: 18, plays: 39, replies: 14 },
-                            { user: "ClubDJ", avatar: "CD", timing: "0:15.0 - 0:35.0", text: "The perfect intro for mixing into this track", likes: 92, shares: 24, plays: 51, replies: 11 },
-                            { user: "FilmScore", avatar: "FS", timing: "0:14.9 - 0:34.7", text: "This could be in a movie trailer, so cinematic", likes: 73, shares: 16, plays: 37, replies: 9 },
-                            { user: "AnxietyRelief", avatar: "AR", timing: "0:15.2 - 0:34.6", text: "Weirdly calming despite the tension building", likes: 56, shares: 8, plays: 23, replies: 6 },
-                            { user: "ProductionClass", avatar: "PC", timing: "0:15.1 - 0:35.0", text: "Teaching this exact technique in my course", likes: 84, shares: 19, plays: 42, replies: 17 },
-                            { user: "MinimalLover", avatar: "ML", timing: "0:14.8 - 0:34.9", text: "Less elements but maximum impact", likes: 91, shares: 22, plays: 49, replies: 13 },
-                            { user: "HeartRateUp", avatar: "HR", timing: "0:15.0 - 0:34.8", text: "My pulse literally syncs with this buildup", likes: 68, shares: 15, plays: 31, replies: 8 },
-                            { user: "SilenceGuru", avatar: "SG", timing: "0:15.3 - 0:34.5", text: "The use of silence here is masterful", likes: 79, shares: 13, plays: 26, replies: 10 },
-                            { user: "EnergyBuilder", avatar: "EB", timing: "0:15.1 - 0:35.1", text: "From zero to hero in 20 seconds", likes: 103, shares: 28, plays: 55, replies: 15 }
+                            { user: "TensionMaster", avatar: "TM", timing: "0:14.8 - 0:34.9", text: "This is how you create anticipation in music", likes: 142, shares: 23, plays: 45, replies: 19, playlists: 89, isTopTake: true },
+                            { user: "IntroExpert", avatar: "IE", timing: "0:15.0 - 0:34.5", text: "The way this builds tension is absolutely perfect 🚀", likes: 89, shares: 12, plays: 34, replies: 12, playlists: 56 },
+                            { user: "DrumProgrammer", avatar: "DP", timing: "0:15.2 - 0:35.1", text: "That kick pattern in the build is so simple but effective", likes: 67, shares: 10, plays: 28, replies: 8, playlists: 34 },
+                            { user: "BuildupKing", avatar: "BK", timing: "0:15.1 - 0:34.8", text: "Every producer should study this intro sequence", likes: 78, shares: 18, plays: 39, replies: 14, playlists: 45 },
+                            { user: "ClubDJ", avatar: "CD", timing: "0:15.0 - 0:35.0", text: "The perfect intro for mixing into this track", likes: 92, shares: 24, plays: 51, replies: 11, playlists: 67 }
                         ]
                     },
                     {
@@ -843,20 +825,11 @@
                         totalPlays: 1456,
                         description: "Most viral moment • Peak energy discussion",
                         comments: [
-                            { user: "EnergyGuru", avatar: "EG", timing: "2:15.3 - 2:30.0", text: "This drop hits harder than any gym pre-workout", likes: 203, shares: 56, plays: 123, replies: 31, isTopTake: true },
-                            { user: "BeatHunter", avatar: "BH", timing: "2:15.0 - 2:29.8", text: "The way the beat drops here... pure energy ⚡", likes: 156, shares: 34, plays: 89, replies: 24 },
-                            { user: "BassMaster", avatar: "BM", timing: "2:15.1 - 2:30.2", text: "That sub-bass frequency here is insane 🔊", likes: 179, shares: 28, plays: 67, replies: 15 },
-                            { user: "MotivationMode", avatar: "MM", timing: "2:15.2 - 2:29.9", text: "This moment = instant confidence boost", likes: 167, shares: 43, plays: 78, replies: 21 },
-                            { user: "CarStereo", avatar: "CS", timing: "2:15.0 - 2:30.1", text: "My subwoofers can't handle this section", likes: 134, shares: 29, plays: 61, replies: 18 },
-                            { user: "AdrenalineRush", avatar: "AR", timing: "2:15.3 - 2:29.7", text: "Literally feel my heart rate spike every time", likes: 142, shares: 31, plays: 72, replies: 14 },
-                            { user: "ClubNights", avatar: "CN", timing: "2:15.1 - 2:30.0", text: "The entire club loses their minds at this drop", likes: 189, shares: 47, plays: 96, replies: 27 },
-                            { user: "WorkoutPump", avatar: "WP", timing: "2:15.2 - 2:29.8", text: "PRs happen when this drop hits during deadlifts", likes: 157, shares: 38, plays: 84, replies: 19 },
-                            { user: "SonicBoom", avatar: "SB", timing: "2:15.0 - 2:30.2", text: "The sound design here is absolutely mental", likes: 123, shares: 22, plays: 53, replies: 12 },
-                            { user: "EardrumTest", avatar: "ET", timing: "2:15.3 - 2:29.9", text: "Warning: may cause permanent smile syndrome", likes: 178, shares: 42, plays: 87, replies: 23 },
-                            { user: "AdrenalGlands", avatar: "AG", timing: "2:15.1 - 2:30.1", text: "My fight or flight response activates instantly", likes: 91, shares: 18, plays: 45, replies: 11 },
-                            { user: "PowerLifter", avatar: "PL", timing: "2:15.2 - 2:29.8", text: "This is what peak performance sounds like", likes: 164, shares: 35, plays: 79, replies: 16 },
-                            { user: "NeighborApology", avatar: "NA", timing: "2:15.0 - 2:30.0", text: "Sorry neighbors, but this NEEDS to be loud", likes: 201, shares: 51, plays: 102, replies: 29 },
-                            { user: "PureBass", avatar: "PB", timing: "2:15.3 - 2:29.7", text: "This frequency literally moves furniture", likes: 146, shares: 26, plays: 58, replies: 13 }
+                            { user: "EnergyGuru", avatar: "EG", timing: "2:15.3 - 2:30.0", text: "This drop hits harder than any gym pre-workout", likes: 203, shares: 56, plays: 123, replies: 31, playlists: 201, isTopTake: true },
+                            { user: "BeatHunter", avatar: "BH", timing: "2:15.0 - 2:29.8", text: "The way the beat drops here... pure energy ⚡", likes: 156, shares: 34, plays: 89, replies: 24, playlists: 145 },
+                            { user: "BassMaster", avatar: "BM", timing: "2:15.1 - 2:30.2", text: "That sub-bass frequency here is insane 🔊", likes: 179, shares: 28, plays: 67, replies: 15, playlists: 167 },
+                            { user: "MotivationMode", avatar: "MM", timing: "2:15.2 - 2:29.9", text: "This moment = instant confidence boost", likes: 167, shares: 43, plays: 78, replies: 21, playlists: 189 },
+                            { user: "CarStereo", avatar: "CS", timing: "2:15.0 - 2:30.1", text: "My subwoofers can't handle this section", likes: 134, shares: 29, plays: 61, replies: 18, playlists: 123 }
                         ]
                     }
                 ]
@@ -883,8 +856,8 @@
                         totalPlays: 1876,
                         description: "Kendrick's most discussed flow pattern change",
                         comments: [
-                            { user: "FlowMaster", avatar: "FM", timing: "0:22.1 - 0:37.9", text: "This flow switch is absolutely INSANE 🎤", likes: 289, shares: 45, plays: 123, replies: 45, isTopTake: true },
-                            { user: "RapAnalyst", avatar: "RA", timing: "0:22.0 - 0:38.0", text: "The way he breaks rhythm here is pure artistry", likes: 267, shares: 32, plays: 89, replies: 32 }
+                            { user: "FlowMaster", avatar: "FM", timing: "0:22.1 - 0:37.9", text: "This flow switch is absolutely INSANE 🎤", likes: 289, shares: 45, plays: 123, replies: 45, playlists: 267, isTopTake: true },
+                            { user: "RapAnalyst", avatar: "RA", timing: "0:22.0 - 0:38.0", text: "The way he breaks rhythm here is pure artistry", likes: 267, shares: 32, plays: 89, replies: 32, playlists: 234 }
                         ]
                     },
                     {
@@ -903,8 +876,8 @@
                         totalPlays: 892,
                         description: "Simple but incredibly effective piano foundation",
                         comments: [
-                            { user: "PianoSimple", avatar: "PS", timing: "0:08.0 - 0:23.8", text: "That piano loop is so simple but so effective 🎹", likes: 156, shares: 23, plays: 67, replies: 23, isTopTake: true },
-                            { user: "MinimalBeat", avatar: "MB", timing: "0:08.2 - 0:24.0", text: "Less is more - perfect example", likes: 134, shares: 18, plays: 45, replies: 18 }
+                            { user: "PianoSimple", avatar: "PS", timing: "0:08.0 - 0:23.8", text: "That piano loop is so simple but so effective 🎹", likes: 156, shares: 23, plays: 67, replies: 23, playlists: 134, isTopTake: true },
+                            { user: "MinimalBeat", avatar: "MB", timing: "0:08.2 - 0:24.0", text: "Less is more - perfect example", likes: 134, shares: 18, plays: 45, replies: 18, playlists: 98 }
                         ]
                     }
                 ]
@@ -950,7 +923,7 @@
             return song.moments[prevIndex];
         }
 
-        // Create moment card HTML
+        // Create moment card HTML with enhanced comment actions
         function createMomentCardHTML(moment) {
             return `
                 <div class="moment-header ${moment.bgClass}">
@@ -995,7 +968,7 @@
                     </div>
                     
                     <div class="comments-list">
-                        ${moment.comments.map(comment => `
+                        ${moment.comments.map((comment, index) => `
                             <div class="comment ${comment.isTopTake ? 'top-comment' : ''}">
                                 <div class="comment-header">
                                     <div class="comment-user">
@@ -1006,18 +979,24 @@
                                         </div>
                                     </div>
                                     <div class="comment-actions">
-                                        <button class="comment-btn ${comment.isTopTake ? 'top-btn' : ''}" onclick="likeComment(this)">❤️ ${comment.likes}</button>
-                                        <button class="comment-btn">📤 ${comment.shares}</button>
-                                        <button class="comment-btn">▶️ ${comment.plays}</button>
+                                        <button class="comment-btn ${comment.isTopTake ? 'top-btn' : ''}" onclick="likeComment(this, ${index})" title="Like this insight">
+                                            ❤️ ${comment.likes}
+                                        </button>
+                                        <button class="comment-btn" onclick="replyToComment(${index})" title="Reply to this insight">
+                                            💬 ${comment.replies}
+                                        </button>
+                                        <button class="comment-btn" onclick="shareComment(${index})" title="Share this insight">
+                                            ↗ ${comment.shares}
+                                        </button>
+                                        <button class="comment-btn" onclick="playSnippet(${index})" title="Play this snippet">
+                                            ▶️ ${comment.plays}
+                                        </button>
+                                        <button class="comment-btn" onclick="addToPlaylist(this, ${index})" title="Add to playlist">
+                                            ➕ ${comment.playlists}
+                                        </button>
                                     </div>
                                 </div>
                                 <div class="comment-text">${comment.text}</div>
-                                <div class="comment-engagement">
-                                    <span class="engagement-item" onclick="engageComment(this, 'like')">Like</span>
-                                    <span class="engagement-item" onclick="engageComment(this, 'reply')">Reply</span>
-                                    <span class="engagement-item" onclick="engageComment(this, 'share')">Share</span>
-                                    <span class="engagement-item" onclick="engageComment(this, 'play')">Play snippet</span>
-                                </div>
                             </div>
                         `).join('')}
                     </div>
@@ -1141,55 +1120,54 @@
             createMomentCards();
         }
 
-        // Action functions
-        function toggleLike() {
-            const likeBtn = document.getElementById('likeBtn');
-            likeBtn.classList.toggle('liked');
-            showToast(likeBtn.classList.contains('liked') ? 'Moment liked! ❤️' : 'Like removed');
-        }
-
-        function addComment() {
-            showToast('Add your discovery to this discussion 💬');
-        }
-
-        function saveDiscussion() {
-            const saveBtn = document.getElementById('saveBtn');
-            saveBtn.classList.toggle('saved');
-            showToast(saveBtn.classList.contains('saved') ? 'Discussion saved! ⭐' : 'Save removed');
-        }
-
-        function shareDiscussion() {
-            showToast('Discussion shared! ↗');
-        }
-
-        function likeComment(btn) {
+        // Comment interaction functions
+        function likeComment(btn, commentIndex) {
             btn.classList.toggle('liked');
             const currentCount = parseInt(btn.textContent.match(/\d+/)[0]);
             const newCount = btn.classList.contains('liked') ? currentCount + 1 : currentCount - 1;
             btn.innerHTML = btn.innerHTML.replace(/\d+/, newCount);
             
-            if (btn.classList.contains('liked')) {
-                showToast('Comment liked! This affects ranking 👑');
-            } else {
-                showToast('Like removed');
-            }
+            showToast(btn.classList.contains('liked') ? 
+                'Comment liked! This affects ranking 👑' : 
+                'Like removed'
+            );
         }
 
-        function engageComment(element, type) {
-            switch(type) {
-                case 'like':
-                    showToast('Liked! Engagement boosts comment ranking');
-                    break;
-                case 'reply':
-                    showToast('Reply to this discovery 💬');
-                    break;
-                case 'share':
-                    showToast('Shared! High shares = title candidate 🏆');
-                    break;
-                case 'play':
-                    showToast('Playing snippet! Plays count toward ranking');
-                    break;
-            }
+        function replyToComment(commentIndex) {
+            showToast('💬 Reply to this musical insight');
+        }
+
+        function shareComment(commentIndex) {
+            showToast('↗ Shared insight! High shares = title candidate 🏆');
+        }
+
+        function playSnippet(commentIndex) {
+            const moment = getCurrentMoment();
+            const comment = moment.comments[commentIndex];
+            showToast(`▶️ Playing snippet: ${comment.timing}`);
+        }
+
+        function addToPlaylist(btn, commentIndex) {
+            btn.classList.toggle('playlist-added');
+            const currentCount = parseInt(btn.textContent.match(/\d+/)[0]);
+            const newCount = btn.classList.contains('playlist-added') ? currentCount + 1 : currentCount - 1;
+            btn.innerHTML = btn.innerHTML.replace(/\d+/, newCount);
+            
+            showToast(btn.classList.contains('playlist-added') ? 
+                '➕ Added to playlist! Highest value signal 🎵' : 
+                'Removed from playlist'
+            );
+        }
+
+        // Song action functions
+        function listenToFullSong() {
+            const song = getCurrentSong();
+            showToast(`🎧 Playing full song: ${song.title}`);
+        }
+
+        function createLoopMoment() {
+            const song = getCurrentSong();
+            showToast(`➕ Create your loop from: ${song.title}`);
         }
 
         // Show toast
@@ -1296,10 +1274,8 @@
             showToast('⬇️ Previous moment');
         });
 
-        document.getElementById('likeBtn').addEventListener('click', toggleLike);
-        document.getElementById('commentBtn').addEventListener('click', addComment);
-        document.getElementById('saveBtn').addEventListener('click', saveDiscussion);
-        document.getElementById('shareBtn').addEventListener('click', shareDiscussion);
+        document.getElementById('listenFullBtn').addEventListener('click', listenToFullSong);
+        document.getElementById('createLoopBtn').addEventListener('click', createLoopMoment);
 
         // Keyboard navigation
         document.addEventListener('keydown', (e) => {
@@ -1317,7 +1293,7 @@
                 showToast('➡️ Next song');
             } else if (e.key === ' ') {
                 e.preventDefault();
-                toggleLike();
+                listenToFullSong();
             }
         });
 
@@ -1331,15 +1307,15 @@
 
         // Welcome messages
         setTimeout(() => {
-            showToast('🎯 Perfect hybrid! Swipe songs, tap moments');
+            showToast('🎯 Perfect comment actions! Like, reply, share, play, playlist');
         }, 1000);
 
         setTimeout(() => {
-            showToast('📱 Comments scroll freely - zero conflicts!');
+            showToast('🎧 Right sidebar: Song actions for discovery & creation');
         }, 4000);
 
         setTimeout(() => {
-            showToast('✨ TikTok-style sidebar for social actions');
+            showToast('📱 All interactions drive ranking - best take becomes title!');
         }, 7000);
     </script>
 </body>
