@@ -121,6 +121,21 @@
             overflow: hidden;
         }
 
+        /* Swipe zone - bottom 200px only */
+        .swipe-zone {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 200px;
+            z-index: 50;
+            pointer-events: none;
+        }
+
+        .swipe-zone.active {
+            pointer-events: all;
+        }
+
         /* Individual moment cards that can slide independently */
         .moment-card {
             position: absolute;
@@ -489,6 +504,45 @@
             transform: scale(1.1);
         }
 
+        /* Large Song Navigation Buttons */
+        .song-nav-btn {
+            width: 56px;
+            height: 56px;
+            border-radius: 16px;
+            background: linear-gradient(135deg, rgba(29, 185, 84, 0.9), rgba(29, 185, 84, 0.7));
+            backdrop-filter: blur(20px);
+            border: 2px solid rgba(29, 185, 84, 0.4);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            font-size: 12px;
+            color: white;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 6px 25px rgba(29, 185, 84, 0.3);
+            text-align: center;
+            line-height: 1.2;
+        }
+
+        .song-nav-btn:hover {
+            background: linear-gradient(135deg, rgba(29, 185, 84, 1), rgba(29, 185, 84, 0.8));
+            transform: scale(1.1);
+            border-color: rgba(29, 185, 84, 0.6);
+            box-shadow: 0 8px 30px rgba(29, 185, 84, 0.5);
+        }
+
+        .song-nav-btn .nav-icon {
+            font-size: 18px;
+            margin-bottom: 2px;
+        }
+
+        .song-nav-btn .nav-text {
+            font-size: 8px;
+            font-weight: 600;
+            opacity: 0.9;
+        }
+
         /* Navigation Hints */
         .nav-hints {
             position: fixed;
@@ -589,27 +643,41 @@
             <!-- Individual moment cards will be positioned here -->
         </div>
 
+        <!-- Swipe Zone - Bottom 200px only -->
+        <div class="swipe-zone" id="swipeZone"></div>
+
         <!-- Enhanced Right Sidebar -->
         <div class="right-sidebar">
+            <!-- Social Actions -->
             <button class="sidebar-action" onclick="toggleLike()" id="likeBtn">❤️</button>
             <button class="sidebar-action" onclick="shareDiscussion()">📤</button>
             <button class="sidebar-action" onclick="saveDiscussion()">📚</button>
             <button class="sidebar-action" onclick="addComment()">💬</button>
+            
+            <!-- Song Navigation - Bottom Position -->
+            <button class="song-nav-btn" onclick="nextSong()" id="nextSongBtn">
+                <div class="nav-icon">⬆️</div>
+                <div class="nav-text">Next Song</div>
+            </button>
+            <button class="song-nav-btn" onclick="prevSong()" id="prevSongBtn">
+                <div class="nav-icon">⬇️</div>
+                <div class="nav-text">Prev Song</div>
+            </button>
         </div>
 
         <!-- Navigation Hints -->
         <div class="nav-hints">
             <div class="nav-hint">
-                <span>⬆️</span>
-                <span>Next moment from bottom</span>
+                <span>⬆️⬇️</span>
+                <span>Swipe moments (bottom area)</span>
             </div>
             <div class="nav-hint">
-                <span>⬇️</span>
-                <span>Prev moment from top</span>
+                <span>📜</span>
+                <span>Scroll comments (middle)</span>
             </div>
             <div class="nav-hint">
-                <span>⬅️➡️</span>
-                <span>Songs slide horizontally</span>
+                <span>🎵</span>
+                <span>Tap buttons for songs</span>
             </div>
         </div>
 
@@ -628,7 +696,6 @@
         let currentX = 0;
         let isDragging = false;
         let startTime = 0;
-        let swipeDirection = null; // 'vertical' or 'horizontal'
 
         // Card references
         let currentCard = null;
@@ -917,92 +984,81 @@
             updateSnippetRegion(moment.start, moment.end, 232);
         }
 
-        // TIKTOK-STYLE TOUCH HANDLERS
+        // TIKTOK-STYLE TOUCH HANDLERS - LIMITED TO BOTTOM ZONE
         document.addEventListener('touchstart', (e) => {
-            startY = e.touches[0].clientY;
-            startX = e.touches[0].clientX;
-            currentY = startY;
-            currentX = startX;
-            isDragging = false;
-            startTime = Date.now();
-            swipeDirection = null;
+            const touch = e.touches[0];
+            const windowHeight = window.innerHeight;
+            const touchY = touch.clientY;
+            
+            // Only detect swipes in bottom 200px
+            if (touchY > windowHeight - 200) {
+                startY = touch.clientY;
+                startX = touch.clientX;
+                currentY = startY;
+                currentX = startX;
+                isDragging = false;
+                startTime = Date.now();
+                
+                // Activate swipe zone
+                document.getElementById('swipeZone').classList.add('active');
+            }
         }, { passive: true });
 
         document.addEventListener('touchmove', (e) => {
-            if (!isDragging && (Math.abs(e.touches[0].clientY - startY) > 10 || Math.abs(e.touches[0].clientX - startX) > 10)) {
+            const swipeZone = document.getElementById('swipeZone');
+            if (!swipeZone.classList.contains('active')) return; // Not in swipe zone
+            
+            if (!isDragging && Math.abs(e.touches[0].clientY - startY) > 10) {
                 isDragging = true;
-                
-                // Determine swipe direction
-                const deltaY = e.touches[0].clientY - startY;
-                const deltaX = e.touches[0].clientX - startX;
-                
-                if (Math.abs(deltaY) > Math.abs(deltaX)) {
-                    swipeDirection = 'vertical';
-                } else {
-                    swipeDirection = 'horizontal';
-                }
             }
             
             if (isDragging) {
                 currentY = e.touches[0].clientY;
-                currentX = e.touches[0].clientX;
-                
                 const deltaY = currentY - startY;
-                const deltaX = currentX - startX;
                 
-                if (swipeDirection === 'vertical') {
-                    // TIKTOK VERTICAL SWIPE - Both cards move together
-                    const windowHeight = window.innerHeight - 55;
-                    const progress = deltaY / windowHeight; // Percentage of swipe
+                // TIKTOK VERTICAL SWIPE - Both cards move together
+                const windowHeight = window.innerHeight - 55;
+                const progress = deltaY / windowHeight; // Percentage of swipe
+                
+                // Enable dragging mode
+                currentCard.classList.add('dragging');
+                nextCard.classList.add('dragging');
+                prevCard.classList.add('dragging');
+                
+                if (deltaY < 0) {
+                    // Swiping UP - Next moment comes from bottom
+                    const currentY = progress * 100; // Current card moves up
+                    const nextY = 100 + (progress * 100); // Next card follows from bottom
                     
-                    // Enable dragging mode
-                    currentCard.classList.add('dragging');
-                    nextCard.classList.add('dragging');
-                    prevCard.classList.add('dragging');
+                    currentCard.style.transform = `translateY(${currentY}%)`;
+                    nextCard.style.transform = `translateY(${nextY}%)`;
                     
-                    if (deltaY < 0) {
-                        // Swiping UP - Next card comes from bottom
-                        const currentY = progress * 100; // Current card moves up
-                        const nextY = 100 + (progress * 100); // Next card follows from bottom
-                        
-                        currentCard.style.transform = `translateY(${currentY}%)`;
-                        nextCard.style.transform = `translateY(${nextY}%)`;
-                        
-                    } else {
-                        // Swiping DOWN - Prev card comes from top
-                        const currentY = progress * 100; // Current card moves down
-                        const prevY = -100 + (progress * 100); // Prev card follows from top
-                        
-                        currentCard.style.transform = `translateY(${currentY}%)`;
-                        prevCard.style.transform = `translateY(${prevY}%)`;
-                    }
+                } else {
+                    // Swiping DOWN - Prev moment comes from top
+                    const currentY = progress * 100; // Current card moves down
+                    const prevY = -100 + (progress * 100); // Prev card follows from top
                     
-                    e.preventDefault();
-                    
-                } else if (swipeDirection === 'horizontal') {
-                    // TIKTOK HORIZONTAL SWIPE - Songs (for future implementation)
-                    const windowWidth = window.innerWidth;
-                    const progress = deltaX / windowWidth;
-                    
-                    // For now, just show visual feedback
-                    currentCard.style.transform = `translateX(${progress * 20}%)`;
-                    
-                    e.preventDefault();
+                    currentCard.style.transform = `translateY(${currentY}%)`;
+                    prevCard.style.transform = `translateY(${prevY}%)`;
                 }
+                
+                e.preventDefault();
             }
         }, { passive: false });
 
         document.addEventListener('touchend', (e) => {
+            const swipeZone = document.getElementById('swipeZone');
+            if (!swipeZone.classList.contains('active')) return; // Not in swipe zone
+            
             if (isDragging) {
                 const deltaY = currentY - startY;
-                const deltaX = currentX - startX;
                 const swipeTime = Date.now() - startTime;
                 const isQuickSwipe = swipeTime < 300;
                 
                 // Determine if swipe should complete
                 const threshold = isQuickSwipe ? 50 : 100;
                 
-                if (swipeDirection === 'vertical' && Math.abs(deltaY) > threshold) {
+                if (Math.abs(deltaY) > threshold) {
                     if (deltaY < 0) {
                         // Completed UP swipe - Go to next moment
                         nextMoment();
@@ -1012,26 +1068,16 @@
                         prevMoment();
                         showToast('⬇️ Previous moment from top!');
                     }
-                } else if (swipeDirection === 'horizontal' && Math.abs(deltaX) > threshold) {
-                    if (deltaX < 0) {
-                        // Completed LEFT swipe - Next song
-                        nextSong();
-                        showToast('⬅️ Next song from right!');
-                    } else {
-                        // Completed RIGHT swipe - Previous song
-                        prevSong();
-                        showToast('➡️ Previous song from left!');
-                    }
                 } else {
                     // Didn't meet threshold - snap back
                     resetCardPositions();
-                    showToast('💫 Snap back - swipe further!');
+                    showToast('💫 Swipe further in bottom area!');
                 }
             }
             
             // Reset drag state
             isDragging = false;
-            swipeDirection = null;
+            swipeZone.classList.remove('active');
         }, { passive: true });
 
         // Reset cards to original positions
@@ -1040,7 +1086,7 @@
             nextCard.classList.remove('dragging');
             prevCard.classList.remove('dragging');
             
-            currentCard.style.transform = 'translateY(0%) translateX(0%)';
+            currentCard.style.transform = 'translateY(0%)';
             nextCard.style.transform = 'translateY(100%)';
             prevCard.style.transform = 'translateY(-100%)';
         }
@@ -1180,15 +1226,15 @@
 
         // Welcome messages
         setTimeout(() => {
-            showToast('🎵 Real TikTok-style swiping! Next card slides from bottom');
+            showToast('🎵 Swipe up/down in bottom area for moments!');
         }, 1000);
 
         setTimeout(() => {
-            showToast('⬆️ Swipe UP → Next moment slides up from bottom');
+            showToast('📜 Scroll comments freely in middle area');
         }, 4000);
 
         setTimeout(() => {
-            showToast('💡 Both cards visible during swipe - just like TikTok!');
+            showToast('🎵 Use green buttons for song navigation');
         }, 7000);
     </script>
 </body>
