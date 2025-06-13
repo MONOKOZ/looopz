@@ -24,26 +24,24 @@
             height: 100vh;
             max-width: 430px;
             margin: 0 auto;
-            background: #000000; /* Pure black, no gradients during swipe */
+            background: #000000; /* Pure black base */
             overflow: hidden;
         }
 
-        /* Song Themes */
-        .song-kanye { --song-bg: linear-gradient(135deg, #ff6b6b, #4ecdc4); }
-        .song-kendrick { --song-bg: linear-gradient(135deg, #667eea, #764ba2); }
-        .song-weeknd { --song-bg: linear-gradient(135deg, #f093fb, #f5576c); }
+        /* No more song themes - using dynamic colors */
 
-        /* Compact Top Player - FIXED */
+        /* Compact Top Player - DYNAMIC BACKGROUND */
         .top-player {
             position: fixed;
             top: 0;
             left: 0;
             right: 0;
-            background: rgba(0, 0, 0, 0.95);
+            background: var(--top-comment-bg, rgba(0, 0, 0, 0.95));
             backdrop-filter: blur(20px);
             padding: 25px 12px 4px;
             z-index: 100;
             border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            transition: background 0.5s ease;
         }
 
         .player-content {
@@ -59,7 +57,7 @@
             width: 18px;
             height: 18px;
             border-radius: 3px;
-            background: var(--song-bg);
+            background: rgba(255, 255, 255, 0.1);
             font-size: 9px;
             display: flex;
             align-items: center;
@@ -120,13 +118,13 @@
             overflow: hidden;
         }
 
-        /* Swipe zone - bottom 100px only */
+        /* Swipe zone - TOP AREA (comments section) */
         .swipe-zone {
             position: absolute;
-            bottom: 0;
+            top: 140px; /* Start after header */
             left: 0;
             right: 0;
-            height: 100px;
+            bottom: 115px; /* End before nav hints */
             z-index: 50;
             pointer-events: none;
         }
@@ -136,6 +134,7 @@
         }
 
         /* Individual moment cards that can slide independently */
+        /* Individual moment cards - DYNAMIC BACKGROUND */
         .moment-card {
             position: absolute;
             top: 0;
@@ -149,6 +148,7 @@
             will-change: transform;
             /* Hardware acceleration */
             transform: translate3d(0, 0, 0);
+            background: var(--card-bg, #000000);
         }
 
         .moment-card.dragging {
@@ -193,7 +193,7 @@
         .moment-header {
             position: relative;
             height: 140px;
-            background: var(--moment-bg, var(--song-bg));
+            background: var(--moment-bg, #1a1a1a);
             background-size: cover;
             background-position: center;
             overflow: hidden;
@@ -471,12 +471,12 @@
             background: rgba(255, 255, 255, 0.05);
         }
 
-        /* Sidebar inside each moment card - MOVES WITH CONTENT */
+        /* Sidebar inside each moment card - MOVED UP 16PX */
         .moment-card .right-sidebar {
             position: absolute;
             right: 8px;
             top: 50%;
-            transform: translateY(-50%);
+            transform: translateY(calc(-50% - 16px)); /* Moved up 16px */
             display: flex;
             flex-direction: column;
             gap: 16px;
@@ -1014,14 +1014,38 @@
             container.appendChild(prevCard);
         }
 
-        // Update top player and theme
+        // Generate color based on top comment data
+        function generateTopCommentColor(moment) {
+            const topComment = moment.comments.find(c => c.isTopTake);
+            if (!topComment) return { miniPlayer: 'rgba(0, 0, 0, 0.95)', cardBg: '#000000' };
+            
+            // Generate color based on engagement score and user avatar
+            const engagement = topComment.likes + topComment.shares + topComment.plays;
+            const hue = (engagement * 7) % 360; // Varies hue based on engagement
+            const avatar = topComment.avatar;
+            const avatarColor = avatar.charCodeAt(0) + avatar.charCodeAt(1); // Simple hash from avatar
+            
+            // Subtle color variations
+            const saturation = 15 + (avatarColor % 20); // 15-35% saturation
+            const lightness = 8 + (engagement % 12); // 8-20% lightness
+            
+            return {
+                miniPlayer: `hsla(${hue}, ${saturation}%, ${lightness}%, 0.95)`,
+                cardBg: `hsla(${hue}, ${Math.max(5, saturation - 10)}%, ${Math.max(3, lightness - 5)}%, 0.1)`
+            };
+        }
+
+        // Update top player and theme with dynamic colors
         function updateTopPlayer() {
             const moment = getCurrentMoment();
             const song = getCurrentSong();
             
-            // Update app container theme
-            const appContainer = document.getElementById('appContainer');
-            appContainer.className = `app-container ${song.themeClass}`;
+            // Generate dynamic colors from top comment
+            const colors = generateTopCommentColor(moment);
+            
+            // Update CSS custom properties
+            document.documentElement.style.setProperty('--top-comment-bg', colors.miniPlayer);
+            document.documentElement.style.setProperty('--card-bg', colors.cardBg);
             
             // Update top player
             document.getElementById('songInfo').textContent = `${song.title} - ${song.artist}`;
@@ -1032,14 +1056,14 @@
             updateSnippetRegion(moment.start, moment.end, 232);
         }
 
-        // TIKTOK-STYLE TOUCH HANDLERS - LIMITED TO BOTTOM ZONE ONLY
+        // REVERSED SWIPE LOGIC - COMMENTS AREA
         document.addEventListener('touchstart', (e) => {
             const touch = e.touches[0];
             const windowHeight = window.innerHeight;
             const touchY = touch.clientY;
             
-            // Only detect swipes in bottom 100px - be very strict about this
-            if (touchY > windowHeight - 100) {
+            // Detect swipes in comments area (140px from top to 115px from bottom)
+            if (touchY > 140 && touchY < windowHeight - 115) {
                 startY = touch.clientY;
                 startX = touch.clientX;
                 currentY = startY;
@@ -1068,44 +1092,42 @@
                 currentY = e.touches[0].clientY;
                 const deltaY = currentY - startY;
                 
-                // FIXED: Account for top player (55px) in the movement calculation
-                const availableHeight = window.innerHeight - 55; // Subtract top player height
-                const progress = deltaY / availableHeight; // Movement relative to available space
+                // Movement calculation for comments area
+                const availableHeight = window.innerHeight - 55 - 140 - 115; // Subtract top player, header, and nav
+                const progress = deltaY / availableHeight;
                 
                 // Enable dragging mode
                 currentCard.classList.add('dragging');
                 nextCard.classList.add('dragging');
                 prevCard.classList.add('dragging');
                 
+                // REVERSED: Swipe UP = Previous moment, Swipe DOWN = Next moment
                 if (deltaY < 0) {
-                    // Swiping UP - Next moment comes from bottom
-                    const currentTransform = progress * 100; // Current card moves up
-                    const nextTransform = 100 + (progress * 100); // Next card follows from bottom
+                    // Swiping UP - Previous moment comes from top
+                    const currentTransform = progress * 100;
+                    const prevTransform = -100 + (progress * 100);
                     
-                    // Hardware accelerated transforms for smoother performance
-                    currentCard.style.transform = `translate3d(0, ${currentTransform}%, 0)`;
-                    nextCard.style.transform = `translate3d(0, ${nextTransform}%, 0)`;
-                    prevCard.style.transform = `translate3d(0, -100%, 0)`; // Keep prev card hidden
-                    
-                } else {
-                    // Swiping DOWN - Prev moment comes from top
-                    const currentTransform = progress * 100; // Current card moves down
-                    const prevTransform = -100 + (progress * 100); // Prev card follows from top
-                    
-                    // Hardware accelerated transforms for smoother performance
                     currentCard.style.transform = `translate3d(0, ${currentTransform}%, 0)`;
                     prevCard.style.transform = `translate3d(0, ${prevTransform}%, 0)`;
-                    nextCard.style.transform = `translate3d(0, 100%, 0)`; // Keep next card hidden
+                    nextCard.style.transform = `translate3d(0, 100%, 0)`;
+                    
+                } else {
+                    // Swiping DOWN - Next moment comes from bottom
+                    const currentTransform = progress * 100;
+                    const nextTransform = 100 + (progress * 100);
+                    
+                    currentCard.style.transform = `translate3d(0, ${currentTransform}%, 0)`;
+                    nextCard.style.transform = `translate3d(0, ${nextTransform}%, 0)`;
+                    prevCard.style.transform = `translate3d(0, -100%, 0)`;
                 }
                 
-                e.preventDefault(); // Only prevent default in swipe zone
+                e.preventDefault();
             }
         }, { passive: false });
 
         document.addEventListener('touchend', (e) => {
             const swipeZone = document.getElementById('swipeZone');
             
-            // Only handle end if we were in swipe zone
             if (!swipeZone.classList.contains('active')) {
                 return;
             }
@@ -1115,27 +1137,25 @@
                 const swipeTime = Date.now() - startTime;
                 const isQuickSwipe = swipeTime < 300;
                 
-                // SIMPLE: Use reasonable thresholds for any swipe
                 const threshold = isQuickSwipe ? 50 : 80;
                 
                 if (Math.abs(deltaY) > threshold) {
+                    // REVERSED LOGIC
                     if (deltaY < 0) {
-                        // Completed UP swipe - Go to next moment
-                        nextMoment();
-                        showToast('⬆️ Next moment!');
-                    } else {
-                        // Completed DOWN swipe - Go to prev moment
+                        // Swiped UP = Previous moment
                         prevMoment();
-                        showToast('⬇️ Previous moment!');
+                        showToast('⬆️ Previous moment!');
+                    } else {
+                        // Swiped DOWN = Next moment
+                        nextMoment();
+                        showToast('⬇️ Next moment!');
                     }
                 } else {
-                    // Didn't meet threshold - snap back
                     resetCardPositions();
                     showToast('💫 Snap back');
                 }
             }
             
-            // Always reset drag state and deactivate swipe zone
             isDragging = false;
             swipeZone.classList.remove('active');
         }, { passive: true });
