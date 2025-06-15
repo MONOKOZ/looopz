@@ -218,6 +218,7 @@ body {
     cursor: pointer;
     transition: all 0.3s ease;
     border: 1px solid transparent;
+    position: relative;
 }
 
 .track-item:hover { background: rgba(42, 42, 42, 0.8); transform: translateX(4px); }
@@ -288,6 +289,87 @@ body {
 }
 
 .track-action-btn.secondary { background: var(--secondary); }
+.track-action-btn.menu { background: var(--gray); }
+
+/* Three-Dot Context Menu */
+.track-context-menu {
+    position: absolute;
+    background: var(--card);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 8px 0;
+    min-width: 200px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+    backdrop-filter: blur(20px);
+    z-index: 1000;
+    opacity: 0;
+    transform: scale(0.9) translateY(-10px);
+    transition: all 0.2s ease;
+    pointer-events: none;
+}
+
+.track-context-menu.show {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    pointer-events: all;
+}
+
+.context-menu-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    color: var(--light);
+    font-size: 14px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border: none;
+    background: none;
+    width: 100%;
+    text-align: left;
+}
+
+.context-menu-item:hover {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--primary);
+}
+
+.context-menu-item:first-child {
+    border-radius: 12px 12px 0 0;
+}
+
+.context-menu-item:last-child {
+    border-radius: 0 0 12px 12px;
+}
+
+.context-menu-icon {
+    font-size: 16px;
+    width: 20px;
+    text-align: center;
+    flex-shrink: 0;
+}
+
+.context-menu-text {
+    flex: 1;
+}
+
+.context-menu-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 999;
+    background: transparent;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.context-menu-overlay.show {
+    opacity: 1;
+    pointer-events: all;
+}
 
 .load-more-btn {
     width: 100%;
@@ -563,8 +645,6 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
     text-align: center;
     font-weight: 500;
 }
-
-
 
 .precision-inputs {
     padding: 0 20px;
@@ -999,13 +1079,10 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
     }
 
     .precision-popup-content {
-    background: linear-gradient(15deg, var(--dark), rgba(42, 42, 42, 0.85));
-    /*border: 1px solid rgba(255, 255, 255, 0.08);*/
-    padding
-    margin-top: 165px;
-
+        background: linear-gradient(15deg, var(--dark), rgba(42, 42, 42, 0.85));
+        padding: 20px;
+        margin-top: 165px;
     }
-
 }
 
 @keyframes pulse {
@@ -1195,6 +1272,31 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
         </div>
     </div>
 
+    <!-- Track Context Menu -->
+    <div class="context-menu-overlay" id="context-menu-overlay"></div>
+    <div class="track-context-menu" id="track-context-menu">
+        <button class="context-menu-item" id="menu-discover-moments">
+            <span class="context-menu-icon">🔍</span>
+            <span class="context-menu-text">Discover Moments</span>
+        </button>
+        <button class="context-menu-item" id="menu-add-playlist">
+            <span class="context-menu-icon">➕</span>
+            <span class="context-menu-text">Add to Playlist</span>
+        </button>
+        <button class="context-menu-item" id="menu-create-loop">
+            <span class="context-menu-icon">🔄</span>
+            <span class="context-menu-text">Create Loop</span>
+        </button>
+        <button class="context-menu-item" id="menu-share">
+            <span class="context-menu-icon">📤</span>
+            <span class="context-menu-text">Share</span>
+        </button>
+        <button class="context-menu-item" id="menu-spotify">
+            <span class="context-menu-icon">🎵</span>
+            <span class="context-menu-text">Listen in Spotify</span>
+        </button>
+    </div>
+
     <div class="mobile-nav">
         <div class="nav-container">
             <button class="nav-btn" id="nav-search">
@@ -1217,11 +1319,9 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
         </div>
     </div>
 
-
-
     <script src="https://sdk.scdn.co/spotify-player.js"></script>
     <script>
-// SPOTIFY INTEGRATION - CLEANED UP VERSION
+// SPOTIFY INTEGRATION - WITH COMPLETE THREE-DOT CONTEXT MENU
 
 // Config
 const SPOTIFY_CLIENT_ID = '46637d8f5adb41c0a4be34e0df0c1597';
@@ -1235,6 +1335,7 @@ let currentTime = 0, duration = 0, loopStart = 0, loopEnd = 30;
 let loopEnabled = false, loopCount = 0, loopTarget = 1, loopStartTime = 0;
 let updateTimer = null, savedLoops = [], isLooping = false, isDragging = false;
 let currentView = 'login', currentSearchResults = [], currentEditingLoopId = null;
+let currentContextMenuTrackIndex = null;
 
 // Search state
 let searchState = {
@@ -1246,10 +1347,6 @@ let searchState = {
     hasMore: false,
     query: ''
 };
-
-// Long press state - REMOVED
-// let longPressTimers = new Map();
-// let longPressIntervals = new Map();
 
 // Elements
 let els = {};
@@ -1350,56 +1447,128 @@ function updateLoopVisuals() {
     els.precisionEnd.value = formatTime(loopEnd);
 }
 
-// Long press functionality
-function setupLongPress(element, callback) {
-    let isLongPress = false;
+// Context Menu Functions
+function showTrackContextMenu(trackIndex, buttonElement) {
+    currentContextMenuTrackIndex = trackIndex;
+    const menu = els.contextMenu;
+    const overlay = els.contextMenuOverlay;
+    
+    // Position menu relative to button
+    const rect = buttonElement.getBoundingClientRect();
+    const menuWidth = 200;
+    const menuHeight = 240; // Approximate height
+    
+    let left = rect.left - menuWidth + rect.width;
+    let top = rect.bottom + 8;
+    
+    // Adjust if menu would go off screen
+    if (left < 8) left = rect.right + 8;
+    if (left + menuWidth > window.innerWidth - 8) left = window.innerWidth - menuWidth - 8;
+    if (top + menuHeight > window.innerHeight - 8) top = rect.top - menuHeight - 8;
+    
+    menu.style.left = left + 'px';
+    menu.style.top = top + 'px';
+    
+    // Show menu with animation
+    overlay.classList.add('show');
+    setTimeout(() => menu.classList.add('show'), 10);
+}
 
-    const startLongPress = () => {
-        isLongPress = false;
-        const timer = setTimeout(() => {
-            isLongPress = true;
-            element.classList.add('active');
-            callback();
+function hideTrackContextMenu() {
+    const menu = els.contextMenu;
+    const overlay = els.contextMenuOverlay;
+    
+    menu.classList.remove('show');
+    overlay.classList.remove('show');
+    currentContextMenuTrackIndex = null;
+}
 
-            // Start continuous execution
-            const interval = setInterval(callback, 150); // Moderate speed
-            longPressIntervals.set(element, interval);
-        }, 1250); // 1.25 seconds
+function getCurrentContextTrack() {
+    if (currentContextMenuTrackIndex === null || !currentSearchResults) return null;
+    return currentSearchResults[currentContextMenuTrackIndex];
+}
 
-        longPressTimers.set(element, timer);
-    };
+// Context Menu Action Handlers
+async function handleDiscoverMoments() {
+    const track = getCurrentContextTrack();
+    if (!track) return;
+    
+    hideTrackContextMenu();
+    showStatus(`🔍 Discovering moments in "${track.name}"...`);
+    // TODO: Navigate to discovery view for this track
+    console.log('Discover moments for:', track);
+}
 
-    const endLongPress = () => {
-        const timer = longPressTimers.get(element);
-        const interval = longPressIntervals.get(element);
+async function handleAddToPlaylist() {
+    const track = getCurrentContextTrack();
+    if (!track) return;
+    
+    hideTrackContextMenu();
+    showStatus(`➕ Adding "${track.name}" to playlist...`);
+    // TODO: Show playlist selection popup
+    console.log('Add to playlist:', track);
+}
 
-        if (timer) {
-            clearTimeout(timer);
-            longPressTimers.delete(element);
+async function handleCreateLoop() {
+    const track = getCurrentContextTrack();
+    if (!track) return;
+    
+    hideTrackContextMenu();
+    // Same as clicking the + button - select the track
+    await selectTrack(track.uri, track.name, track.artists[0].name, track.duration_ms, track.album.images[0]?.url || '');
+}
+
+async function handleShare() {
+    const track = getCurrentContextTrack();
+    if (!track) return;
+    
+    hideTrackContextMenu();
+    
+    const shareUrl = `https://open.spotify.com/track/${track.id}`;
+    const shareText = `🎵 Check out "${track.name}" by ${track.artists[0].name}`;
+    
+    try {
+        if (navigator.share && navigator.canShare && navigator.canShare({ url: shareUrl })) {
+            await navigator.share({
+                title: `${track.name} - ${track.artists[0].name}`,
+                text: shareText,
+                url: shareUrl
+            });
+            showStatus('📤 Shared successfully!');
+        } else {
+            await navigator.clipboard.writeText(`${shareText}\n${shareUrl}`);
+            showStatus('📋 Link copied to clipboard!');
         }
+    } catch (error) {
+        showStatus('❌ Failed to share');
+        console.error('Share error:', error);
+    }
+}
 
-        if (interval) {
-            clearInterval(interval);
-            longPressIntervals.delete(element);
-        }
-
-        element.classList.remove('active');
-
-        // If it wasn't a long press, execute once
-        if (!isLongPress) {
-            callback();
-        }
-    };
-
-    // Mouse events
-    element.addEventListener('mousedown', startLongPress);
-    element.addEventListener('mouseup', endLongPress);
-    element.addEventListener('mouseleave', endLongPress);
-
-    // Touch events
-    element.addEventListener('touchstart', startLongPress, { passive: true });
-    element.addEventListener('touchend', endLongPress, { passive: true });
-    element.addEventListener('touchcancel', endLongPress, { passive: true });
+async function handleListenInSpotify() {
+    const track = getCurrentContextTrack();
+    if (!track) return;
+    
+    hideTrackContextMenu();
+    
+    const spotifyUrl = `spotify:track:${track.id}`;
+    const webUrl = `https://open.spotify.com/track/${track.id}`;
+    
+    try {
+        // Try to open in Spotify app first
+        window.location.href = spotifyUrl;
+        
+        // Fallback to web player after a short delay
+        setTimeout(() => {
+            window.open(webUrl, '_blank');
+        }, 500);
+        
+        showStatus('🎵 Opening in Spotify...');
+    } catch (error) {
+        // Fallback to web player
+        window.open(webUrl, '_blank');
+        showStatus('🎵 Opening in Spotify...');
+    }
 }
 
 // PKCE Auth
@@ -1909,6 +2078,7 @@ function displaySearchResults(tracks, hasMore = false) {
             <div class="track-actions">
                 <button class="track-action-btn play-track-btn" data-track-index="${index}">▶</button>
                 <button class="track-action-btn secondary select-track-btn" data-track-index="${index}">+</button>
+                <button class="track-action-btn menu track-menu-btn" data-track-index="${index}">⋮</button>
             </div>
         </div>
     `).join('');
@@ -2768,10 +2938,14 @@ function setupEventListeners() {
         }
     });
 
-    // ESC key to close popup
+    // ESC key to close popup or context menu
     document.addEventListener('keydown', (e) => {
-        if (e.key === 'Escape' && !els.precisionPopup.classList.contains('hidden')) {
-            els.precisionPopup.classList.add('hidden');
+        if (e.key === 'Escape') {
+            if (!els.precisionPopup.classList.contains('hidden')) {
+                els.precisionPopup.classList.add('hidden');
+            } else if (els.contextMenuOverlay.classList.contains('show')) {
+                hideTrackContextMenu();
+            }
         }
     });
 
@@ -2815,7 +2989,7 @@ function setupEventListeners() {
                 await seekToPosition(newTime * 1000);
             }
 
-            // Loop controls - CLEANED UP (removed precision-repeat references)
+            // Loop controls
             else if (target.matches('#start-loop-btn')) {
                 e.preventDefault();
                 if (!currentTrack || !loopEnabled) {
@@ -2909,6 +3083,12 @@ function setupEventListeners() {
                     await selectTrack(track.uri, track.name, track.artists[0].name, track.duration_ms, track.album.images[0]?.url || '');
                 }
             }
+            else if (target.matches('.track-menu-btn')) {
+                e.stopPropagation();
+                e.preventDefault();
+                const index = parseInt(target.dataset.trackIndex);
+                showTrackContextMenu(index, target);
+            }
             else if (target.closest('.track-item') && !target.closest('.track-actions')) {
                 e.preventDefault();
                 const item = target.closest('.track-item');
@@ -2917,6 +3097,32 @@ function setupEventListeners() {
                 if (track) {
                     await selectTrack(track.uri, track.name, track.artists[0].name, track.duration_ms, track.album.images[0]?.url || '');
                 }
+            }
+
+            // Context Menu Actions
+            else if (target.matches('#menu-discover-moments')) {
+                e.preventDefault();
+                await handleDiscoverMoments();
+            }
+            else if (target.matches('#menu-add-playlist')) {
+                e.preventDefault();
+                await handleAddToPlaylist();
+            }
+            else if (target.matches('#menu-create-loop')) {
+                e.preventDefault();
+                await handleCreateLoop();
+            }
+            else if (target.matches('#menu-share')) {
+                e.preventDefault();
+                await handleShare();
+            }
+            else if (target.matches('#menu-spotify')) {
+                e.preventDefault();
+                await handleListenInSpotify();
+            }
+            else if (target.matches('#context-menu-overlay')) {
+                e.preventDefault();
+                hideTrackContextMenu();
             }
 
             // Library actions
@@ -3026,9 +3232,9 @@ window.saveLoopEdits = saveLoopEdits;
 
 // Init
 function init() {
-    console.log('🚀 Initializing LOOOPZ - Cleaned Up Version...');
+    console.log('🚀 Initializing LOOOPZ with Three-Dot Context Menu...');
 
-    // Cache all elements - CLEANED UP (removed precisionRepeatValue)
+    // Cache all elements
     els = {
         loginScreen: document.getElementById('login-screen'),
         searchSection: document.getElementById('search-section'),
@@ -3073,7 +3279,9 @@ function init() {
         navSearch: document.getElementById('nav-search'),
         navPlayer: document.getElementById('nav-player'),
         navLibrary: document.getElementById('nav-library'),
-        navDiscovery: document.getElementById('nav-discovery')
+        navDiscovery: document.getElementById('nav-discovery'),
+        contextMenu: document.getElementById('track-context-menu'),
+        contextMenuOverlay: document.getElementById('context-menu-overlay')
     };
 
     setupEventListeners();
@@ -3081,7 +3289,7 @@ function init() {
     checkAuth();
     loadSavedLoops();
 
-    console.log('✅ LOOOPZ initialization complete - All cleaned up!');
+    console.log('✅ LOOOPZ initialization complete with Three-Dot Context Menu!');
 }
 
 document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', init) : init();
