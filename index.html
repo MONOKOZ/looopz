@@ -45,16 +45,16 @@
         </div>
 
         <!-- Search -->
-        <div id="search-section" class="section" style="display: none;">
+        <div id="search-section" class="section hidden">
             <div class="search-container">
                 <input type="text" id="search-input" class="search-input" placeholder="Search for songs, artists, or albums...">
-                <button class="search-back-btn" id="search-back-btn" style="display: none;">← Back</button>
+                <button class="search-back-btn hidden" id="search-back-btn">← Back</button>
             </div>
             <div id="search-results" class="search-results"></div>
         </div>
 
         <!-- Player -->
-        <div id="player-section" class="section" style="display: none;">
+        <div id="player-section" class="section hidden">
             <div class="player-container">
                 <div class="track-info">
                     <h2 id="current-track">No track playing</h2>
@@ -101,13 +101,13 @@
         </div>
 
         <!-- Library -->
-        <div id="library-section" class="section" style="display: none;">
+        <div id="library-section" class="section hidden">
             <h2 class="section-title">My Saved Loops</h2>
             <div id="loops-list" class="loops-list"></div>
         </div>
 
         <!-- Playlists -->
-        <div id="playlists-section" class="section" style="display: none;">
+        <div id="playlists-section" class="section hidden">
             <div class="section-header">
                 <h2 class="section-title">My Playlists</h2>
                 <button class="create-playlist-btn" id="create-playlist-btn">+ Create Playlist</button>
@@ -121,7 +121,7 @@
     <div class="context-menu-overlay" id="context-menu-overlay"></div>
 
     <!-- Add to Playlist Popup -->
-    <div class="popup-overlay" id="add-to-playlist-popup">
+    <div class="popup-overlay hidden" id="add-to-playlist-popup">
         <div class="popup-content">
             <div class="popup-header">
                 <h3>Add to Playlist</h3>
@@ -135,7 +135,7 @@
     </div>
 
     <!-- Precision Popup -->
-    <div class="precision-popup" id="precision-popup">
+    <div class="precision-popup hidden" id="precision-popup">
         <div class="precision-popup-content">
             <div class="precision-popup-header">
                 <h3>Fine-tune Loop Points</h3>
@@ -156,7 +156,7 @@
     </div>
 
     <!-- Playlist Form Popup -->
-    <div class="precision-popup" id="playlist-form-popup">
+    <div class="precision-popup hidden" id="playlist-form-popup">
         <div class="precision-popup-content">
             <div class="precision-popup-header">
                 <h3 id="playlist-form-title">Create Playlist</h3>
