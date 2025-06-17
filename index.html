@@ -12,7 +12,8 @@
     <meta property="og:url" content="https://looopz.vercel.app/">
     <meta property="og:image" content="https://looopz.vercel.app/og-image.png">
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='40' fill='none' stroke='%231DB954' stroke-width='6'/%3E%3Ccircle cx='50' cy='50' r='25' fill='none' stroke='%231DB954' stroke-width='4'/%3E%3Ccircle cx='50' cy='50' r='10' fill='%231DB954'/%3E%3C/svg%3E">
-    <link rel="stylesheet" href="style.css">
+    <link rel="stylesheet" href="style.css" />
+   
 </head>
 <body>
     <div class="app-header">
@@ -41,121 +42,231 @@
             <div class="login-icon">⚡</div>
             <h1 class="login-title">Welcome to LOOOPZ</h1>
             <p class="login-subtitle">Create perfect loops from any Spotify track.<br>Precision timing. Endless possibilities.</p>
-            <button class="connect-btn" id="connect-btn">Connect with Spotify</button>
+            <button class="btn" id="connect-btn">Connect Spotify Premium</button>
+            <p style="color: var(--light-gray); font-size: 13px; margin-top: 12px;">Requires Spotify Premium for full track playback</p>
         </div>
 
         <!-- Search -->
-        <div id="search-section" class="section hidden">
-            <div class="search-container">
-                <input type="text" id="search-input" class="search-input" placeholder="Search for songs, artists, or albums...">
-                <button class="search-back-btn hidden" id="search-back-btn">← Back</button>
+        <div id="search-section" class="hidden">
+            <div class="card">
+                <div class="search-container">
+                    <div class="search-header" id="search-header">
+                        <button class="back-btn hidden" id="search-back-btn">←</button>
+                        <input type="text" class="search-input" id="search-input" placeholder="Search for any song..." autocomplete="off">
+                    </div>
+                </div>
+                <div id="search-results">
+                    <div style="text-align: center; padding: 40px; color: var(--light-gray);">Search for tracks to start creating loops</div>
+                </div>
             </div>
-            <div id="search-results" class="search-results"></div>
         </div>
 
         <!-- Player -->
-        <div id="player-section" class="section hidden">
-            <div class="player-container">
-                <div class="track-info">
-                    <h2 id="current-track">No track playing</h2>
-                    <p id="current-artist">Select a track to start</p>
-                </div>
-
-                <div class="progress-section">
-                    <div class="time-display">
-                        <span id="current-time">0:00</span>
-                        <span id="duration">0:00</span>
+        <div id="player-section" class="hidden">
+            <div class="card">
+                <!-- Playlist Now Playing (if active) -->
+                <div class="playlist-now-playing hidden" id="playlist-now-playing">
+                    <div class="playlist-now-playing-header">
+                        <div class="playlist-now-playing-title">Playing from Playlist</div>
+                        <div class="playlist-progress" id="playlist-progress">1/5</div>
                     </div>
-                    <div class="progress-container" id="progress-container">
-                        <div class="progress-bar" id="progress-bar"></div>
-                        <div class="loop-region" id="loop-region">
-                            <div class="loop-handle start" id="loop-start-handle"></div>
-                            <div class="loop-handle end" id="loop-end-handle"></div>
+                    <div class="playlist-current-item">
+                        <img src="" alt="" class="playlist-current-item-icon" id="playlist-current-icon">
+                        <div class="playlist-current-item-info">
+                            <div class="playlist-current-item-name" id="playlist-current-name">-</div>
+                            <div class="playlist-current-item-type" id="playlist-current-type">-</div>
                         </div>
-                        <div class="time-popup start-popup" id="start-popup">0:00</div>
-                        <div class="time-popup end-popup" id="end-popup">0:30</div>
+                        <div class="playlist-playback-controls">
+                            <button class="playlist-control-btn" id="playlist-prev-btn">⏮</button>
+                            <button class="playlist-control-btn" id="playlist-stop-btn">⏹</button>
+                            <button class="playlist-control-btn" id="playlist-next-btn">⏭</button>
+                        </div>
                     </div>
                 </div>
 
-                <div class="controls-section">
+                <div class="now-playing">
+                    <div class="current-track" id="current-track">No track selected</div>
+                    <div class="current-artist" id="current-artist"></div>
+                </div>
+
+                <div class="progress-container" id="progress-container">
+                    <div class="loop-region" id="loop-region"></div>
+                    <div class="progress-bar" id="progress-bar"></div>
+                    <div class="loop-handle start" id="loop-start-handle">
+                        <div class="time-popup" id="start-popup">0:00.000</div>
+                    </div>
+                    <div class="loop-handle end" id="loop-end-handle">
+                        <div class="time-popup" id="end-popup">0:30.000</div>
+                    </div>
+                </div>
+
+                <div class="time-display">
+                    <span id="current-time">0:00.000</span>
+                    <span id="duration">0:00.000</span>
+                </div>
+
+                <div class="main-controls">
                     <div class="playback-controls">
                         <button class="control-btn" id="backward-btn">⏪</button>
-                        <button class="control-btn play-pause" id="play-pause-btn">▶</button>
+                        <button class="control-btn play-pause-btn" id="play-pause-btn">▶</button>
                         <button class="control-btn" id="forward-btn">⏩</button>
                     </div>
-                    <div class="loop-controls">
-                        <button class="loop-btn" id="start-loop-btn">Set Loop Start</button>
-                        <button class="loop-btn save" id="save-loop-btn">💾 Save Loop</button>
-                        <div class="loop-toggle" id="loop-toggle">
-                            <span>Loop</span>
-                            <div class="toggle-switch"></div>
-                        </div>
-                        <div class="repeat-value" id="repeat-value">1/1</div>
-                    </div>
-                </div>
 
-                <div class="fine-tune-section">
-                    <button class="precision-btn" id="precision-btn">⚡ Fine-tune Loop Points</button>
+                    <div class="loop-controls">
+                        <div class="loop-section">
+                            <span>Loop Mode</span>
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="loop-toggle">
+                                <span class="toggle-slider"></span>
+                            </label>
+                        </div>
+
+                        <div class="loop-section">
+                            <span>Repeat Count</span>
+                            <div class="repeat-counter">
+                                <div class="repeat-btn" id="repeat-decrease">−</div>
+                                <div class="repeat-value" id="repeat-value">1×</div>
+                                <div class="repeat-btn" id="repeat-increase">+</div>
+                            </div>
+                        </div>
+
+                        <div class="loop-actions">
+                            <button class="btn start-loop-btn" id="start-loop-btn">Start Loop</button>
+                            <button class="btn secondary" id="save-loop-btn">Save Loop</button>
+                            <button class="btn secondary" id="add-to-playlist-btn">+ Playlist</button>
+                            <button class="btn" id="precision-btn" style="background: linear-gradient(135deg, #444, #333); padding: 10px 16px;">⚙️ Precision</button>
+                        </div>
+                    </div>
                 </div>
             </div>
         </div>
 
         <!-- Library -->
-        <div id="library-section" class="section hidden">
-            <h2 class="section-title">My Saved Loops</h2>
-            <div id="loops-list" class="loops-list"></div>
+        <div id="library-section" class="hidden">
+            <div class="card">
+                <h2 class="card-title">
+                    <span>My Saved Loops</span>
+                    <button class="btn danger" id="clear-all-loops" style="padding: 6px 12px; font-size: 12px;">Clear All</button>
+                </h2>
+                <div id="loops-list">
+                    <div style="text-align: center; padding: 60px 20px;">
+                        <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.4;">📦</div>
+                        <div style="color: var(--light-gray); font-size: 16px; margin-bottom: 8px;">No saved loops yet</div>
+                        <div style="color: var(--light-gray); font-size: 13px;">Create and save loops to build your collection</div>
+                    </div>
+                </div>
+            </div>
         </div>
 
         <!-- Playlists -->
-        <div id="playlists-section" class="section hidden">
-            <div class="section-header">
-                <h2 class="section-title">My Playlists</h2>
-                <button class="create-playlist-btn" id="create-playlist-btn">+ Create Playlist</button>
-            </div>
-            <div id="playlists-list" class="playlists-list"></div>
-        </div>
-    </div>
-
-    <!-- Context Menu -->
-    <div class="context-menu" id="track-context-menu"></div>
-    <div class="context-menu-overlay" id="context-menu-overlay"></div>
-
-    <!-- Add to Playlist Popup -->
-    <div class="popup-overlay hidden" id="add-to-playlist-popup">
-        <div class="popup-content">
-            <div class="popup-header">
-                <h3>Add to Playlist</h3>
-                <button class="popup-close" id="add-to-playlist-close">✕</button>
-            </div>
-            <div class="playlist-selection">
-                <div id="playlist-selection-list"></div>
-                <button class="quick-create-btn" id="quick-create-playlist">+ Create New Playlist</button>
+        <div id="playlists-section" class="hidden">
+            <div class="card">
+                <h2 class="card-title">
+                    <span>My Playlists</span>
+                    <button class="btn secondary" id="create-playlist-btn" style="padding: 6px 12px; font-size: 12px;">+ Create</button>
+                </h2>
+                <div id="playlists-list">
+                    <div style="text-align: center; padding: 60px 20px;">
+                        <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.4;">🎵</div>
+                        <div style="color: var(--light-gray); font-size: 16px; margin-bottom: 8px;">No playlists yet</div>
+                        <div style="color: var(--light-gray); font-size: 13px;">Create playlists to mix loops and full tracks</div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
 
-    <!-- Precision Popup -->
+    <!-- Precision Controls Popup -->
     <div class="precision-popup hidden" id="precision-popup">
         <div class="precision-popup-content">
             <div class="precision-popup-header">
-                <h3>Fine-tune Loop Points</h3>
+                <h3>Precision Controls</h3>
                 <button class="popup-close" id="precision-close">✕</button>
             </div>
+
             <div class="precision-inputs">
-                <div class="input-group">
-                    <label>Start Time</label>
-                    <input type="text" id="precision-start" placeholder="0:00.000">
+                <div class="precision-field">
+                    <label class="precision-label">Start Time</label>
+                    <input type="text" class="precision-input" id="precision-start" placeholder="0:00.000">
                 </div>
-                <div class="input-group">
-                    <label>End Time</label>
-                    <input type="text" id="precision-end" placeholder="0:30.000">
+                <div class="precision-field">
+                    <label class="precision-label">End Time</label>
+                    <input type="text" class="precision-input" id="precision-end" placeholder="0:30.000">
                 </div>
             </div>
-            <div class="precision-hint">Format: M:SS.mmm or SS.mmm</div>
+
+            <div class="fine-tune-section">
+                <div class="fine-tune-controls">
+                    <div class="fine-tune-group">
+                        <div class="fine-tune-title">Start Loop</div>
+                        <div class="fine-tune-row">
+                            <button class="fine-tune-btn" data-target="start" data-amount="-1">-1s</button>
+                            <button class="fine-tune-btn" data-target="start" data-amount="1">+1s</button>
+                        </div>
+                        <div class="fine-tune-row">
+                            <button class="fine-tune-btn" data-target="start" data-amount="-0.1">-100ms</button>
+                            <button class="fine-tune-btn" data-target="start" data-amount="0.1">+100ms</button>
+                        </div>
+                    </div>
+                    <div class="fine-tune-group">
+                        <div class="fine-tune-title">End Loop</div>
+                        <div class="fine-tune-row">
+                            <button class="fine-tune-btn" data-target="end" data-amount="-1">-1s</button>
+                            <button class="fine-tune-btn" data-target="end" data-amount="1">+1s</button>
+                        </div>
+                        <div class="fine-tune-row">
+                            <button class="fine-tune-btn" data-target="end" data-amount="-0.1">-100ms</button>
+                            <button class="fine-tune-btn" data-target="end" data-amount="0.1">+100ms</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
-    <!-- Playlist Form Popup -->
+    <!-- Track Context Menu -->
+    <div class="context-menu-overlay" id="context-menu-overlay"></div>
+    <div class="track-context-menu" id="track-context-menu">
+        <button class="context-menu-item" id="menu-discover-moments">
+            <span class="context-menu-icon">🔍</span>
+            <span class="context-menu-text">Discover Moments</span>
+        </button>
+        <button class="context-menu-item" id="menu-add-playlist">
+            <span class="context-menu-icon">➕</span>
+            <span class="context-menu-text">Add to Playlist</span>
+        </button>
+        <button class="context-menu-item" id="menu-create-loop">
+            <span class="context-menu-icon">🔄</span>
+            <span class="context-menu-text">Create Loop</span>
+        </button>
+        <button class="context-menu-item" id="menu-share">
+            <span class="context-menu-icon">📤</span>
+            <span class="context-menu-text">Share</span>
+        </button>
+        <button class="context-menu-item" id="menu-spotify">
+            <span class="context-menu-icon">🎵</span>
+            <span class="context-menu-text">Listen in Spotify</span>
+        </button>
+    </div>
+
+    <!-- Add to Playlist Popup -->
+    <div class="add-to-playlist-popup hidden" id="add-to-playlist-popup">
+        <div class="add-to-playlist-content">
+            <div class="add-to-playlist-header">
+                <h3>Add to Playlist</h3>
+                <button class="popup-close" id="add-to-playlist-close">✕</button>
+            </div>
+<div class="playlist-selection-list" id="playlist-selection-list">
+                <!-- Playlists will be populated here -->
+            </div>
+            <button class="create-new-playlist-btn" id="quick-create-playlist">
+                <span>➕</span>
+                <span>Create New Playlist</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Create/Edit Playlist Popup -->
     <div class="precision-popup hidden" id="playlist-form-popup">
         <div class="precision-popup-content">
             <div class="precision-popup-header">
@@ -207,7 +318,8 @@
         </div>
     </div>
 
-    <script src="https://sdk.scdn.co/spotify-player.js"></script>
     <script src="script.js"></script>
+<script src="https://sdk.scdn.co/spotify-player.js"></script>
+
 </body>
 </html>
