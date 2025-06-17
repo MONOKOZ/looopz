@@ -3077,3 +3077,52 @@ function init() {
 }
 
 document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', init) : init();
+
+// Patch for loop toggle functionality
+// Add this to the end of your script.js file
+
+// Override the loopToggle event listener to work with classes
+document.addEventListener('DOMContentLoaded', function() {
+    const loopToggleElement = document.getElementById('loop-toggle');
+    if (loopToggleElement) {
+        // Remove the old event listener
+        const newLoopToggle = loopToggleElement.cloneNode(true);
+        loopToggleElement.parentNode.replaceChild(newLoopToggle, loopToggleElement);
+        
+        // Add new event listener
+        newLoopToggle.addEventListener('click', function() {
+            loopEnabled = !loopEnabled;
+            this.classList.toggle('active', loopEnabled);
+            loopCount = 0;
+            
+            const startLoopBtn = document.getElementById('start-loop-btn');
+            if (startLoopBtn) {
+                startLoopBtn.disabled = !loopEnabled;
+            }
+            
+            showStatus(loopEnabled ? `Loop enabled: ${loopTarget} time(s)` : 'Loop disabled');
+        });
+    }
+});
+
+// Fix for the loopToggle.checked references in the code
+Object.defineProperty(els, 'loopToggle', {
+    get: function() {
+        return {
+            checked: loopEnabled,
+            set checked(value) {
+                loopEnabled = value;
+                const toggle = document.getElementById('loop-toggle');
+                if (toggle) {
+                    toggle.classList.toggle('active', value);
+                }
+            },
+            addEventListener: function(event, handler) {
+                const toggle = document.getElementById('loop-toggle');
+                if (toggle) {
+                    toggle.addEventListener(event, handler);
+                }
+            }
+        };
+    }
+});
