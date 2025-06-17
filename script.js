@@ -21,7 +21,7 @@ let currentPlaylistIndex = 0;
 let isPlaylistMode = false;
 let currentEditingPlaylistId = null;
 let pendingPlaylistItem = null;
-let playlistEngine = null;
+let playlistLoopCount = 0; // Track loop count within playlist
 
 // Search state
 let searchState = {
@@ -36,89 +36,6 @@ let searchState = {
 
 // Elements
 let els = {};
-
-// Playlist Engine Class for proper playlist management
-class PlaylistEngine {
-    constructor() {
-        this.playlist = null;
-        this.currentIndex = 0;
-        this.isPlaying = false;
-        this.isLoopingTrack = false;
-        this.trackLoopCount = 0;
-        this.trackLoopTarget = 1;
-    }
-
-    setPlaylist(playlist) {
-        this.playlist = playlist;
-        this.currentIndex = 0;
-    }
-
-    getCurrentTrack() {
-        if (!this.playlist || !this.playlist.items || this.playlist.items.length === 0) return null;
-        return this.playlist.items[this.currentIndex];
-    }
-
-    async playNext() {
-        if (!this.playlist || !this.playlist.items) return;
-        
-        // Check if we should loop the current track
-        if (this.isLoopingTrack && this.trackLoopCount < this.trackLoopTarget) {
-            this.trackLoopCount++;
-            const currentTrack = this.getCurrentTrack();
-            if (currentTrack) {
-                await playTrackWithLoopPoints(currentTrack);
-                return;
-            }
-        }
-
-        // Reset track loop state
-        this.isLoopingTrack = false;
-        this.trackLoopCount = 0;
-        
-        // Move to next track
-        this.currentIndex = (this.currentIndex + 1) % this.playlist.items.length;
-        const nextTrack = this.getCurrentTrack();
-        
-        if (nextTrack) {
-            updateStatus(`Playing track ${this.currentIndex + 1} of ${this.playlist.items.length}`);
-            await playTrackWithLoopPoints(nextTrack);
-        }
-    }
-
-    async playPrevious() {
-        if (!this.playlist || !this.playlist.items) return;
-        
-        this.currentIndex = this.currentIndex > 0 ? this.currentIndex - 1 : this.playlist.items.length - 1;
-        const prevTrack = this.getCurrentTrack();
-        
-        if (prevTrack) {
-            updateStatus(`Playing track ${this.currentIndex + 1} of ${this.playlist.items.length}`);
-            await playTrackWithLoopPoints(prevTrack);
-        }
-    }
-
-    enableTrackLoop(loopTarget = 1) {
-        this.isLoopingTrack = true;
-        this.trackLoopTarget = loopTarget;
-        this.trackLoopCount = 0;
-    }
-
-    disableTrackLoop() {
-        this.isLoopingTrack = false;
-        this.trackLoopCount = 0;
-    }
-
-    reset() {
-        this.playlist = null;
-        this.currentIndex = 0;
-        this.isPlaying = false;
-        this.isLoopingTrack = false;
-        this.trackLoopCount = 0;
-    }
-}
-
-// Initialize playlist engine
-playlistEngine = new PlaylistEngine();
 
 // Utils
 function formatTime(seconds, showMs = true) {
@@ -234,43 +151,20 @@ function initSpotifyPlayer() {
             updatePlayPauseButton();
             updateProgress();
 
-            // Handle track end for both loop and playlist modes
-            if (state.position === 0 && state.paused && duration > 0) {
-                handleTrackEnd();
-            }
-
-            // Handle looping within a track
-            if (loopEnabled && !state.paused && currentTime >= loopEnd && !isLooping) {
-                isLooping = true;
-                if (loopCount < loopTarget - 1) {
-                    loopCount++;
-                    els.repeatValue.textContent = `${loopCount}/${loopTarget}`;
-                    spotifyPlayer.seek(loopStart * 1000);
-                    setTimeout(() => { isLooping = false; }, 100);
-                } else {
-                    // Loop complete
-                    loopCount = 0;
-                    els.repeatValue.textContent = '1/1';
-                    if (isPlaylistMode && playlistEngine.playlist) {
-                        // If in playlist mode, check if we should loop this track again
-                        if (playlistEngine.isLoopingTrack) {
-                            playlistEngine.trackLoopCount++;
-                            if (playlistEngine.trackLoopCount < playlistEngine.trackLoopTarget) {
-                                spotifyPlayer.seek(loopStart * 1000);
-                                setTimeout(() => { isLooping = false; }, 100);
-                            } else {
-                                // Track loop complete, move to next
-                                playlistEngine.playNext();
-                            }
-                        } else {
-                            // No track loop, just move to next
-                            playlistEngine.playNext();
-                        }
-                    } else {
-                        // Not in playlist mode, just restart the loop
+            // Handle track end - fixed for playlist mode
+            if (state.position === 0 && state.paused && duration > 0 && !isDragging) {
+                // Track ended naturally
+                if (isPlaylistMode && currentPlaylist) {
+                    // In playlist mode, move to next track
+                    setTimeout(() => {
+                        playNextInPlaylist();
+                    }, 100);
+                } else if (loopEnabled) {
+                    // In single track mode with loop enabled, restart
+                    setTimeout(() => {
                         spotifyPlayer.seek(loopStart * 1000);
-                        setTimeout(() => { isLooping = false; }, 100);
-                    }
+                        spotifyPlayer.resume();
+                    }, 100);
                 }
             }
         });
@@ -301,17 +195,6 @@ function initSpotifyPlayer() {
         document.body.appendChild(script);
     } else {
         window.onSpotifyWebPlaybackSDKReady();
-    }
-}
-
-function handleTrackEnd() {
-    if (isPlaylistMode && playlistEngine.playlist) {
-        // In playlist mode, let the engine handle next track
-        playlistEngine.playNext();
-    } else if (loopEnabled) {
-        // In single track mode with loop enabled, restart
-        spotifyPlayer.seek(loopStart * 1000);
-        spotifyPlayer.resume();
     }
 }
 
@@ -530,7 +413,9 @@ async function playFromSearch(index) {
     
     // Exit playlist mode when playing from search
     isPlaylistMode = false;
-    playlistEngine.reset();
+    currentPlaylist = null;
+    currentPlaylistIndex = 0;
+    playlistLoopCount = 0;
     
     // Reset loop state
     loopEnabled = false;
@@ -607,7 +492,7 @@ function updateLoop() {
         currentTime = state.position / 1000;
         updateProgress();
         
-        // Handle loop boundary
+        // Handle loop boundary with better playlist support
         if (loopEnabled && currentTime >= loopEnd && !isLooping) {
             isLooping = true;
             
@@ -621,9 +506,18 @@ function updateLoop() {
                 loopCount = 0;
                 els.repeatValue.textContent = '1/1';
                 
-                if (isPlaylistMode && playlistEngine.playlist) {
-                    // Let playlist engine handle next action
-                    playlistEngine.playNext();
+                if (isPlaylistMode && currentPlaylist) {
+                    // Check if we should repeat this track in playlist
+                    const currentTrackInPlaylist = currentPlaylist.items[currentPlaylistIndex];
+                    if (currentTrackInPlaylist && currentTrackInPlaylist.repeat && playlistLoopCount < currentTrackInPlaylist.repeat - 1) {
+                        playlistLoopCount++;
+                        spotifyPlayer.seek(loopStart * 1000);
+                        setTimeout(() => { isLooping = false; }, 100);
+                    } else {
+                        // Move to next track in playlist
+                        playlistLoopCount = 0;
+                        playNextInPlaylist();
+                    }
                 } else {
                     // Single track mode - restart loop
                     spotifyPlayer.seek(loopStart * 1000);
@@ -632,6 +526,23 @@ function updateLoop() {
             }
         }
     });
+}
+
+async function playNextInPlaylist() {
+    if (!currentPlaylist || !currentPlaylist.items) return;
+    
+    currentPlaylistIndex = (currentPlaylistIndex + 1) % currentPlaylist.items.length;
+    const nextTrack = currentPlaylist.items[currentPlaylistIndex];
+    
+    if (nextTrack) {
+        updateStatus(`Playing track ${currentPlaylistIndex + 1} of ${currentPlaylist.items.length}`);
+        // Reset states for new track
+        isLooping = false;
+        loopCount = 0;
+        playlistLoopCount = 0;
+        
+        await playTrackWithLoopPoints(nextTrack);
+    }
 }
 
 function updateNowPlaying(track) {
@@ -682,18 +593,10 @@ async function playPlaylist(playlistId) {
     isPlaylistMode = true;
     currentPlaylist = playlist;
     currentPlaylistIndex = 0;
-    
-    // Initialize playlist engine
-    playlistEngine.setPlaylist(playlist);
-    
-    // Check if current track has loop settings
-    const firstTrack = playlist.items[0];
-    if (firstTrack.repeat && firstTrack.repeat > 1) {
-        playlistEngine.enableTrackLoop(firstTrack.repeat);
-    }
+    playlistLoopCount = 0;
     
     updateStatus(`Playing playlist: ${playlist.name}`);
-    await playTrackWithLoopPoints(firstTrack);
+    await playTrackWithLoopPoints(playlist.items[0]);
     
     showView('player');
 }
@@ -706,18 +609,10 @@ async function playFromPlaylist(playlistId, trackIndex) {
     isPlaylistMode = true;
     currentPlaylist = playlist;
     currentPlaylistIndex = trackIndex;
-    
-    // Initialize playlist engine
-    playlistEngine.setPlaylist(playlist);
-    playlistEngine.currentIndex = trackIndex;
-    
-    const track = playlist.items[trackIndex];
-    if (track.repeat && track.repeat > 1) {
-        playlistEngine.enableTrackLoop(track.repeat);
-    }
+    playlistLoopCount = 0;
     
     updateStatus(`Playing from playlist: ${playlist.name}`);
-    await playTrackWithLoopPoints(track);
+    await playTrackWithLoopPoints(playlist.items[trackIndex]);
     
     showView('player');
 }
@@ -807,9 +702,11 @@ async function playLoop(loopId) {
     const loop = savedLoops.find(l => l.id === loopId);
     if (!loop) return;
 
-    // Exit playlist mode when playing a single loop
+    // Exit playlist mode when playing a saved loop
     isPlaylistMode = false;
-    playlistEngine.reset();
+    currentPlaylist = null;
+    currentPlaylistIndex = 0;
+    playlistLoopCount = 0;
     
     loopStart = loop.loopStart;
     loopEnd = loop.loopEnd;
@@ -1259,8 +1156,11 @@ function setupEventListeners() {
     els.backwardBtn.addEventListener('click', () => {
         if (!spotifyPlayer) return;
         
-        if (isPlaylistMode && playlistEngine.playlist) {
-            playlistEngine.playPrevious();
+        if (isPlaylistMode && currentPlaylist) {
+            // Go to previous track in playlist
+            currentPlaylistIndex = currentPlaylistIndex > 0 ? currentPlaylistIndex - 1 : currentPlaylist.items.length - 1;
+            playlistLoopCount = 0;
+            playTrackWithLoopPoints(currentPlaylist.items[currentPlaylistIndex]);
         } else {
             const newTime = Math.max(0, currentTime - 5);
             spotifyPlayer.seek(newTime * 1000);
@@ -1270,8 +1170,9 @@ function setupEventListeners() {
     els.forwardBtn.addEventListener('click', () => {
         if (!spotifyPlayer) return;
         
-        if (isPlaylistMode && playlistEngine.playlist) {
-            playlistEngine.playNext();
+        if (isPlaylistMode && currentPlaylist) {
+            // Go to next track in playlist
+            playNextInPlaylist();
         } else {
             const newTime = Math.min(duration, currentTime + 5);
             spotifyPlayer.seek(newTime * 1000);
