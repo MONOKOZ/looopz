@@ -57,62 +57,6 @@ function cleanupPlaybackMode() {
     };
 }
 
-// Wrap the existing playTrackInBackground function
-const originalPlayTrackInBackground = playTrackInBackground;
-playTrackInBackground = async function(track) {
-    cleanupPlaybackMode();
-    playbackSource = 'search';
-    return originalPlayTrackInBackground(track);
-};
-
-// Wrap the existing selectTrack function
-const originalSelectTrack = selectTrack;
-selectTrack = async function(uri, name, artist, durationMs, imageUrl) {
-    cleanupPlaybackMode();
-    playbackSource = 'search';
-    return originalSelectTrack(uri, name, artist, durationMs, imageUrl);
-};
-
-// Wrap the existing loadSavedLoop function
-const originalLoadSavedLoop = loadSavedLoop;
-loadSavedLoop = async function(loopId) {
-    cleanupPlaybackMode();
-    playbackSource = 'library';
-    return originalLoadSavedLoop(loopId);
-};
-
-// Wrap the existing playPlaylist function
-const originalPlayPlaylist = playPlaylist;
-playPlaylist = async function(playlistId, startIndex = 0) {
-    cleanupPlaybackMode();
-    playbackSource = 'playlist';
-    return originalPlayPlaylist(playlistId, startIndex);
-};
-
-// Fix the progress update to handle different sources correctly
-const originalStartProgressUpdates = startProgressUpdates;
-startProgressUpdates = function() {
-    stopProgressUpdates();
-    updateTimer = setInterval(async () => {
-        if (isPlaying && spotifyPlayer && !isLooping) {
-            try {
-                const state = await spotifyPlayer.getCurrentState();
-                if (state && state.position !== undefined) {
-                    currentTime = state.position / 1000;
-                    updateProgress();
-                    
-                    // Only handle loop end for non-playlist sources
-                    if (loopEnabled && currentTime >= loopEnd - 0.1 && loopCount < loopTarget && !isPlaylistMode && playbackSource !== 'playlist') {
-                        const timeSinceLoopStart = Date.now() - loopStartTime;
-                        if (timeSinceLoopStart > 800) await handleLoopEnd();
-                    }
-                }
-            } catch (error) {
-                console.warn('State check failed:', error.message);
-            }
-        }
-    }, 100);
-};
 
 // Search state
 let searchState = {
@@ -1312,13 +1256,7 @@ function updateSearchTrackHighlighting(uri, isSelected = false) {
   }
 }
 
-// Wrap the existing playTrackInBackground function
-const originalPlayTrackInBackground = playTrackInBackground;
-playTrackInBackground = async function(track) {
-    cleanupPlaybackMode();
-    playbackSource = 'search';
-    return originalPlayTrackInBackground(track);
-};
+
 
 // Background play without navigation
 async function playTrackInBackground(track) {
@@ -1347,13 +1285,7 @@ async function playTrackInBackground(track) {
   }
 }
 
-// Wrap the existing selectTrack function
-const originalSelectTrack = selectTrack;
-selectTrack = async function(uri, name, artist, durationMs, imageUrl) {
-    cleanupPlaybackMode();
-    playbackSource = 'search';
-    return originalSelectTrack(uri, name, artist, durationMs, imageUrl);
-};
+
 
 // SEAMLESS SEARCH-TO-PLAYER TRANSITION - NEW IMPLEMENTATION
 async function selectTrack(uri, name, artist, durationMs, imageUrl) {
@@ -1672,13 +1604,7 @@ function renderLoopsList() {
   `).join('');
 }
 
-// Wrap the existing loadSavedLoop function
-const originalLoadSavedLoop = loadSavedLoop;
-loadSavedLoop = async function(loopId) {
-    cleanupPlaybackMode();
-    playbackSource = 'library';
-    return originalLoadSavedLoop(loopId);
-};
+
 
 // Library loop loading - starts from loop start position
 async function loadSavedLoop(loopId) {
@@ -2008,13 +1934,7 @@ function reorderPlaylistItems(playlistId, fromIndex, toIndex) {
   savePlaylistsToStorage();
 }
 
-// Wrap the existing playPlaylist function
-const originalPlayPlaylist = playPlaylist;
-playPlaylist = async function(playlistId, startIndex = 0) {
-    cleanupPlaybackMode();
-    playbackSource = 'playlist';
-    return originalPlayPlaylist(playlistId, startIndex);
-};
+
 
 async function playPlaylist(playlistId, startIndex = 0) {
   const playlist = savedPlaylists.find(p => p.id === playlistId);
@@ -3197,6 +3117,48 @@ function init() {
   checkAuth();
   loadSavedLoops();
   loadSavedPlaylists();
+
+// ADD THE WRAPPERS HERE - AFTER ALL FUNCTIONS ARE DEFINED:
+  
+  // Wrap the existing playTrackInBackground function
+  if (typeof playTrackInBackground === 'function') {
+      const originalPlayTrackInBackground = playTrackInBackground;
+      window.playTrackInBackground = async function(track) {
+          cleanupPlaybackMode();
+          playbackSource = 'search';
+          return originalPlayTrackInBackground.call(this, track);
+      };
+  }
+
+  // Wrap the existing selectTrack function
+  if (typeof selectTrack === 'function') {
+      const originalSelectTrack = selectTrack;
+      window.selectTrack = async function(uri, name, artist, durationMs, imageUrl) {
+          cleanupPlaybackMode();
+          playbackSource = 'search';
+          return originalSelectTrack.call(this, uri, name, artist, durationMs, imageUrl);
+      };
+  }
+
+  // Wrap the existing loadSavedLoop function
+  if (typeof loadSavedLoop === 'function') {
+      const originalLoadSavedLoop = loadSavedLoop;
+      window.loadSavedLoop = async function(loopId) {
+          cleanupPlaybackMode();
+          playbackSource = 'library';
+          return originalLoadSavedLoop.call(this, loopId);
+      };
+  }
+
+  // Wrap the existing playPlaylist function
+  if (typeof playPlaylist === 'function') {
+      const originalPlayPlaylist = playPlaylist;
+      window.playPlaylist = async function(playlistId, startIndex = 0) {
+          cleanupPlaybackMode();
+          playbackSource = 'playlist';
+          return originalPlayPlaylist.call(this, playlistId, startIndex);
+      };
+  }
 
   console.log('✅ LOOOPZ initialization complete with Playlist Management!');
 }
