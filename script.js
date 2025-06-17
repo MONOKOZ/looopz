@@ -23,6 +23,97 @@ let currentEditingPlaylistId = null;
 let pendingPlaylistItem = null; // For adding items to playlists
 let playlistEngine = null; // Will hold the playlist engine instance
 
+// Add this to your script.js to fix the playback state interference
+// This should be added right after your existing state variables
+
+// Playback source tracking
+let playbackSource = null; // 'search', 'library', 'playlist', or null
+let previousPlaybackState = null;
+
+// Function to clean up any active playback mode
+function cleanupPlaybackMode() {
+    // Stop playlist mode if active
+    if (isPlaylistMode) {
+        isPlaylistMode = false;
+        currentPlaylist = null;
+        currentPlaylistIndex = 0;
+        if (playlistEngine) {
+            playlistEngine.stopPlaylist();
+        }
+    }
+    
+    // Reset loop state if needed
+    if (loopEnabled && playbackSource !== 'library') {
+        loopCount = 0;
+        loopStartTime = 0;
+    }
+    
+    // Store previous state
+    previousPlaybackState = {
+        source: playbackSource,
+        track: currentTrack,
+        time: currentTime,
+        isPlaying: isPlaying
+    };
+}
+
+// Wrap the existing playTrackInBackground function
+const originalPlayTrackInBackground = playTrackInBackground;
+playTrackInBackground = async function(track) {
+    cleanupPlaybackMode();
+    playbackSource = 'search';
+    return originalPlayTrackInBackground(track);
+};
+
+// Wrap the existing selectTrack function
+const originalSelectTrack = selectTrack;
+selectTrack = async function(uri, name, artist, durationMs, imageUrl) {
+    cleanupPlaybackMode();
+    playbackSource = 'search';
+    return originalSelectTrack(uri, name, artist, durationMs, imageUrl);
+};
+
+// Wrap the existing loadSavedLoop function
+const originalLoadSavedLoop = loadSavedLoop;
+loadSavedLoop = async function(loopId) {
+    cleanupPlaybackMode();
+    playbackSource = 'library';
+    return originalLoadSavedLoop(loopId);
+};
+
+// Wrap the existing playPlaylist function
+const originalPlayPlaylist = playPlaylist;
+playPlaylist = async function(playlistId, startIndex = 0) {
+    cleanupPlaybackMode();
+    playbackSource = 'playlist';
+    return originalPlayPlaylist(playlistId, startIndex);
+};
+
+// Fix the progress update to handle different sources correctly
+const originalStartProgressUpdates = startProgressUpdates;
+startProgressUpdates = function() {
+    stopProgressUpdates();
+    updateTimer = setInterval(async () => {
+        if (isPlaying && spotifyPlayer && !isLooping) {
+            try {
+                const state = await spotifyPlayer.getCurrentState();
+                if (state && state.position !== undefined) {
+                    currentTime = state.position / 1000;
+                    updateProgress();
+                    
+                    // Only handle loop end for non-playlist sources
+                    if (loopEnabled && currentTime >= loopEnd - 0.1 && loopCount < loopTarget && !isPlaylistMode && playbackSource !== 'playlist') {
+                        const timeSinceLoopStart = Date.now() - loopStartTime;
+                        if (timeSinceLoopStart > 800) await handleLoopEnd();
+                    }
+                }
+            } catch (error) {
+                console.warn('State check failed:', error.message);
+            }
+        }
+    }, 100);
+};
+
 // Search state
 let searchState = {
   isSecondLevel: false,
@@ -3077,52 +3168,3 @@ function init() {
 }
 
 document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', init) : init();
-
-// Patch for loop toggle functionality
-// Add this to the end of your script.js file
-
-// Override the loopToggle event listener to work with classes
-document.addEventListener('DOMContentLoaded', function() {
-    const loopToggleElement = document.getElementById('loop-toggle');
-    if (loopToggleElement) {
-        // Remove the old event listener
-        const newLoopToggle = loopToggleElement.cloneNode(true);
-        loopToggleElement.parentNode.replaceChild(newLoopToggle, loopToggleElement);
-        
-        // Add new event listener
-        newLoopToggle.addEventListener('click', function() {
-            loopEnabled = !loopEnabled;
-            this.classList.toggle('active', loopEnabled);
-            loopCount = 0;
-            
-            const startLoopBtn = document.getElementById('start-loop-btn');
-            if (startLoopBtn) {
-                startLoopBtn.disabled = !loopEnabled;
-            }
-            
-            showStatus(loopEnabled ? `Loop enabled: ${loopTarget} time(s)` : 'Loop disabled');
-        });
-    }
-});
-
-// Fix for the loopToggle.checked references in the code
-Object.defineProperty(els, 'loopToggle', {
-    get: function() {
-        return {
-            checked: loopEnabled,
-            set checked(value) {
-                loopEnabled = value;
-                const toggle = document.getElementById('loop-toggle');
-                if (toggle) {
-                    toggle.classList.toggle('active', value);
-                }
-            },
-            addEventListener: function(event, handler) {
-                const toggle = document.getElementById('loop-toggle');
-                if (toggle) {
-                    toggle.addEventListener(event, handler);
-                }
-            }
-        };
-    }
-});
