@@ -1,4 +1,4 @@
-<script>
+
 // SPOTIFY INTEGRATION - WITH SEAMLESS SEARCH-TO-PLAYER TRANSITION AND PLAYLIST MANAGEMENT
 
 // Config
@@ -3078,4 +3078,4 @@ function init() {
 }
 
 document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', init) : init();
-  </script>
+
