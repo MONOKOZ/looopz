@@ -2204,6 +2204,12 @@ async function selectTrack(uri, name, artist, durationMs, imageUrl) {
         if (seamlessTransition) {
             // Don't reload the track, just continue from current position
             console.log('✅ Seamless transition - continuing from position:', preservedPosition);
+            
+            // Ensure progress updates are running and UI is synced
+            updateProgress();
+            updatePlayPauseButton();
+            updateNowPlayingIndicator(currentTrack);
+            startProgressUpdates();
         } else {
             // Normal loading for different tracks
             await loadTrackIntoSpotify(currentTrack);
