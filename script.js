@@ -697,14 +697,20 @@ class PlaylistTransitionEngine {
 
   // Setup loop parameters for loop items
   setupLoopItem(loopItem) {
-      // These would integrate with existing loop variables
-      // For now, store in class properties
+      // Store loop parameters
       this.currentLoop = {
           start: loopItem.start,
           end: loopItem.end,
           duration: loopItem.end - loopItem.start
       };
 
+      // Update global loop variables to sync with player UI
+      loopStart = loopItem.start;
+      loopEnd = loopItem.end;
+      loopTarget = loopItem.playCount || 1;
+      loopEnabled = true;
+      loopCount = 0;
+      
       console.log(`🔄 Loop setup: ${formatTime(loopItem.start)} - ${formatTime(loopItem.end)} × ${this.currentLoopTarget}`);
   }
 
@@ -743,11 +749,17 @@ class PlaylistTransitionEngine {
 
       // Handle loop items
       if (currentItem.type === 'loop' && this.currentLoop) {
-          await this.handleLoopProgress(currentTime, currentItem);
+          // Check if we've reached the loop end point
+          if (currentTime >= this.currentLoop.end - 0.1) {
+              await this.handleLoopProgress(currentTime);
+          }
+      } else if (currentItem.type === 'track') {
+          // For full tracks, check if track has ended
+          const duration = currentItem.duration || 180;
+          if (currentTime >= duration - 0.5) {
+              await this.skipToNext();
+          }
       }
-
-      // Handle full track completion (will be caught by Spotify SDK events)
-      // This is backup logic for precise timing
   }
 
   // Handle loop progression within a loop item
@@ -990,8 +1002,8 @@ function initializeSpotifyPlayer() {
           updatePlayPauseButton();
           updateNowPlayingIndicator(currentTrack);
 
-          // Handle playlist mode progress
-          if (isPlaylistMode && playlistEngine) {
+          // Handle playlist mode progress - this is the important part
+          if (isPlaylistMode && playlistEngine && isPlaying) {
               playlistEngine.handlePlaybackProgress(currentTime);
           }
 
@@ -1019,37 +1031,45 @@ function initializeSpotifyPlayer() {
 }
 
 function setupPlaylistEngineCallbacks() {
-  if (!playlistEngine) return;
+    if (!playlistEngine) return;
 
-  playlistEngine.onItemChange = (item, index) => {
-      console.log('🎵 Playlist item changed:', item);
-      updatePlaylistNowPlaying(item, index);
+    playlistEngine.onItemChange = (item, index) => {
+        console.log('🎵 Playlist item changed:', item);
+        updatePlaylistNowPlaying(item, index);
 
-      // Update main player UI
-      if (item.type === 'loop') {
-          loopStart = item.start;
-          loopEnd = item.end;
-          loopTarget = item.playCount || 1;
-          loopEnabled = true;
-          els.loopToggle.checked = true;
-          updateRepeatDisplay();
-          updateLoopVisuals();
-      } else {
-          loopEnabled = false;
-          els.loopToggle.checked = false;
-      }
-  };
+        // Update main player UI
+        if (item.type === 'loop') {
+            loopStart = item.start;
+            loopEnd = item.end;
+            loopTarget = item.playCount || 1;
+            loopEnabled = true;
+            loopCount = 0;  // Reset loop count
+            loopStartTime = Date.now();  // Reset loop timer
+            
+            if (els.loopToggle) {
+                els.loopToggle.classList.add('active');
+            }
+            updateRepeatDisplay();
+            updateLoopVisuals();
+        } else {
+            loopEnabled = false;
+            if (els.loopToggle) {
+                els.loopToggle.classList.remove('active');
+            }
+        }
+    };
 
-  playlistEngine.onLoopProgress = (current, target) => {
-      console.log(`🔄 Playlist loop progress: ${current}/${target}`);
-      showStatus(`Loop ${current}/${target}`);
-  };
+    playlistEngine.onLoopProgress = (current, target) => {
+        console.log(`🔄 Playlist loop progress: ${current}/${target}`);
+        showStatus(`Loop ${current}/${target}`);
+        loopCount = current - 1;  // Sync with global loop count
+    };
 
-  playlistEngine.onPlaylistComplete = () => {
-      console.log('🏁 Playlist complete!');
-      showStatus('Playlist finished!');
-      stopPlaylistMode();
-  };
+    playlistEngine.onPlaylistComplete = () => {
+        console.log('🏁 Playlist complete!');
+        showStatus('Playlist finished!');
+        stopPlaylistMode();
+    };
 }
 
 function startProgressUpdates() {
