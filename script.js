@@ -23,6 +23,97 @@ let currentEditingPlaylistId = null;
 let pendingPlaylistItem = null; // For adding items to playlists
 let playlistEngine = null; // Will hold the playlist engine instance
 
+// Add this to your script.js to fix the playback state interference
+// This should be added right after your existing state variables
+
+// Playback source tracking
+let playbackSource = null; // 'search', 'library', 'playlist', or null
+let previousPlaybackState = null;
+
+// Function to clean up any active playback mode
+function cleanupPlaybackMode() {
+    // Stop playlist mode if active
+    if (isPlaylistMode) {
+        isPlaylistMode = false;
+        currentPlaylist = null;
+        currentPlaylistIndex = 0;
+        if (playlistEngine) {
+            playlistEngine.stopPlaylist();
+        }
+    }
+    
+    // Reset loop state if needed
+    if (loopEnabled && playbackSource !== 'library') {
+        loopCount = 0;
+        loopStartTime = 0;
+    }
+    
+    // Store previous state
+    previousPlaybackState = {
+        source: playbackSource,
+        track: currentTrack,
+        time: currentTime,
+        isPlaying: isPlaying
+    };
+}
+
+// Wrap the existing playTrackInBackground function
+const originalPlayTrackInBackground = playTrackInBackground;
+playTrackInBackground = async function(track) {
+    cleanupPlaybackMode();
+    playbackSource = 'search';
+    return originalPlayTrackInBackground(track);
+};
+
+// Wrap the existing selectTrack function
+const originalSelectTrack = selectTrack;
+selectTrack = async function(uri, name, artist, durationMs, imageUrl) {
+    cleanupPlaybackMode();
+    playbackSource = 'search';
+    return originalSelectTrack(uri, name, artist, durationMs, imageUrl);
+};
+
+// Wrap the existing loadSavedLoop function
+const originalLoadSavedLoop = loadSavedLoop;
+loadSavedLoop = async function(loopId) {
+    cleanupPlaybackMode();
+    playbackSource = 'library';
+    return originalLoadSavedLoop(loopId);
+};
+
+// Wrap the existing playPlaylist function
+const originalPlayPlaylist = playPlaylist;
+playPlaylist = async function(playlistId, startIndex = 0) {
+    cleanupPlaybackMode();
+    playbackSource = 'playlist';
+    return originalPlayPlaylist(playlistId, startIndex);
+};
+
+// Fix the progress update to handle different sources correctly
+const originalStartProgressUpdates = startProgressUpdates;
+startProgressUpdates = function() {
+    stopProgressUpdates();
+    updateTimer = setInterval(async () => {
+        if (isPlaying && spotifyPlayer && !isLooping) {
+            try {
+                const state = await spotifyPlayer.getCurrentState();
+                if (state && state.position !== undefined) {
+                    currentTime = state.position / 1000;
+                    updateProgress();
+                    
+                    // Only handle loop end for non-playlist sources
+                    if (loopEnabled && currentTime >= loopEnd - 0.1 && loopCount < loopTarget && !isPlaylistMode && playbackSource !== 'playlist') {
+                        const timeSinceLoopStart = Date.now() - loopStartTime;
+                        if (timeSinceLoopStart > 800) await handleLoopEnd();
+                    }
+                }
+            } catch (error) {
+                console.warn('State check failed:', error.message);
+            }
+        }
+    }, 100);
+};
+
 // Search state
 let searchState = {
   isSecondLevel: false,
@@ -1018,24 +1109,26 @@ function setupPlaylistEngineCallbacks() {
 }
 
 function startProgressUpdates() {
-  stopProgressUpdates();
-  updateTimer = setInterval(async () => {
-      if (isPlaying && spotifyPlayer && !isLooping) {
-          try {
-              const state = await spotifyPlayer.getCurrentState();
-              if (state && state.position !== undefined) {
-                  currentTime = state.position / 1000;
-                  updateProgress();
-                  if (loopEnabled && currentTime >= loopEnd - 0.1 && loopCount < loopTarget && !isPlaylistMode) {
-                      const timeSinceLoopStart = Date.now() - loopStartTime;
-                      if (timeSinceLoopStart > 800) await handleLoopEnd();
-                  }
-              }
-          } catch (error) {
-              console.warn('State check failed:', error.message);
-          }
-      }
-  }, 100);
+    stopProgressUpdates();
+    updateTimer = setInterval(async () => {
+        if (isPlaying && spotifyPlayer && !isLooping) {
+            try {
+                const state = await spotifyPlayer.getCurrentState();
+                if (state && state.position !== undefined) {
+                    currentTime = state.position / 1000;
+                    updateProgress();
+                    
+                    // Only handle loop end for non-playlist sources
+                    if (loopEnabled && currentTime >= loopEnd - 0.1 && loopCount < loopTarget && !isPlaylistMode && playbackSource !== 'playlist') {
+                        const timeSinceLoopStart = Date.now() - loopStartTime;
+                        if (timeSinceLoopStart > 800) await handleLoopEnd();
+                    }
+                }
+            } catch (error) {
+                console.warn('State check failed:', error.message);
+            }
+        }
+    }, 100);
 }
 
 function stopProgressUpdates() {
@@ -1219,6 +1312,14 @@ function updateSearchTrackHighlighting(uri, isSelected = false) {
   }
 }
 
+// Wrap the existing playTrackInBackground function
+const originalPlayTrackInBackground = playTrackInBackground;
+playTrackInBackground = async function(track) {
+    cleanupPlaybackMode();
+    playbackSource = 'search';
+    return originalPlayTrackInBackground(track);
+};
+
 // Background play without navigation
 async function playTrackInBackground(track) {
   try {
@@ -1245,6 +1346,14 @@ async function playTrackInBackground(track) {
       showStatus('Failed to play track');
   }
 }
+
+// Wrap the existing selectTrack function
+const originalSelectTrack = selectTrack;
+selectTrack = async function(uri, name, artist, durationMs, imageUrl) {
+    cleanupPlaybackMode();
+    playbackSource = 'search';
+    return originalSelectTrack(uri, name, artist, durationMs, imageUrl);
+};
 
 // SEAMLESS SEARCH-TO-PLAYER TRANSITION - NEW IMPLEMENTATION
 async function selectTrack(uri, name, artist, durationMs, imageUrl) {
@@ -1562,6 +1671,14 @@ function renderLoopsList() {
       </div>
   `).join('');
 }
+
+// Wrap the existing loadSavedLoop function
+const originalLoadSavedLoop = loadSavedLoop;
+loadSavedLoop = async function(loopId) {
+    cleanupPlaybackMode();
+    playbackSource = 'library';
+    return originalLoadSavedLoop(loopId);
+};
 
 // Library loop loading - starts from loop start position
 async function loadSavedLoop(loopId) {
@@ -1890,6 +2007,14 @@ function reorderPlaylistItems(playlistId, fromIndex, toIndex) {
   playlist.updatedAt = new Date().toISOString();
   savePlaylistsToStorage();
 }
+
+// Wrap the existing playPlaylist function
+const originalPlayPlaylist = playPlaylist;
+playPlaylist = async function(playlistId, startIndex = 0) {
+    cleanupPlaybackMode();
+    playbackSource = 'playlist';
+    return originalPlayPlaylist(playlistId, startIndex);
+};
 
 async function playPlaylist(playlistId, startIndex = 0) {
   const playlist = savedPlaylists.find(p => p.id === playlistId);
