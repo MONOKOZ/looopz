@@ -144,15 +144,16 @@ function updateLoopVisuals() {
 
 // FIX 6: Show/hide loop handles based on loop enabled state
 if (loopEnabled) {
-    els.loopStartHandle.style.display = 'block';
-    els.loopStartHandle.style.opacity = '0'; // Start at 0, CSS hover will show it
-    els.loopStartHandle.style.visibility = 'visible';
+    // Reset all inline styles to let CSS take control
+    els.loopStartHandle.style.display = '';
+    els.loopStartHandle.style.opacity = '';
+    els.loopStartHandle.style.visibility = '';
     
-    els.loopEndHandle.style.display = 'block';
-    els.loopEndHandle.style.opacity = '0'; // Start at 0, CSS hover will show it
-    els.loopEndHandle.style.visibility = 'visible';
+    els.loopEndHandle.style.display = '';
+    els.loopEndHandle.style.opacity = '';
+    els.loopEndHandle.style.visibility = '';
     
-    els.loopRegion.style.display = 'block';
+    els.loopRegion.style.display = '';
     els.loopRegion.style.opacity = '1';
 } else {
     els.loopStartHandle.style.display = 'none';
