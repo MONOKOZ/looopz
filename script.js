@@ -358,7 +358,7 @@ function disconnectSpotify() {
   showStatus('Disconnected from Spotify');
 }
 
-// Load track with optional start position
+// Find the loadTrackIntoSpotify function (around line 416) and replace it with:
 async function loadTrackIntoSpotify(track, startPositionMs = 0) {
   if (!spotifyDeviceId || !spotifyAccessToken) {
       throw new Error('Spotify not ready');
@@ -366,6 +366,25 @@ async function loadTrackIntoSpotify(track, startPositionMs = 0) {
 
   try {
       console.log('🎵 Loading track:', track.name, 'at position:', startPositionMs);
+
+      // FIX: Set currentTrack IMMEDIATELY - don't wait for sync
+      currentTrack = {
+          uri: track.uri,
+          name: track.name,
+          artist: track.artist,
+          duration: track.duration || 180, // Default 3 min if not provided
+          image: track.image || ''
+      };
+      
+      // Update UI IMMEDIATELY
+      duration = currentTrack.duration;
+      els.currentTrack.textContent = track.name;
+      els.currentArtist.textContent = track.artist;
+      updateProgress();
+      updatePlayPauseButton();
+      
+      // Enable the play/pause button right away
+      els.playPauseBtn.disabled = false;
 
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       if (isMobile && spotifyPlayer) {
@@ -404,20 +423,14 @@ async function loadTrackIntoSpotify(track, startPositionMs = 0) {
                   synced = true;
                   isPlaying = !state.paused;
                   currentTime = state.position / 1000;
-                  duration = state.track_window.current_track.duration_ms / 1000;
                   
-                  // Update current track info
-                  currentTrack = {
-                      uri: track.uri,
-                      name: track.name,
-                      artist: track.artist,
-                      duration: duration,
-                      image: track.image
-                  };
+                  // Update duration if we get a more accurate one from SDK
+                  if (state.track_window.current_track.duration_ms) {
+                      duration = state.track_window.current_track.duration_ms / 1000;
+                      currentTrack.duration = duration;
+                  }
                   
-                  // Update UI
-                  els.currentTrack.textContent = track.name;
-                  els.currentArtist.textContent = track.artist;
+                  // Update everything with SDK data
                   updateProgress();
                   updatePlayPauseButton();
                   updateNowPlayingIndicator(currentTrack);
@@ -435,17 +448,19 @@ async function loadTrackIntoSpotify(track, startPositionMs = 0) {
 
       if (!synced) {
           console.warn('⚠️ SDK sync incomplete, but track should be loaded');
-          // Start progress updates anyway
-          if (isPlaying) {
-              startProgressUpdates();
-          }
+          // Assume playing since we just sent play command
+          isPlaying = true;
+          updatePlayPauseButton();
+          updateNowPlayingIndicator(currentTrack);
+          startProgressUpdates();
       }
 
-      console.log('✅ Track loaded and ready for SDK control');
+      console.log('✅ Track loaded and ready for control');
       return true;
 
   } catch (error) {
       console.error('🚨 Track loading error:', error);
+      // Even on error, we have currentTrack set for UI
       throw error;
   }
 }
