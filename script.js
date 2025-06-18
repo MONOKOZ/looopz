@@ -142,16 +142,23 @@ function updateLoopVisuals() {
   els.precisionStart.value = formatTime(loopStart);
   els.precisionEnd.value = formatTime(loopEnd);
 
-  // FIX 6: Show/hide loop handles based on loop enabled state
-  if (loopEnabled) {
-      els.loopStartHandle.style.display = 'block';
-      els.loopEndHandle.style.display = 'block';
-      els.loopRegion.style.display = 'block';
-  } else {
-      els.loopStartHandle.style.display = 'none';
-      els.loopEndHandle.style.display = 'none';
-      els.loopRegion.style.display = 'none';
-  }
+// FIX 6: Show/hide loop handles based on loop enabled state
+if (loopEnabled) {
+    els.loopStartHandle.style.display = 'block';
+    els.loopStartHandle.style.opacity = '0'; // Start at 0, CSS hover will show it
+    els.loopStartHandle.style.visibility = 'visible';
+    
+    els.loopEndHandle.style.display = 'block';
+    els.loopEndHandle.style.opacity = '0'; // Start at 0, CSS hover will show it
+    els.loopEndHandle.style.visibility = 'visible';
+    
+    els.loopRegion.style.display = 'block';
+    els.loopRegion.style.opacity = '1';
+} else {
+    els.loopStartHandle.style.display = 'none';
+    els.loopEndHandle.style.display = 'none';
+    els.loopRegion.style.display = 'none';
+}
 }
 
 // Context Menu Functions - IMPROVED
