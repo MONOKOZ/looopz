@@ -405,6 +405,27 @@ async function loadTrackIntoSpotify(track, startPositionMs = 0) {
                   isPlaying = !state.paused;
                   currentTime = state.position / 1000;
                   duration = state.track_window.current_track.duration_ms / 1000;
+                  
+                  // Update current track info
+                  currentTrack = {
+                      uri: track.uri,
+                      name: track.name,
+                      artist: track.artist,
+                      duration: duration,
+                      image: track.image
+                  };
+                  
+                  // Update UI
+                  els.currentTrack.textContent = track.name;
+                  els.currentArtist.textContent = track.artist;
+                  updateProgress();
+                  updatePlayPauseButton();
+                  updateNowPlayingIndicator(currentTrack);
+                  
+                  // Start progress updates if playing
+                  if (isPlaying) {
+                      startProgressUpdates();
+                  }
               }
           } catch (e) {
               console.log(`⏳ Sync attempt ${attempts + 1} failed`);
@@ -414,6 +435,10 @@ async function loadTrackIntoSpotify(track, startPositionMs = 0) {
 
       if (!synced) {
           console.warn('⚠️ SDK sync incomplete, but track should be loaded');
+          // Start progress updates anyway
+          if (isPlaying) {
+              startProgressUpdates();
+          }
       }
 
       console.log('✅ Track loaded and ready for SDK control');
@@ -826,11 +851,16 @@ function setupPlaylistEngineCallbacks() {
           loopTarget = item.playCount || 1;
           loopEnabled = true;
           loopCount = 0; // Reset loop count
+          loopStartTime = Date.now(); // Reset loop timer
           els.loopToggle.checked = true;
           updateRepeatDisplay();
           updateLoopVisuals();
+          
+          console.log(`📢 Main player loop enabled: ${formatTime(loopStart)} - ${formatTime(loopEnd)} (${loopTarget}×)`);
       } else {
+          // Full track - disable looping
           loopEnabled = false;
+          loopCount = 0;
           els.loopToggle.checked = false;
           updateLoopVisuals(); // This will hide handles
       }
@@ -875,10 +905,16 @@ function stopProgressUpdates() {
 
 // FIX 9: Unified loop end handling function
 async function checkLoopEnd() {
+  // Debug logging for playlist loops
+  if (isPlaylistMode && loopEnabled) {
+      console.log(`🔍 Checking playlist loop: time=${currentTime.toFixed(3)}s, end=${loopEnd.toFixed(3)}s, threshold=${LOOP_END_THRESHOLD}s, loopCount=${loopCount}/${loopTarget}`);
+  }
+  
   // Check if we've reached the loop end with precise timing
   if (currentTime >= loopEnd - LOOP_END_THRESHOLD && loopCount < loopTarget) {
       const timeSinceLoopStart = Date.now() - loopStartTime;
       if (timeSinceLoopStart > 800) {
+          console.log(`🎯 Loop endpoint detected at ${currentTime.toFixed(3)}s!`);
           await handleLoopEnd();
       }
   }
