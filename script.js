@@ -1,75 +1,75 @@
-// SPOTIFY INTEGRATION - RESTRUCTURED WITH UNIFIED LOOP SYSTEM AND PRECISE TIMING
-
-// Config
-const SPOTIFY_CLIENT_ID = '46637d8f5adb41c0a4be34e0df0c1597';
-const SPOTIFY_REDIRECT_URI = 'https://looopz.vercel.app/';
-const SPOTIFY_SCOPES = 'streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state';
-
-// Core State
-let spotifyPlayer = null, spotifyDeviceId = null, spotifyAccessToken = null;
-let isConnected = false, isPlaying = false, currentTrack = null;
-let currentTime = 0, duration = 0, loopStart = 0, loopEnd = 30;
-
-// UNIFIED Loop System - Single source of truth for all loop operations
-let loopEnabled = false;
-let loopCount = 0;          // Current loop iteration
-let loopTarget = 1;         // Target loop iterations
-let loopStartTime = 0;      // Timestamp when loop session started
-let lastSeekTime = 0;       // Prevent rapid seeks
-
-// Timing Control
+// LOOOPZ - Enhanced Spotify Track Looper
+// State Variables
+let spotifyPlayer = null;
+let accessToken = null;
+let deviceId = null;
+let isConnected = false;
+let retryCount = 0;
+let syncCheckInterval = null;
 let updateTimer = null;
-let isLooping = false;      // Prevents concurrent loop operations
-let isDragging = false;
+let lastLoopSeek = 0;
 
-// UI State
+// Track State
+let currentTrack = null;
+let currentTime = 0;
+let duration = 0;
+let isPlaying = false;
+
+// Loop State - UNIFIED SYSTEM
+let loopEnabled = false;
+let loopStart = 0;
+let loopEnd = 30;
+let loopTarget = 1;
+let loopCount = 0;
+let isLooping = false;
+
+// Views
 let currentView = 'login';
-let currentSearchResults = [];
-let currentEditingLoopId = null;
-let currentContextMenuTrackIndex = null;
-
-// Playlist State - Simplified and unified
-let savedPlaylists = [];
-let currentPlaylist = null;
-let currentPlaylistIndex = 0;
-let isPlaylistMode = false;
-let currentEditingPlaylistId = null;
-let pendingPlaylistItem = null;
-
-// Search State
 let searchState = {
-    isSecondLevel: false,
-    currentLevel: 'tracks',
-    currentEntity: null,
+    query: '',
     currentOffset: 0,
     totalTracks: 0,
     hasMore: false,
-    query: ''
+    isSecondLevel: false,
+    currentLevel: 'tracks',
+    currentEntity: null
 };
 
 // Storage
 let savedLoops = [];
+let savedPlaylists = [];
+let currentSearchResults = [];
+let currentEditingLoopId = null;
+let currentEditingPlaylistId = null;
+let currentContextMenuTrackIndex = null;
+let pendingPlaylistItem = null;
 
-// Elements
+// Playlist Mode
+let isPlaylistMode = false;
+let currentPlaylist = null;
+let currentPlaylistIndex = 0;
+let playlistEngine = null;
+
+// DOM Elements
 let els = {};
 
-// ===== UTILITY FUNCTIONS =====
-
-function formatTime(seconds, showMs = true) {
+// Format time helper
+function formatTime(seconds, includeMs = true) {
+    if (!seconds || seconds < 0) return includeMs ? '0:00.000' : '0:00';
     const mins = Math.floor(seconds / 60);
     const secs = Math.floor(seconds % 60);
-    if (showMs) {
-        const ms = Math.floor((seconds % 1) * 1000);
+    const ms = Math.floor((seconds % 1) * 1000);
+    
+    if (includeMs) {
         return `${mins}:${secs.toString().padStart(2, '0')}.${ms.toString().padStart(3, '0')}`;
     }
     return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-function parseTimeInput(input) {
-    if (typeof input === 'number') return input;
-    if (!input || typeof input !== 'string') return 0;
-
-    const parts = input.trim().split(':');
+// Parse time input helper
+function parseTimeInput(str) {
+    if (!str) return 0;
+    const parts = str.split(':');
     if (parts.length === 2) {
         const minutes = parseInt(parts[0]) || 0;
         const secondsParts = parts[1].split('.');
@@ -89,8 +89,6 @@ function showStatus(message, duration = 3000) {
     els.statusBar.classList.add('show');
     setTimeout(() => els.statusBar.classList.remove('show'), duration);
 }
-
-// ===== UI UPDATE FUNCTIONS =====
 
 function updateProgress() {
     if (!duration) return;
@@ -155,149 +153,184 @@ function updateLoopVisuals() {
     els.endPopup.textContent = formatTime(loopEnd);
     els.precisionStart.value = formatTime(loopStart);
     els.precisionEnd.value = formatTime(loopEnd);
+
+    // FIX 6: Show/hide loop handles based on loop state
+    const handleVisibility = loopEnabled ? 'visible' : 'hidden';
+    els.loopStartHandle.style.visibility = handleVisibility;
+    els.loopEndHandle.style.visibility = handleVisibility;
+    els.loopRegion.style.visibility = handleVisibility;
 }
 
-// ===== CORE PLAYBACK FUNCTIONS =====
+// Context Menu Functions - IMPROVED
+function showTrackContextMenu(trackIndex, buttonElement) {
+    currentContextMenuTrackIndex = trackIndex;
+    const menu = els.contextMenu;
+    const overlay = els.contextMenuOverlay;
 
-async function loadTrackIntoSpotify(track, startPositionMs = 0) {
-    if (!spotifyPlayer || !spotifyDeviceId || !track) return;
+    // Always position at bottom center - consistent positioning
+    menu.style.left = '50%';
+    menu.style.bottom = '120px';
+    menu.style.transform = 'translateX(-50%) translateY(20px) scale(0.95)';
 
-    try {
-        const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${spotifyDeviceId}`, {
-            method: 'PUT',
-            body: JSON.stringify({
-                uris: [track.uri],
-                position_ms: startPositionMs
-            }),
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${spotifyAccessToken}`
+    // Show overlay first
+    overlay.classList.add('show');
+
+    // Show menu with improved animation timing
+    requestAnimationFrame(() => {
+        menu.classList.add('show');
+    });
+}
+
+function hideTrackContextMenu() {
+    const menu = els.contextMenu;
+    const overlay = els.contextMenuOverlay;
+
+    menu.classList.remove('show');
+    overlay.classList.remove('show');
+    currentContextMenuTrackIndex = null;
+}
+
+function getCurrentContextTrack() {
+    if (currentContextMenuTrackIndex === null || !currentSearchResults) return null;
+    return currentSearchResults[currentContextMenuTrackIndex];
+}
+
+// Context Menu Action Handlers - IMPROVED RESPONSIVENESS
+async function handleDiscoverMoments() {
+    const track = getCurrentContextTrack();
+    if (!track) return;
+
+    hideTrackContextMenu();
+    showStatus(`🔍 Discovering moments in "${track.name}"...`);
+    // TODO: Navigate to discovery view for this track
+    console.log('Discover moments for:', track);
+}
+
+async function handleAddToPlaylist() {
+    const track = getCurrentContextTrack();
+    if (!track) return;
+
+    hideTrackContextMenu();
+
+    // Create a pending playlist item for this track
+    pendingPlaylistItem = {
+        type: 'track',
+        uri: track.uri,
+        trackId: track.id,
+        name: track.name,
+        artist: track.artists[0].name,
+        image: track.album.images[0]?.url,
+        duration: track.duration_ms / 1000,
+        playCount: 1
+    };
+
+    showAddToPlaylistPopup();
+}
+
+async function handlePlayInBackground() {
+    const track = getCurrentContextTrack();
+    if (!track) return;
+
+    hideTrackContextMenu();
+    await playTrackInBackground(track);
+}
+
+// Spotify SDK Initialization
+function initializeSpotifySDK() {
+    console.log('🎵 Initializing Spotify SDK...');
+
+    window.onSpotifyWebPlaybackSDKReady = () => {
+        console.log('🎵 Spotify SDK ready!');
+
+        spotifyPlayer = new Spotify.Player({
+            name: 'LOOOPZ Player',
+            getOAuthToken: cb => cb(accessToken),
+            volume: 1.0
+        });
+
+        spotifyPlayer.addListener('ready', ({ device_id }) => {
+            console.log('✅ Player ready with Device ID:', device_id);
+            deviceId = device_id;
+            isConnected = true;
+            updateConnectionStatus();
+            showStatus('Connected to Spotify!');
+
+            if (playlistEngine) {
+                playlistEngine.player = spotifyPlayer;
+                playlistEngine.deviceId = deviceId;
             }
         });
 
-        if (!response.ok) {
-            const errorText = await response.text();
-            throw new Error(`Spotify API error: ${response.status} - ${errorText}`);
-        }
+        spotifyPlayer.addListener('not_ready', ({ device_id }) => {
+            console.log('⚠️ Device has gone offline:', device_id);
+            isConnected = false;
+            updateConnectionStatus();
+        });
 
-        await new Promise(resolve => setTimeout(resolve, 500));
-        return true;
-    } catch (error) {
-        console.error('🚨 Failed to load track:', error);
-        throw error;
-    }
-}
+        spotifyPlayer.addListener('player_state_changed', (state) => {
+            if (!state) return;
 
-async function togglePlayPause() {
-    if (!spotifyPlayer) return;
+            const track = state.track_window.current_track;
+            if (track) {
+                currentTime = state.position / 1000;
+                duration = state.duration / 1000;
+                isPlaying = !state.paused;
 
-    try {
-        if (isPlaying) {
-            await spotifyPlayer.pause();
-        } else {
-            await spotifyPlayer.resume();
-        }
-    } catch (error) {
-        console.error('🚨 Play/pause failed:', error);
-        showStatus('Playback control failed');
-    }
-}
+                updateProgress();
+                updatePlayPauseButton();
+                updateNowPlayingIndicator(currentTrack);
 
-async function seek(position) {
-    if (!spotifyPlayer) return;
-    
-    // Prevent rapid seeks
-    const now = Date.now();
-    if (now - lastSeekTime < 300) return;
-    lastSeekTime = now;
-    
-    try {
-        await spotifyPlayer.seek(position * 1000);
-        currentTime = position;
-        updateProgress();
-    } catch (error) {
-        console.error('🚨 Seek failed:', error);
-    }
-}
-
-async function skipForward() {
-    if (!spotifyPlayer) return;
-    const newTime = Math.min(currentTime + 10, duration);
-    await seek(newTime);
-}
-
-async function skipBackward() {
-    if (!spotifyPlayer) return;
-    const newTime = Math.max(currentTime - 10, 0);
-    await seek(newTime);
-}
-
-// ===== UNIFIED LOOP SYSTEM =====
-
-// FIXED: Renamed from startLoop to setLoop - just sets loop points without auto-playing
-async function setLoop() {
-    if (!currentTrack) {
-        showStatus('No track selected');
-        return;
-    }
-
-    // Reset counters for new loop session
-    loopCount = 0;
-    loopStartTime = Date.now();
-    loopEnabled = true;
-    els.loopToggle.checked = true;
-    
-    if (isPlaylistMode) {
-        showStatus(`🔄 Loop set: ${loopTarget}× (Playlist mode)`);
-    } else {
-        showStatus(`🔄 Loop set: ${loopTarget}×`);
-    }
-    
-    updateRepeatDisplay();
-}
-
-// FIXED: Unified loop end handling for both regular and playlist modes
-async function handleLoopEnd() {
-    // Prevent concurrent loop operations
-    if (isLooping) return;
-    
-    try {
-        isLooping = true;
-        loopCount++;
-        
-        console.log(`🔄 Loop ${loopCount}/${loopTarget} (${isPlaylistMode ? 'Playlist' : 'Regular'} mode)`);
-        
-        if (loopCount >= loopTarget) {
-            // Loop target reached
-            if (isPlaylistMode) {
-                // Move to next playlist item
-                await moveToNextPlaylistItem();
-            } else {
-                // Stop regular loop
-                await togglePlayPause();
-                showStatus(`✅ Loop completed! (${loopCount}×)`);
-                loopEnabled = false;
-                els.loopToggle.checked = false;
-                loopCount = 0;
+                // FIX 3: More precise loop detection (0.05 second buffer)
+                if (loopEnabled && !isLooping && loopCount < loopTarget && !isPlaylistMode) {
+                    if (currentTime >= loopEnd - 0.05) {
+                        handleLoopEnd();
+                    }
+                }
             }
-        } else {
-            // Continue looping
-            await seek(loopStart);
-            const remaining = loopTarget - loopCount;
-            showStatus(`🔄 Loop ${loopCount}/${loopTarget} (${remaining} remaining)`);
-        }
-        
-    } catch (error) {
-        console.error('🚨 Loop end handling error:', error);
-    } finally {
-        // Reset looping flag after short delay
-        setTimeout(() => {
-            isLooping = false;
-        }, 200);
-    }
+        });
+
+        spotifyPlayer.connect();
+    };
+
+    if (window.Spotify) window.onSpotifyWebPlaybackSDKReady();
 }
 
-// FIXED: Enhanced progress tracking with precise timing
+function setupPlaylistEngineCallbacks() {
+    if (!playlistEngine) return;
+
+    playlistEngine.onItemChange = (item, index) => {
+        console.log('🎵 Playlist item changed:', item);
+        updatePlaylistNowPlaying(item, index);
+
+        // Update main player UI
+        if (item.type === 'loop') {
+            loopStart = item.start;
+            loopEnd = item.end;
+            loopTarget = item.playCount || 1;
+            loopEnabled = true;
+            els.loopToggle.checked = true;
+            updateRepeatDisplay();
+            updateLoopVisuals();
+        } else {
+            loopEnabled = false;
+            els.loopToggle.checked = false;
+            updateLoopVisuals();
+        }
+    };
+
+    playlistEngine.onLoopProgress = (current, target) => {
+        console.log(`🔄 Playlist loop progress: ${current}/${target}`);
+        showStatus(`Loop ${current}/${target}`);
+    };
+
+    playlistEngine.onPlaylistComplete = () => {
+        console.log('🏁 Playlist complete!');
+        showStatus('Playlist finished!');
+        stopPlaylistMode();
+    };
+}
+
+// FIX 7: Enhanced progress update frequency (50ms)
 function startProgressUpdates() {
     stopProgressUpdates();
     updateTimer = setInterval(async () => {
@@ -308,21 +341,16 @@ function startProgressUpdates() {
                     currentTime = state.position / 1000;
                     updateProgress();
                     
-                    // FIXED: Precise loop detection for both modes
-                    if (loopEnabled && currentTime >= loopEnd - 0.03) { // Reduced buffer for precision
-                        if (loopCount < loopTarget) {
-                            const timeSinceLoopStart = Date.now() - loopStartTime;
-                            if (timeSinceLoopStart > 400) { // Minimum time between loop operations
-                                await handleLoopEnd();
-                            }
-                        }
+                    // FIX 9: Unified loop end handling
+                    if (loopEnabled && currentTime >= loopEnd - 0.05 && loopCount < loopTarget && !isPlaylistMode) {
+                        handleLoopEnd();
                     }
                 }
             } catch (error) {
                 console.warn('State check failed:', error.message);
             }
         }
-    }, 50); // Higher frequency for better precision
+    }, 50); // FIX 7: Changed from 100ms to 50ms
 }
 
 function stopProgressUpdates() {
@@ -332,248 +360,213 @@ function stopProgressUpdates() {
     }
 }
 
-// ===== PLAYLIST FUNCTIONS =====
+// FIX 4: Debouncing for rapid seek prevention
+async function handleLoopEnd() {
+    // Prevent rapid seeks with debouncing
+    const now = Date.now();
+    if (now - lastLoopSeek < 500) return; // 500ms debounce
+    lastLoopSeek = now;
 
-async function moveToNextPlaylistItem() {
-    if (!currentPlaylist || !isPlaylistMode) return;
-    
-    currentPlaylistIndex++;
-    
-    if (currentPlaylistIndex >= currentPlaylist.items.length) {
-        // Playlist completed
-        console.log('🏁 Playlist completed!');
-        showStatus('🏁 Playlist finished!');
-        stopPlaylistMode();
-        return;
-    }
-    
-    // Load next item
-    const nextItem = currentPlaylist.items[currentPlaylistIndex];
-    await loadPlaylistItem(nextItem);
-}
-
-async function loadPlaylistItem(item) {
     try {
-        console.log('🎵 Loading playlist item:', item);
-        
-        // Reset unified loop system for new item
-        loopCount = 0;
-        loopTarget = item.playCount || 1;
-        loopStartTime = Date.now();
-        
-        // Set up loop parameters
-        if (item.type === 'loop') {
-            loopStart = item.start;
-            loopEnd = item.end;
-            loopEnabled = true;
-            els.loopToggle.checked = true;
-            
-            // Load track and start at loop start
-            const trackData = {
-                uri: item.trackUri || item.uri,
-                name: item.name,
-                artist: item.artist,
-                duration_ms: (item.duration || item.end) * 1000
-            };
-            
-            currentTrack = trackData;
-            duration = trackData.duration_ms / 1000;
-            
-            await loadTrackIntoSpotify(trackData, loopStart * 1000);
-            
+        isLooping = true;
+        loopCount++;
+
+        if (loopCount >= loopTarget) {
+            await togglePlayPause();
+            showStatus(`Loop completed! (${loopTarget}×)`);
+            loopCount = 0;
+            isLooping = false;
         } else {
-            // Full track
-            loopEnabled = false;
-            els.loopToggle.checked = false;
-            
-            const trackData = {
-                uri: item.uri,
-                name: item.name,
-                artist: item.artist,
-                duration_ms: (item.duration || 180) * 1000
-            };
-            
-            currentTrack = trackData;
-            duration = trackData.duration_ms / 1000;
-            loopStart = 0;
-            loopEnd = duration;
-            
-            await loadTrackIntoSpotify(trackData, 0);
+            await seekToPosition(loopStart * 1000);
+            showStatus(`Loop ${loopCount}/${loopTarget}`);
+            setTimeout(() => { isLooping = false; }, 200);
         }
-        
-        // Update UI
-        els.currentTrack.textContent = item.name;
-        els.currentArtist.textContent = item.artist;
-        updateLoopVisuals();
-        updateRepeatDisplay();
-        updateProgress();
-        
-        showStatus(`🎵 ${item.name} (${loopTarget}×)`);
-        
     } catch (error) {
-        console.error('🚨 Failed to load playlist item:', error);
-        showStatus('Failed to load playlist item');
+        console.error('Loop end error:', error);
+        isLooping = false;
     }
 }
 
-function stopPlaylistMode() {
-    isPlaylistMode = false;
-    currentPlaylist = null;
-    currentPlaylistIndex = 0;
-    
-    // Reset unified loop system
-    loopCount = 0;
-    loopTarget = 1;
-    
-    // Hide playlist controls
-    document.querySelectorAll('.playlist-now-playing').forEach(el => el.style.display = 'none');
-    
-    updateRepeatDisplay();
-}
-
-async function playPlaylist(playlistId, startIndex = 0) {
-    const playlist = savedPlaylists.find(p => p.id === playlistId);
-    if (!playlist || playlist.items.length === 0) {
-        showStatus('Playlist is empty');
+// Audio Controls
+async function togglePlayPause() {
+    if (!spotifyPlayer) {
+        showStatus('Not connected to Spotify');
         return;
     }
 
     try {
-        // Update play count
-        playlist.playCount = (playlist.playCount || 0) + 1;
-        savePlaylistsToStorage();
-
-        // Start playlist mode
-        isPlaylistMode = true;
-        currentPlaylist = playlist;
-        currentPlaylistIndex = startIndex;
-
-        // Load first item
-        const firstItem = playlist.items[startIndex];
-        await loadPlaylistItem(firstItem);
-
-        // Show player view with playlist controls
-        showView('player');
-        showPlaylistNowPlaying();
-
-        showStatus(`🎵 Playing playlist: ${playlist.name}`);
-
-    } catch (error) {
-        console.error('🚨 Playlist play error:', error);
-        showStatus('Failed to play playlist');
-    }
-}
-
-function showPlaylistNowPlaying() {
-    if (!currentPlaylist) return;
-    
-    // Show playlist controls in player
-    const playlistControls = document.querySelector('.playlist-now-playing');
-    if (playlistControls) {
-        playlistControls.style.display = 'flex';
-        const playlistTitle = playlistControls.querySelector('.playlist-title');
-        const playlistProgress = playlistControls.querySelector('.playlist-progress');
-        
-        if (playlistTitle) playlistTitle.textContent = currentPlaylist.name;
-        if (playlistProgress) {
-            playlistProgress.textContent = `${currentPlaylistIndex + 1} / ${currentPlaylist.items.length}`;
+        if (isPlaying) {
+            await spotifyPlayer.pause();
+            showStatus('Paused');
+        } else {
+            await spotifyPlayer.resume();
+            showStatus('Playing');
         }
-    }
-}
-
-// ===== SEARCH FUNCTIONS =====
-
-async function playTrackInBackground(track, trackIndex) {
-    try {
-        showStatus(`▶ Playing: ${track.name}`);
-        
-        // Set current track for seamless transition support
-        currentTrack = {
-            uri: track.uri,
-            name: track.name,
-            artist: track.artists[0].name,
-            duration_ms: track.duration_ms
-        };
-        
-        duration = track.duration_ms / 1000;
-        await loadTrackIntoSpotify(currentTrack);
-        
-        // Update UI highlighting
-        updateSearchTrackHighlighting(track.uri);
-        updateNowPlayingIndicator(currentTrack);
-        startProgressUpdates();
     } catch (error) {
-        console.error('🚨 Background play failed:', error);
-        showStatus('Failed to play track');
+        console.error('Toggle play/pause error:', error);
+        showStatus('Playback error');
     }
 }
 
-// SEAMLESS SEARCH-TO-PLAYER TRANSITION - Enhanced
-async function selectTrack(uri, trackIndex) {
-    if (!currentSearchResults || trackIndex < 0 || trackIndex >= currentSearchResults.length) return;
+async function seekBackward() {
+    await seekToPosition(Math.max(0, currentTime - 10) * 1000);
+}
 
-    const track = currentSearchResults[trackIndex];
-    hideTrackContextMenu();
+async function seekForward() {
+    await seekToPosition(Math.min(duration, currentTime + 10) * 1000);
+}
+
+async function seekToPosition(positionMs) {
+    if (!spotifyPlayer) return;
 
     try {
-        let seamlessTransition = false;
+        await spotifyPlayer.seek(positionMs);
+        currentTime = positionMs / 1000;
+        updateProgress();
+    } catch (error) {
+        console.error('Seek error:', error);
+    }
+}
 
-        // Detection logic - Check if same track is already playing
+async function playFromPosition(positionMs) {
+    try {
+        await seekToPosition(positionMs);
+        if (!isPlaying) {
+            await togglePlayPause();
+        }
+    } catch (error) {
+        console.error('Play from position error:', error);
+    }
+}
+
+// FIX 2: Renamed from startLoop to setLoop - only sets loop points
+async function setLoop() {
+    if (!currentTrack || !loopEnabled) {
+        showStatus('Please select a track and enable loop mode');
+        return;
+    }
+    
+    // Only set loop counts, don't seek
+    loopCount = 0;
+    showStatus(`Loop set: ${formatTime(loopStart)} - ${formatTime(loopEnd)} (${loopTarget}×)`);
+}
+
+// Track Loading
+async function loadTrackIntoSpotify(track, startPositionMs = 0) {
+    if (!spotifyPlayer || !deviceId) {
+        showStatus('Player not ready');
+        return;
+    }
+
+    try {
+        const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                uris: [track.uri],
+                position_ms: startPositionMs
+            })
+        });
+
+        if (!response.ok) throw new Error('Failed to play track');
+
+        await new Promise(resolve => setTimeout(resolve, 300));
+
+        duration = track.duration;
+        isPlaying = true;
+        updatePlayPauseButton();
+        updateNowPlayingIndicator(track);
+        startProgressUpdates();
+        console.log('✅ Track loaded successfully');
+
+    } catch (error) {
+        console.error('Load track error:', error);
+        showStatus('Failed to load track');
+        throw error;
+    }
+}
+
+// Track Selection
+async function selectTrack(uri) {
+    try {
+        let track = currentSearchResults.find(t => t.uri === uri);
+        
+        if (!track) {
+            console.error('Track not found in search results');
+            return;
+        }
+
+        const { name, artists, album, duration_ms } = track;
+        
+        currentTrack = {
+            uri,
+            name,
+            artist: artists[0].name,
+            image: album.images[0]?.url,
+            duration: duration_ms / 1000
+        };
+
+        els.currentTrack.textContent = name;
+        els.currentArtist.textContent = artists[0].name;
+        els.albumCover.src = album.images[0]?.url || '';
+        els.albumCover.style.display = album.images[0]?.url ? 'block' : 'none';
+
+        duration = duration_ms / 1000;
+
+        // Check for seamless transition
+        let seamlessTransition = false;
+        let preservedPosition = 0;
+
         if (currentTrack && currentTrack.uri === uri && isPlaying) {
             seamlessTransition = true;
-            console.log('🔄 Seamless transition detected - same track already playing');
+            preservedPosition = currentTime * 1000;
+            console.log('🎵 Same track - seamless transition mode');
         }
 
-        // Track data setup
-        currentTrack = {
-            uri: track.uri,
-            name: track.name,
-            artist: track.artists[0].name,
-            duration_ms: track.duration_ms
-        };
-
-        duration = track.duration_ms / 1000;
-        
-        // Update main player UI immediately
-        els.currentTrack.textContent = currentTrack.name;
-        els.currentArtist.textContent = currentTrack.artist;
-
-        // Modified track loading
+        // MODIFIED TRACK LOADING - Use preserved position for seamless transitions
         if (seamlessTransition) {
-            console.log('✅ Seamless transition - continuing from position:', currentTime);
+            console.log('✅ Seamless transition - continuing from position:', preservedPosition);
+            
             updateProgress();
             updatePlayPauseButton();
             updateNowPlayingIndicator(currentTrack);
             startProgressUpdates();
         } else {
             await loadTrackIntoSpotify(currentTrack);
+            
             if (isPlaying) {
                 await togglePlayPause();
             }
         }
 
-        // Loop handle adjustment for seamless transitions
+        // LOOP HANDLE ADJUSTMENT - Position intelligently around current time
         if (seamlessTransition) {
             const currentPos = currentTime;
-            
+
             if (loopStart > currentPos) {
                 loopStart = Math.max(0, currentPos - 10);
+                console.log('🔄 Adjusted loop start to accommodate current position');
             }
-            
+
             if (loopEnd <= currentPos) {
                 loopEnd = Math.min(duration, currentPos + 20);
+                console.log('🔄 Adjusted loop end to accommodate current position');
             }
-            
+
             if (currentPos > loopEnd || currentPos + 30 < loopStart) {
                 loopStart = Math.max(0, currentPos - 5);
                 loopEnd = Math.min(duration, currentPos + 25);
+                console.log('🔄 Created new loop region around current position');
             }
 
-            showStatus(`✅ Seamless takeover: ${currentTrack.name} (continuing from ${formatTime(currentPos)})`);
+            showStatus(`✅ Seamless takeover: ${name} (continuing from ${formatTime(currentPos)})`);
         } else {
             loopStart = 0;
             loopEnd = Math.min(30, duration);
-            showStatus(`✅ Selected: ${currentTrack.name}`);
+            showStatus(`✅ Selected: ${name}`);
         }
 
         updateLoopVisuals();
@@ -586,30 +579,7 @@ async function selectTrack(uri, trackIndex) {
     }
 }
 
-// ===== CONTEXT MENU FUNCTIONS =====
-
-function showTrackContextMenu(trackIndex, buttonElement) {
-    currentContextMenuTrackIndex = trackIndex;
-    const menu = els.contextMenu;
-    const overlay = els.contextMenuOverlay;
-    
-    menu.style.left = '50%';
-    menu.style.bottom = '120px';
-    menu.style.top = 'auto';
-    menu.style.transform = 'translateX(-50%)';
-    
-    menu.classList.add('show');
-    overlay.classList.add('show');
-}
-
-function hideTrackContextMenu() {
-    els.contextMenu.classList.remove('show');
-    els.contextMenuOverlay.classList.remove('show');
-    currentContextMenuTrackIndex = null;
-}
-
-// ===== VIEW MANAGEMENT =====
-
+// Views
 function showView(view) {
     currentView = view;
 
@@ -623,42 +593,487 @@ function showView(view) {
     if (view === 'search') els.searchSection.classList.remove('hidden');
     if (view === 'player') els.playerSection.classList.remove('hidden');
     if (view === 'library') els.librarySection.classList.remove('hidden');
-    if (view === 'playlists') {
-        els.playlistsSection.classList.remove('hidden');
-        renderPlaylistsList();
+    if (view === 'playlists') els.playlistsSection.classList.remove('hidden');
+
+    const navButtons = [els.navSearch, els.navPlayer, els.navLibrary, els.navPlaylists];
+    navButtons.forEach(btn => btn?.classList.remove('active'));
+
+    if (view === 'search') els.navSearch?.classList.add('active');
+    if (view === 'player') els.navPlayer?.classList.add('active');
+    if (view === 'library') els.navLibrary?.classList.add('active');
+    if (view === 'playlists') els.navPlaylists?.classList.add('active');
+
+    updateNowPlayingIndicator(isPlaying ? currentTrack : null);
+
+    if (view === 'library') renderLoopsList();
+    if (view === 'playlists') renderPlaylistsList();
+}
+
+// Spotify Authentication
+function checkForSharedLoop() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const sharedData = urlParams.get('loop');
+    
+    if (sharedData) {
+        try {
+            const decoded = atob(sharedData);
+            const loopData = JSON.parse(decoded);
+            
+            console.log('🔗 Found shared loop:', loopData);
+            sessionStorage.setItem('pending_shared_loop', JSON.stringify(loopData));
+            
+            return true;
+        } catch (error) {
+            console.error('Failed to parse shared loop:', error);
+        }
     }
+    
+    return false;
+}
 
-    document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
-    const navBtn = document.getElementById(`nav-${view}`);
-    if (navBtn) navBtn.classList.add('active');
+async function handleSharedLoop() {
+    const pendingData = sessionStorage.getItem('pending_shared_loop');
+    if (!pendingData) return;
 
-    if (view === 'library') {
-        loadSavedLoops();
-        renderLoopsList();
+    try {
+        const loopData = JSON.parse(pendingData);
+        console.log('📥 Loading shared loop:', loopData);
+
+        showStatus('🔄 Loading shared loop...');
+
+        const choice = await showSharedLoopDialog(loopData);
+        
+        if (choice === 'load') {
+            currentTrack = loopData.track;
+            loopStart = loopData.loop.start;
+            loopEnd = loopData.loop.end;
+            loopTarget = loopData.loop.repeat;
+            loopEnabled = true;
+
+            await selectTrack(loopData.track.uri);
+
+            showStatus(`✅ Loaded loop: ${loopData.track.name}`);
+        }
+
+        sessionStorage.removeItem('pending_shared_loop');
+        cleanupSharedUrl();
+
+    } catch (error) {
+        console.error('Failed to handle shared loop:', error);
+        showStatus('Failed to load shared loop');
     }
 }
 
-// ===== LOOP HANDLES =====
+async function showSharedLoopDialog(loopData) {
+    return new Promise((resolve) => {
+        const dialog = document.createElement('div');
+        dialog.className = 'shared-loop-dialog';
+        dialog.innerHTML = `
+            <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; 
+                        background: rgba(0,0,0,0.8); display: flex; align-items: center; 
+                        justify-content: center; z-index: 1000;">
+                <div style="background: #282828; padding: 24px; border-radius: 12px; 
+                            max-width: 400px; text-align: center;">
+                    <h3 style="color: #1DB954; margin-bottom: 16px;">🎵 Shared Loop</h3>
+                    <p style="color: white; margin-bottom: 8px;">
+                        <strong>${loopData.track.name}</strong> by ${loopData.track.artist}
+                    </p>
+                    <p style="color: #999; margin-bottom: 16px;">
+                        Loop: ${formatTime(loopData.loop.start)} - ${formatTime(loopData.loop.end)} 
+                        (${loopData.loop.repeat}×)
+                    </p>
+                    <button id="load-btn" style="background: #1DB954; color: white; 
+                            border: none; padding: 12px 24px; border-radius: 24px; 
+                            margin: 8px; cursor: pointer;">
+                        🎧 Load Loop
+                    </button>
+                    <button id="cancel-btn" style="background: #444; color: white; 
+                            border: none; padding: 12px 24px; border-radius: 24px; 
+                            margin: 8px; cursor: pointer;">
+                        ❌ Cancel
+                    </button>
+                </div>
+            </div>
+        `;
 
+        document.body.appendChild(dialog);
+
+        dialog.querySelector('#load-btn').onclick = () => {
+            document.body.removeChild(dialog);
+            resolve('load');
+        };
+
+        dialog.querySelector('#cancel-btn').onclick = () => {
+            document.body.removeChild(dialog);
+            resolve('cancel');
+        };
+
+        dialog.onclick = (e) => {
+            if (e.target === dialog) {
+                document.body.removeChild(dialog);
+                resolve('cancel');
+            }
+        };
+    });
+}
+
+function cleanupSharedUrl() {
+    const cleanUrl = window.location.origin + window.location.pathname;
+    window.history.replaceState({}, document.title, cleanUrl);
+    console.log('🔗 Cleaned up shared URL');
+}
+
+// Enhanced Auth Check
+function checkAuth() {
+    console.log('🔐 Starting auth check...');
+
+    const sessionToken = sessionStorage.getItem('spotify_access_token');
+    if (sessionToken && !localStorage.getItem('spotify_access_token')) {
+        console.log('🔄 Migrating auth from sessionStorage...');
+        localStorage.setItem('spotify_access_token', sessionToken);
+        sessionStorage.removeItem('spotify_access_token');
+        const sessionRefresh = sessionStorage.getItem('spotify_refresh_token');
+        if (sessionRefresh) {
+            localStorage.setItem('spotify_refresh_token', sessionRefresh);
+            sessionStorage.removeItem('spotify_refresh_token');
+        }
+    }
+
+    const hasSharedLoop = checkForSharedLoop();
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    const storedToken = localStorage.getItem('spotify_access_token');
+
+    if (code) {
+        console.log('🔐 Found auth code, exchanging for token...');
+        handleCallback(code);
+    } else if (storedToken) {
+        console.log('✅ Found stored token');
+        accessToken = storedToken;
+        showView('search');
+        initializeSpotifySDK();
+        loadSpotifyScript();
+        
+        if (hasSharedLoop) {
+            setTimeout(handleSharedLoop, 1000);
+        }
+    } else {
+        console.log('❌ No auth found');
+        showView('login');
+    }
+}
+
+function login() {
+    const clientId = '72b77eb226d94b14b97a9e4c3ca80a5f';
+    const redirectUri = window.location.origin + window.location.pathname;
+    const scopes = [
+        'streaming',
+        'user-read-email',
+        'user-read-private',
+        'user-read-playback-state',
+        'user-modify-playback-state'
+    ];
+
+    const params = new URLSearchParams({
+        client_id: clientId,
+        response_type: 'code',
+        redirect_uri: redirectUri,
+        scope: scopes.join(' '),
+        show_dialog: true
+    });
+
+    window.location.href = `https://accounts.spotify.com/authorize?${params}`;
+}
+
+async function handleCallback(code) {
+    console.log('🔄 Handling auth callback...');
+    
+    try {
+        const response = await fetch('https://looopz-auth.onrender.com/callback', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                code,
+                redirect_uri: window.location.origin + window.location.pathname
+            })
+        });
+
+        if (!response.ok) throw new Error('Token exchange failed');
+
+        const data = await response.json();
+        
+        localStorage.setItem('spotify_access_token', data.access_token);
+        if (data.refresh_token) {
+            localStorage.setItem('spotify_refresh_token', data.refresh_token);
+        }
+        
+        accessToken = data.access_token;
+
+        window.history.replaceState({}, document.title, window.location.pathname);
+
+        showView('search');
+        initializeSpotifySDK();
+        loadSpotifyScript();
+        showStatus('✅ Successfully connected!');
+
+        const hasSharedLoop = sessionStorage.getItem('pending_shared_loop');
+        if (hasSharedLoop) {
+            setTimeout(handleSharedLoop, 1000);
+        }
+
+    } catch (error) {
+        console.error('🚨 Auth error:', error);
+        showStatus('Authentication failed. Please try again.');
+        showView('login');
+    }
+}
+
+async function refreshAccessToken() {
+    const refreshToken = localStorage.getItem('spotify_refresh_token');
+    if (!refreshToken) {
+        console.error('No refresh token available');
+        logout();
+        return null;
+    }
+
+    try {
+        const response = await fetch('https://looopz-auth.onrender.com/refresh', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ refresh_token: refreshToken })
+        });
+
+        if (!response.ok) throw new Error('Token refresh failed');
+
+        const data = await response.json();
+        localStorage.setItem('spotify_access_token', data.access_token);
+        accessToken = data.access_token;
+        
+        console.log('✅ Token refreshed successfully');
+        return data.access_token;
+
+    } catch (error) {
+        console.error('🚨 Token refresh error:', error);
+        logout();
+        return null;
+    }
+}
+
+function logout() {
+    localStorage.removeItem('spotify_access_token');
+    localStorage.removeItem('spotify_refresh_token');
+    sessionStorage.clear();
+    if (spotifyPlayer) {
+        spotifyPlayer.disconnect();
+    }
+    showView('login');
+    showStatus('Logged out');
+}
+
+function loadSpotifyScript() {
+    if (document.querySelector('script[src="https://sdk.scdn.co/spotify-player.js"]')) {
+        console.log('✅ Spotify SDK script already loaded');
+        return;
+    }
+
+    const script = document.createElement('script');
+    script.src = 'https://sdk.scdn.co/spotify-player.js';
+    script.async = true;
+    script.onerror = () => {
+        console.error('Failed to load Spotify SDK');
+        showStatus('Failed to load Spotify player');
+    };
+    document.body.appendChild(script);
+    console.log('📦 Loading Spotify SDK script...');
+}
+
+// Search Functions
+async function searchTracks(query) {
+    if (!query || query.trim().length === 0) {
+        els.searchResults.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--light-gray);">Search for tracks to start creating loops</div>';
+        return;
+    }
+
+    searchState.query = query;
+
+    try {
+        let searchUrl = `https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=10&offset=${searchState.currentOffset}`;
+
+        const response = await fetch(searchUrl, {
+            headers: {
+                'Authorization': `Bearer ${accessToken}`
+            }
+        });
+
+        if (response.status === 401) {
+            const newToken = await refreshAccessToken();
+            if (newToken) {
+                return searchTracks(query);
+            }
+            return;
+        }
+
+        if (!response.ok) throw new Error('Search failed');
+
+        const data = await response.json();
+
+        if (searchState.currentOffset === 0) {
+            currentSearchResults = data.tracks.items;
+        } else {
+            currentSearchResults = [...currentSearchResults, ...data.tracks.items];
+        }
+
+        searchState.totalTracks = data.tracks.total;
+        searchState.hasMore = data.tracks.next !== null;
+
+        displaySearchResults(currentSearchResults, searchState.hasMore);
+
+    } catch (error) {
+        console.error('Search error:', error);
+        els.searchResults.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--danger);">Search failed. Please try again.</div>';
+    }
+}
+
+async function loadMoreTracks() {
+    if (!searchState.hasMore || !searchState.query) return;
+
+    searchState.currentOffset += 10;
+    showStatus('Loading more tracks...');
+    await searchTracks(searchState.query);
+}
+
+function displaySearchResults(tracks, hasMore = false) {
+    if (tracks.length === 0) {
+        els.searchResults.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--light-gray);">No results found</div>';
+        return;
+    }
+
+    let html = tracks.map((track, index) => `
+        <div class="track-item" data-track-index="${index}">
+            <img src="${track.album.images[2]?.url || ''}" alt="Album cover" class="track-cover" onerror="this.style.display='none'">
+            <div class="track-info">
+                <div class="track-name">${track.name}</div>
+                <div class="track-artist">${track.artists[0].name}</div>
+            </div>
+            <div class="track-duration">${formatTime(track.duration_ms / 1000, false)}</div>
+            <div class="track-actions">
+                <button class="track-action-btn play-track-btn" data-track-index="${index}">▶</button>
+                <button class="track-action-btn secondary select-track-btn" data-track-index="${index}">+</button>
+                <button class="track-action-btn menu track-menu-btn" data-track-index="${index}">⋮</button>
+            </div>
+        </div>
+    `).join('');
+
+    // Add load more button if there are more results
+    if (hasMore) {
+        html += `
+            <button class="load-more-btn" id="load-more-tracks">
+                Load More Tracks (${searchState.totalTracks - currentSearchResults.length} remaining)
+            </button>
+        `;
+    }
+
+    els.searchResults.innerHTML = html;
+
+    if (currentTrack) updateSearchTrackHighlighting(currentTrack.uri);
+}
+
+function updateSearchNavigation() {
+    const backBtn = els.searchBackBtn;
+    if (searchState.isSecondLevel) {
+        backBtn.classList.remove('hidden');
+    } else {
+        backBtn.classList.add('hidden');
+    }
+}
+
+function goBackToMainSearch() {
+    searchState.isSecondLevel = false;
+    searchState.currentLevel = 'tracks';
+    searchState.currentEntity = null;
+    searchState.currentOffset = 0;
+
+    updateSearchNavigation();
+
+    // Re-run the current search
+    if (searchState.query) {
+        searchTracks(searchState.query);
+    }
+}
+
+function updateSearchTrackHighlighting(uri, isSelected = false) {
+    document.querySelectorAll('.track-item').forEach(item => {
+        item.classList.remove('playing', 'selected');
+    });
+
+    if (uri && currentSearchResults) {
+        const trackIndex = currentSearchResults.findIndex(t => t.uri === uri);
+        if (trackIndex !== -1) {
+            const trackElement = document.querySelector(`.track-item[data-track-index="${trackIndex}"]`);
+            if (trackElement) {
+                trackElement.classList.add(isPlaying ? 'playing' : 'selected');
+            }
+        }
+    }
+}
+
+async function playTrackInBackground(track) {
+    try {
+        const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${deviceId}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                uris: [track.uri]
+            })
+        });
+
+        if (!response.ok) throw new Error('Failed to play track');
+
+        currentTrack = {
+            uri: track.uri,
+            name: track.name,
+            artist: track.artists[0].name,
+            image: track.album.images[0]?.url,
+            duration: track.duration_ms / 1000
+        };
+
+        duration = track.duration_ms / 1000;
+        isPlaying = true;
+        
+        updateSearchTrackHighlighting(track.uri, true);
+        updateNowPlayingIndicator(currentTrack);
+        showStatus(`Playing: ${track.name}`);
+        
+        startProgressUpdates();
+
+    } catch (error) {
+        console.error('Play track error:', error);
+        showStatus('Failed to play track');
+    }
+}
+
+// Loop Handles Setup
 function setupLoopHandles() {
+    let isDragging = false;
     let dragTarget = null;
 
-    function startDrag(e, target) {
+    function startDrag(e, handle) {
         isDragging = true;
-        dragTarget = target;
-        target.classList.add('dragging');
-        const popup = target.querySelector('.time-popup');
+        dragTarget = handle;
+        handle.classList.add('dragging');
+        const popup = handle.querySelector('.time-popup');
         if (popup) popup.classList.add('show');
-        if (e.preventDefault) e.preventDefault();
-        if (e.stopPropagation) e.stopPropagation();
+        if (e && e.preventDefault) e.preventDefault();
     }
 
     function updateDrag(e) {
-        if (!isDragging || !dragTarget || !duration) return;
-        if (e.preventDefault) e.preventDefault();
+        if (!isDragging || !dragTarget) return;
 
         const rect = els.progressContainer.getBoundingClientRect();
-        const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+        const clientX = e.clientX || (e.touches ? e.touches[0].clientX : 0);
         const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
         const newTime = percent * duration;
 
@@ -697,8 +1112,7 @@ function setupLoopHandles() {
     document.addEventListener('touchend', stopDrag, { passive: false });
 }
 
-// ===== LOOPS MANAGEMENT =====
-
+// Loops Management
 function loadSavedLoops() {
     try {
         const sessionData = sessionStorage.getItem('looopz_saved_loops');
@@ -712,48 +1126,70 @@ function loadSavedLoops() {
         savedLoops = saved ? JSON.parse(saved) : [];
         updateLoopCountBadge();
     } catch (error) {
-        console.error('Failed to load loops:', error);
+        console.error('Error loading saved loops:', error);
         savedLoops = [];
     }
 }
 
-function saveLoopsToStorage() {
+function saveLooopsToStorage() {
     try {
         localStorage.setItem('looopz_saved_loops', JSON.stringify(savedLoops));
         updateLoopCountBadge();
     } catch (error) {
-        console.error('Failed to save loops:', error);
+        console.error('Error saving loops:', error);
+        showStatus('Failed to save loops');
     }
 }
 
-async function saveCurrentLoop() {
-    if (!currentTrack || loopStart >= loopEnd) {
-        showStatus('Invalid loop settings');
+function saveCurrentLoop() {
+    if (!currentTrack) {
+        showStatus('No track selected');
         return;
     }
 
     const loop = {
-        id: `loop_${Date.now()}`,
+        id: Date.now().toString(),
         track: currentTrack,
-        loop: { start: loopStart, end: loopEnd, repeat: loopTarget },
+        loop: {
+            start: loopStart,
+            end: loopEnd,
+            repeat: loopTarget
+        },
         savedAt: new Date().toISOString()
     };
 
-    savedLoops.push(loop);
-    saveLoopsToStorage();
-    showStatus(`💾 Loop saved! (${savedLoops.length} total)`);
+    savedLoops.unshift(loop);
+    saveLooopsToStorage();
+
+    const saveBtn = els.saveLoopBtn;
+    const originalText = saveBtn.innerHTML;
+    saveBtn.innerHTML = '✅ Saved!';
+    saveBtn.style.background = 'linear-gradient(135deg, #27ae60, #22c55e)';
+
+    setTimeout(() => {
+        saveBtn.innerHTML = originalText;
+        saveBtn.style.background = '';
+    }, 2000);
+
+    showStatus(`Loop saved! Total: ${savedLoops.length}`);
 }
 
 function renderLoopsList() {
     if (savedLoops.length === 0) {
-        els.loopsList.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--light-gray);">No saved loops yet</div>';
+        els.loopsList.innerHTML = `
+            <div style="text-align: center; padding: 60px 20px;">
+                <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.4;">📦</div>
+                <div style="color: var(--light-gray); font-size: 16px; margin-bottom: 8px;">No saved loops yet</div>
+                <div style="color: var(--light-gray); font-size: 13px;">Create and save loops to build your collection</div>
+            </div>
+        `;
         return;
     }
 
-    els.loopsList.innerHTML = savedLoops.map(loop => `
-        <div class="loop-card">
+    els.loopsList.innerHTML = savedLoops.map((loop, index) => `
+        <div class="saved-loop" data-loop-id="${loop.id}">
             <div class="loop-header">
-                <img src="https://via.placeholder.com/56x56/1a1a1a/888?text=♪" alt="Loop" class="loop-thumbnail">
+                <img src="${loop.track.image || ''}" alt="${loop.track.name}" class="loop-thumbnail" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 60 60\"%3E%3Crect width=\"60\" height=\"60\" fill=\"%23333\"/%3E%3C/svg%3E'">
                 <div class="loop-details">
                     <div class="loop-track-name">${loop.track.name}</div>
                     <div class="loop-artist">${loop.track.artist}</div>
@@ -795,49 +1231,68 @@ function renderLoopsList() {
                     </div>
                     <div class="edit-field">
                         <label class="edit-label">Repeat Count</label>
-                        <input type="number" class="edit-input" id="edit-repeat-${loop.id}" value="${loop.loop.repeat}" min="1" max="100">
+                        <input type="number" class="edit-input" id="edit-repeat-${loop.id}" value="${loop.loop.repeat}" min="1" max="99">
                     </div>
                 </div>
                 <div class="edit-actions">
-                    <button class="btn secondary" onclick="saveLoopEdits('${loop.id}')">💾 Save</button>
-                    <button class="btn" onclick="cancelEdit('${loop.id}')">❌ Cancel</button>
+                    <button class="edit-action-btn save" onclick="saveLoopEdits('${loop.id}')">Save</button>
+                    <button class="edit-action-btn cancel" onclick="cancelEdit('${loop.id}')">Cancel</button>
                 </div>
             </div>
         </div>
     `).join('');
 }
 
-function loadLoop(loopId) {
+async function loadSavedLoop(loopId) {
     const loop = savedLoops.find(l => l.id === loopId);
     if (!loop) return;
 
-    currentTrack = loop.track;
-    duration = currentTrack.duration_ms / 1000;
-    loopStart = loop.loop.start;
-    loopEnd = loop.loop.end;
-    loopTarget = loop.loop.repeat;
+    try {
+        currentTrack = loop.track;
+        loopStart = loop.loop.start;
+        loopEnd = loop.loop.end;
+        loopTarget = loop.loop.repeat;
+        loopEnabled = true;
+        loopCount = 0;
 
-    els.currentTrack.textContent = currentTrack.name;
-    els.currentArtist.textContent = currentTrack.artist;
+        els.currentTrack.textContent = loop.track.name;
+        els.currentArtist.textContent = loop.track.artist;
+        els.albumCover.src = loop.track.image || '';
+        els.albumCover.style.display = loop.track.image ? 'block' : 'none';
+        els.loopToggle.checked = true;
 
-    updateLoopVisuals();
-    updateRepeatDisplay();
-    showView('player');
-    showStatus(`✅ Loaded: ${currentTrack.name}`);
+        duration = loop.track.duration;
+        updateLoopVisuals();
+        updateRepeatDisplay();
+
+        await loadTrackIntoSpotify(loop.track, loop.loop.start * 1000);
+
+        isPlaying = true;
+        updatePlayPauseButton();
+        updateNowPlayingIndicator(currentTrack);
+        startProgressUpdates();
+
+        showView('player');
+        showStatus(`🔄 Loop playing: ${loop.track.name} (1/${loopTarget})`);
+
+    } catch (error) {
+        console.error('🚨 Load saved loop error:', error);
+        showStatus('Failed to load loop');
+    }
 }
 
 function editLoop(loopId) {
     document.querySelectorAll('.loop-edit-form').forEach(form => form.classList.remove('active'));
-    const form = document.getElementById(`edit-form-${loopId}`);
-    if (form) {
-        form.classList.add('active');
+    const editForm = document.getElementById(`edit-form-${loopId}`);
+    if (editForm) {
+        editForm.classList.add('active');
         currentEditingLoopId = loopId;
     }
 }
 
 function cancelEdit(loopId) {
-    const form = document.getElementById(`edit-form-${loopId}`);
-    if (form) form.classList.remove('active');
+    const editForm = document.getElementById(`edit-form-${loopId}`);
+    if (editForm) editForm.classList.remove('active');
     currentEditingLoopId = null;
 }
 
@@ -845,105 +1300,435 @@ function saveLoopEdits(loopId) {
     const loop = savedLoops.find(l => l.id === loopId);
     if (!loop) return;
 
-    const startInput = document.getElementById(`edit-start-${loopId}`);
-    const endInput = document.getElementById(`edit-end-${loopId}`);
-    const repeatInput = document.getElementById(`edit-repeat-${loopId}`);
+    const newStart = parseTimeInput(document.getElementById(`edit-start-${loopId}`).value);
+    const newEnd = parseTimeInput(document.getElementById(`edit-end-${loopId}`).value);
+    const newRepeat = parseInt(document.getElementById(`edit-repeat-${loopId}`).value);
 
-    const newStart = parseTimeInput(startInput.value);
-    const newEnd = parseTimeInput(endInput.value);
-    const newRepeat = parseInt(repeatInput.value) || 1;
-
-    if (newStart >= newEnd) {
-        showStatus('Invalid time range');
+    if (newStart < 0 || newStart >= loop.track.duration || newEnd <= newStart || newEnd > loop.track.duration || newRepeat < 1 || newRepeat > 99) {
+        showStatus('❌ Invalid values');
         return;
     }
 
     loop.loop.start = newStart;
     loop.loop.end = newEnd;
     loop.loop.repeat = newRepeat;
-    
-    saveLoopsToStorage();
+    saveLooopsToStorage();
     renderLoopsList();
+    currentEditingLoopId = null;
     showStatus('✅ Loop updated!');
 }
 
 function deleteLoop(loopId) {
-    if (confirm('Delete this loop?')) {
-        savedLoops = savedLoops.filter(l => l.id !== loopId);
-        saveLoopsToStorage();
+    if (!confirm('Delete this loop?')) return;
+
+    const index = savedLoops.findIndex(l => l.id === loopId);
+    if (index !== -1) {
+        savedLoops.splice(index, 1);
+        saveLooopsToStorage();
         renderLoopsList();
-        showStatus('🗑 Loop deleted');
+        showStatus('Loop deleted');
     }
 }
 
-function clearAllLoops() {
-    if (confirm('Delete all saved loops? This cannot be undone.')) {
-        savedLoops = [];
-        saveLoopsToStorage();
-        renderLoopsList();
-        showStatus('🗑 All loops cleared');
-    }
-}
-
-async function shareLoop(loopId) {
+function shareLoop(loopId) {
     const loop = savedLoops.find(l => l.id === loopId);
     if (!loop) return;
 
-    const shareText = `🔥 Check out this loop I made on LOOOPZ!\n\n🎵 ${loop.track.name} by ${loop.track.artist}\n⏱ ${formatTime(loop.loop.start, false)} - ${formatTime(loop.loop.end, false)}\n🔄 ${loop.loop.repeat}x repeat\n\nCreate your own loops at https://looopz.vercel.app`;
+    const shareData = {
+        track: loop.track,
+        loop: loop.loop
+    };
 
-    if (navigator.share) {
-        try {
-            await navigator.share({
-                title: 'LOOOPZ Loop',
-                text: shareText,
-                url: 'https://looopz.vercel.app'
-            });
-        } catch (error) {
-            console.log('Share cancelled or failed');
-        }
-    } else {
-        try {
-            await navigator.clipboard.writeText(shareText);
-            showStatus('📋 Loop details copied to clipboard!');
-        } catch (error) {
-            showStatus('❌ Could not copy to clipboard');
-        }
-    }
+    const encoded = btoa(JSON.stringify(shareData));
+    const shareUrl = `${window.location.origin}${window.location.pathname}?loop=${encoded}`;
+
+    navigator.clipboard.writeText(shareUrl).then(() => {
+        showStatus('🔗 Share link copied!');
+    }).catch(() => {
+        prompt('Copy this link to share:', shareUrl);
+    });
 }
 
-// ===== PLAYLIST MANAGEMENT =====
-
+// Playlist Management
 function loadSavedPlaylists() {
     try {
-        const saved = localStorage.getItem('looopz_saved_playlists');
+        const saved = localStorage.getItem('looopz_playlists');
         savedPlaylists = saved ? JSON.parse(saved) : [];
         updatePlaylistCountBadge();
     } catch (error) {
-        console.error('Failed to load playlists:', error);
+        console.error('Error loading playlists:', error);
         savedPlaylists = [];
     }
 }
 
 function savePlaylistsToStorage() {
     try {
-        localStorage.setItem('looopz_saved_playlists', JSON.stringify(savedPlaylists));
+        localStorage.setItem('looopz_playlists', JSON.stringify(savedPlaylists));
         updatePlaylistCountBadge();
     } catch (error) {
-        console.error('Failed to save playlists:', error);
+        console.error('Error saving playlists:', error);
+        showStatus('Failed to save playlists');
     }
 }
 
+function createPlaylist(name, description = '') {
+    const playlist = {
+        id: Date.now().toString(),
+        name,
+        description,
+        items: [],
+        createdAt: new Date().toISOString(),
+        lastModified: new Date().toISOString()
+    };
+
+    savedPlaylists.unshift(playlist);
+    savePlaylistsToStorage();
+    renderPlaylistsList();
+    showStatus(`✅ Created playlist: ${name}`);
+    return playlist;
+}
+
+function deletePlaylist(playlistId) {
+    if (!confirm('Delete this playlist?')) return;
+
+    const index = savedPlaylists.findIndex(p => p.id === playlistId);
+    if (index !== -1) {
+        savedPlaylists.splice(index, 1);
+        savePlaylistsToStorage();
+        renderPlaylistsList();
+        showStatus('Playlist deleted');
+    }
+}
+
+function addItemToPlaylist(playlistId, item) {
+    const playlist = savedPlaylists.find(p => p.id === playlistId);
+    if (!playlist) return;
+
+    playlist.items.push(item);
+    playlist.lastModified = new Date().toISOString();
+    savePlaylistsToStorage();
+    showStatus(`✅ Added to ${playlist.name}`);
+}
+
+function removeItemFromPlaylist(playlistId, itemIndex) {
+    const playlist = savedPlaylists.find(p => p.id === playlistId);
+    if (!playlist) return;
+
+    playlist.items.splice(itemIndex, 1);
+    playlist.lastModified = new Date().toISOString();
+    savePlaylistsToStorage();
+}
+
+function reorderPlaylistItems(playlistId, fromIndex, toIndex) {
+    const playlist = savedPlaylists.find(p => p.id === playlistId);
+    if (!playlist) return;
+
+    const [item] = playlist.items.splice(fromIndex, 1);
+    playlist.items.splice(toIndex, 0, item);
+    playlist.lastModified = new Date().toISOString();
+    savePlaylistsToStorage();
+}
+
+// Playlist Engine
+class PlaylistEngine {
+    constructor() {
+        this.player = null;
+        this.deviceId = null;
+        this.accessToken = null;
+        this.isPlaying = false;
+        this.currentPlaylist = null;
+        this.currentIndex = 0;
+        this.currentItem = null;
+        this.loopCount = 0;
+        this.itemStartTime = 0;
+        this.checkInterval = null;
+        
+        // Callbacks
+        this.onItemChange = null;
+        this.onLoopProgress = null;
+        this.onPlaylistComplete = null;
+    }
+
+    async startPlaylist(playlist, startIndex = 0) {
+        if (!playlist || !playlist.items || playlist.items.length === 0) {
+            console.error('Invalid playlist');
+            return;
+        }
+
+        this.currentPlaylist = playlist;
+        this.currentIndex = startIndex;
+        this.isPlaying = true;
+
+        await this.playCurrentItem();
+    }
+
+    async playCurrentItem() {
+        if (!this.currentPlaylist || this.currentIndex >= this.currentPlaylist.items.length) {
+            this.handlePlaylistComplete();
+            return;
+        }
+
+        this.currentItem = this.currentPlaylist.items[this.currentIndex];
+        this.loopCount = 0;
+        this.itemStartTime = Date.now();
+
+        if (this.onItemChange) {
+            this.onItemChange(this.currentItem, this.currentIndex);
+        }
+
+        if (this.currentItem.type === 'loop') {
+            await this.playLoop();
+        } else {
+            await this.playFullTrack();
+        }
+    }
+
+    async playLoop() {
+        const { uri, start, end, playCount } = this.currentItem;
+        
+        try {
+            await this.playTrack(uri, start * 1000);
+            this.startLoopChecking(start, end, playCount);
+        } catch (error) {
+            console.error('Failed to play loop:', error);
+            this.nextItem();
+        }
+    }
+
+    async playFullTrack() {
+        const { uri, playCount } = this.currentItem;
+        
+        try {
+            await this.playTrack(uri, 0);
+            this.startTrackChecking(playCount);
+        } catch (error) {
+            console.error('Failed to play track:', error);
+            this.nextItem();
+        }
+    }
+
+    async playTrack(uri, positionMs) {
+        const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${this.deviceId}`, {
+            method: 'PUT',
+            headers: {
+                'Authorization': `Bearer ${this.accessToken}`,
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                uris: [uri],
+                position_ms: positionMs
+            })
+        });
+
+        if (!response.ok) throw new Error('Failed to play track');
+    }
+
+    startLoopChecking(start, end, targetCount) {
+        if (this.checkInterval) clearInterval(this.checkInterval);
+
+        this.checkInterval = setInterval(async () => {
+            if (!this.isPlaying) {
+                clearInterval(this.checkInterval);
+                return;
+            }
+
+            try {
+                const state = await this.player.getCurrentState();
+                if (!state) return;
+
+                const position = state.position / 1000;
+
+                // FIX 1 & 3: Precise loop detection
+                if (position >= end - 0.05) {
+                    this.loopCount++;
+
+                    if (this.onLoopProgress) {
+                        this.onLoopProgress(this.loopCount, targetCount);
+                    }
+
+                    if (this.loopCount >= targetCount) {
+                        clearInterval(this.checkInterval);
+                        this.nextItem();
+                    } else {
+                        await this.player.seek(start * 1000);
+                    }
+                }
+            } catch (error) {
+                console.error('Loop check error:', error);
+            }
+        }, 50); // FIX 7: Enhanced update frequency
+    }
+
+    startTrackChecking(targetCount) {
+        if (this.checkInterval) clearInterval(this.checkInterval);
+
+        let previousPosition = 0;
+        let playCount = 1;
+
+        this.checkInterval = setInterval(async () => {
+            if (!this.isPlaying) {
+                clearInterval(this.checkInterval);
+                return;
+            }
+
+            try {
+                const state = await this.player.getCurrentState();
+                if (!state) return;
+
+                const position = state.position / 1000;
+                const duration = state.duration / 1000;
+
+                // Track restart detection
+                if (position < previousPosition - 5) {
+                    playCount++;
+                    if (this.onLoopProgress) {
+                        this.onLoopProgress(playCount, targetCount);
+                    }
+                }
+
+                previousPosition = position;
+
+                // Track end detection
+                if (position >= duration - 0.5) {
+                    if (playCount >= targetCount) {
+                        clearInterval(this.checkInterval);
+                        this.nextItem();
+                    } else {
+                        await this.player.seek(0);
+                        playCount++;
+                        if (this.onLoopProgress) {
+                            this.onLoopProgress(playCount, targetCount);
+                        }
+                    }
+                }
+            } catch (error) {
+                console.error('Track check error:', error);
+            }
+        }, 50); // FIX 7: Enhanced update frequency
+    }
+
+    nextItem() {
+        this.currentIndex++;
+        this.playCurrentItem();
+    }
+
+    stopPlaylist() {
+        this.isPlaying = false;
+        if (this.checkInterval) {
+            clearInterval(this.checkInterval);
+            this.checkInterval = null;
+        }
+        this.currentPlaylist = null;
+        this.currentIndex = 0;
+        this.currentItem = null;
+    }
+
+    handlePlaylistComplete() {
+        this.stopPlaylist();
+        if (this.onPlaylistComplete) {
+            this.onPlaylistComplete();
+        }
+    }
+}
+
+// Initialize playlist engine
+playlistEngine = new PlaylistEngine();
+
+// Playlist Mode Functions
+async function playPlaylist(playlistId) {
+    const playlist = savedPlaylists.find(p => p.id === playlistId);
+    if (!playlist || !playlist.items || playlist.items.length === 0) {
+        showStatus('Playlist is empty');
+        return;
+    }
+
+    try {
+        isPlaylistMode = true;
+        currentPlaylist = playlist;
+        currentPlaylistIndex = 0;
+
+        // Setup playlist engine
+        playlistEngine.player = spotifyPlayer;
+        playlistEngine.deviceId = deviceId;
+        playlistEngine.accessToken = accessToken;
+        
+        setupPlaylistEngineCallbacks();
+        
+        showView('player');
+        showPlaylistNowPlaying();
+        
+        await playlistEngine.startPlaylist(playlist);
+        
+        showStatus(`▶ Playing playlist: ${playlist.name}`);
+        
+    } catch (error) {
+        console.error('Failed to play playlist:', error);
+        showStatus('Failed to play playlist');
+        isPlaylistMode = false;
+    }
+}
+
+function stopPlaylistMode() {
+    isPlaylistMode = false;
+    currentPlaylist = null;
+    currentPlaylistIndex = 0;
+
+    if (playlistEngine) {
+        playlistEngine.stopPlaylist();
+    }
+
+    hidePlaylistNowPlaying();
+}
+
+function showPlaylistNowPlaying() {
+    const nowPlaying = document.getElementById('playlist-now-playing');
+    if (nowPlaying) nowPlaying.classList.remove('hidden');
+}
+
+function hidePlaylistNowPlaying() {
+    const nowPlaying = document.getElementById('playlist-now-playing');
+    if (nowPlaying) nowPlaying.classList.add('hidden');
+}
+
+function updatePlaylistNowPlaying(item, index) {
+    if (!currentPlaylist) return;
+
+    const totalItems = currentPlaylist.items.length;
+    document.getElementById('playlist-progress').textContent = `${index + 1}/${totalItems}`;
+    
+    const icon = document.getElementById('playlist-current-icon');
+    const name = document.getElementById('playlist-current-name');
+    const type = document.getElementById('playlist-current-type');
+    
+    if (item.type === 'loop') {
+        icon.src = item.image || '';
+        name.textContent = `${item.name} - ${item.artist}`;
+        type.textContent = `Loop: ${formatTime(item.start)} - ${formatTime(item.end)} (${item.playCount}×)`;
+    } else {
+        icon.src = item.image || '';
+        name.textContent = `${item.name} - ${item.artist}`;
+        type.textContent = `Full Track (${item.playCount}×)`;
+    }
+}
+
+// Playlist UI Rendering
 function renderPlaylistsList() {
     if (savedPlaylists.length === 0) {
-        els.playlistsList.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--light-gray);">No playlists yet</div>';
+        els.playlistsList.innerHTML = `
+            <div style="text-align: center; padding: 60px 20px;">
+                <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.4;">🎵</div>
+                <div style="color: var(--light-gray); font-size: 16px; margin-bottom: 8px;">No playlists yet</div>
+                <div style="color: var(--light-gray); font-size: 13px;">Create playlists to organize your loops and tracks</div>
+            </div>
+        `;
         return;
     }
 
     els.playlistsList.innerHTML = savedPlaylists.map(playlist => `
-        <div class="playlist-card">
+        <div class="playlist-card" data-playlist-id="${playlist.id}">
             <div class="playlist-header">
                 <div class="playlist-icon">🎵</div>
-                <div class="playlist-details">
+                <div class="playlist-info">
                     <div class="playlist-name">${playlist.name}</div>
                     <div class="playlist-description">${playlist.description || 'No description'}</div>
                 </div>
@@ -951,16 +1736,16 @@ function renderPlaylistsList() {
 
             <div class="playlist-stats">
                 <div class="playlist-stat">
-                    <span class="playlist-stat-icon">🎵</span>
+                    <span class="playlist-stat-icon">📀</span>
                     <span>${playlist.items.length} items</span>
                 </div>
                 <div class="playlist-stat">
                     <span class="playlist-stat-icon">⏱</span>
-                    <span>${Math.round(playlist.totalDuration / 60)}m</span>
+                    <span>${calculatePlaylistDuration(playlist)}</span>
                 </div>
                 <div class="playlist-stat">
-                    <span class="playlist-stat-icon">▶</span>
-                    <span>${playlist.playCount || 0} plays</span>
+                    <span class="playlist-stat-icon">📅</span>
+                    <span>${new Date(playlist.createdAt).toLocaleDateString()}</span>
                 </div>
             </div>
 
@@ -975,9 +1760,8 @@ function renderPlaylistsList() {
                 <div class="playlist-items" id="playlist-items-${playlist.id}">
                     ${renderPlaylistItems(playlist)}
                 </div>
-                <div class="edit-actions">
-                    <button class="btn secondary" onclick="savePlaylistEdits('${playlist.id}')">💾 Save Changes</button>
-                    <button class="btn" onclick="cancelPlaylistEdit('${playlist.id}')">❌ Cancel</button>
+                <div class="playlist-editor-actions">
+                    <button class="btn secondary" onclick="hidePlaylistEditor('${playlist.id}')">Done</button>
                 </div>
             </div>
         </div>
@@ -986,18 +1770,18 @@ function renderPlaylistsList() {
 
 function renderPlaylistItems(playlist) {
     if (playlist.items.length === 0) {
-        return '<div style="text-align: center; padding: 20px; color: var(--light-gray);">No items in playlist</div>';
+        return '<div style="padding: 20px; text-align: center; color: var(--light-gray);">No items in playlist</div>';
     }
 
     return playlist.items.map((item, index) => `
-        <div class="playlist-item" data-item-index="${index}" draggable="true">
-            <div class="playlist-item-handle">☰</div>
+        <div class="playlist-item" draggable="true" data-item-index="${index}">
+            <div class="playlist-item-handle">≡</div>
             <div class="playlist-item-info">
                 <div class="playlist-item-name">${item.name} - ${item.artist}</div>
                 <div class="playlist-item-type">
-                    ${item.type === 'loop'
-                        ? `Loop: ${formatTime(item.start, false)} - ${formatTime(item.end, false)}`
-                        : 'Full Track'}
+                    ${item.type === 'loop' ? 
+                        `Loop: ${formatTime(item.start)} - ${formatTime(item.end)}` : 
+                        'Full Track'}
                 </div>
             </div>
             <div class="playlist-item-repeat">${item.playCount}×</div>
@@ -1006,77 +1790,108 @@ function renderPlaylistItems(playlist) {
     `).join('');
 }
 
-function editPlaylist(playlistId) {
-    document.querySelectorAll('.playlist-editor').forEach(editor => editor.classList.remove('active'));
+function calculatePlaylistDuration(playlist) {
+    let totalSeconds = 0;
+    
+    playlist.items.forEach(item => {
+        if (item.type === 'loop') {
+            const loopDuration = (item.end - item.start) * item.playCount;
+            totalSeconds += loopDuration;
+        } else {
+            totalSeconds += item.duration * item.playCount;
+        }
+    });
+
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = Math.floor(totalSeconds % 60);
+    return `${minutes}:${seconds.toString().padStart(2, '0')}`;
+}
+
+function showPlaylistEditor(playlistId) {
     const editor = document.getElementById(`playlist-editor-${playlistId}`);
     if (editor) {
         editor.classList.add('active');
-        currentEditingPlaylistId = playlistId;
         setupPlaylistDragAndDrop(playlistId);
     }
 }
 
-function cancelPlaylistEdit(playlistId) {
+function hidePlaylistEditor(playlistId) {
     const editor = document.getElementById(`playlist-editor-${playlistId}`);
     if (editor) editor.classList.remove('active');
-    currentEditingPlaylistId = null;
 }
 
-function savePlaylistEdits(playlistId) {
-    cancelPlaylistEdit(playlistId);
-    showStatus('✅ Playlist updated!');
+function removeFromPlaylist(playlistId, itemIndex) {
+    removeItemFromPlaylist(playlistId, itemIndex);
+
+    // Re-render the playlist items
+    const playlist = savedPlaylists.find(p => p.id === playlistId);
+    if (playlist) {
+        const itemsContainer = document.getElementById(`playlist-items-${playlistId}`);
+        if (itemsContainer) {
+            itemsContainer.innerHTML = renderPlaylistItems(playlist);
+        }
+    }
 }
 
+// Drag and Drop for playlist reordering
 function setupPlaylistDragAndDrop(playlistId) {
     const container = document.getElementById(`playlist-items-${playlistId}`);
     if (!container) return;
 
-    let draggedIndex = -1;
+    let draggedElement = null;
+    let draggedIndex = null;
 
     container.addEventListener('dragstart', (e) => {
-        if (e.target.classList.contains('playlist-item')) {
-            draggedIndex = parseInt(e.target.dataset.itemIndex);
-            e.target.classList.add('dragging');
-        }
+        if (!e.target.classList.contains('playlist-item')) return;
+
+        draggedElement = e.target;
+        draggedIndex = parseInt(e.target.dataset.itemIndex);
+        e.target.classList.add('dragging');
+        e.dataTransfer.effectAllowed = 'move';
     });
 
     container.addEventListener('dragend', (e) => {
-        if (e.target.classList.contains('playlist-item')) {
-            e.target.classList.remove('dragging');
-        }
+        if (!e.target.classList.contains('playlist-item')) return;
+        e.target.classList.remove('dragging');
     });
 
     container.addEventListener('dragover', (e) => {
         e.preventDefault();
+
         const afterElement = getDragAfterElement(container, e.clientY);
-        const dragging = container.querySelector('.dragging');
-        
         if (afterElement == null) {
-            container.appendChild(dragging);
+            container.appendChild(draggedElement);
         } else {
-            container.insertBefore(dragging, afterElement);
+            container.insertBefore(draggedElement, afterElement);
         }
     });
 
     container.addEventListener('drop', (e) => {
         e.preventDefault();
-        const allItems = [...container.querySelectorAll('.playlist-item')];
-        const newIndex = allItems.findIndex(item => item.classList.contains('dragging'));
-        
-        if (draggedIndex !== -1 && newIndex !== -1 && draggedIndex !== newIndex) {
+
+        const items = [...container.querySelectorAll('.playlist-item:not(.dragging)')];
+        const newIndex = items.indexOf(draggedElement);
+
+        if (newIndex !== draggedIndex) {
             reorderPlaylistItems(playlistId, draggedIndex, newIndex);
-            renderPlaylistsList();
+
+            // Re-render items
+            const playlist = savedPlaylists.find(p => p.id === playlistId);
+            if (playlist) {
+                container.innerHTML = renderPlaylistItems(playlist);
+                setupPlaylistDragAndDrop(playlistId);
+            }
         }
     });
 }
 
 function getDragAfterElement(container, y) {
     const draggableElements = [...container.querySelectorAll('.playlist-item:not(.dragging)')];
-    
+
     return draggableElements.reduce((closest, child) => {
         const box = child.getBoundingClientRect();
         const offset = y - box.top - box.height / 2;
-        
+
         if (offset < 0 && offset > closest.offset) {
             return { offset: offset, element: child };
         } else {
@@ -1085,442 +1900,386 @@ function getDragAfterElement(container, y) {
     }, { offset: Number.NEGATIVE_INFINITY }).element;
 }
 
-function removeFromPlaylist(playlistId, itemIndex) {
-    const playlist = savedPlaylists.find(p => p.id === playlistId);
-    if (!playlist) return;
-
-    const removedItem = playlist.items[itemIndex];
-    playlist.items.splice(itemIndex, 1);
-
-    // Update total duration
-    const itemDuration = removedItem.type === 'loop'
-        ? (removedItem.end - removedItem.start) * removedItem.playCount
-        : removedItem.duration * removedItem.playCount;
-    playlist.totalDuration -= itemDuration;
-    playlist.updatedAt = new Date().toISOString();
-
-    savePlaylistsToStorage();
-    renderPlaylistsList();
-    showStatus('Removed from playlist');
-}
-
-function reorderPlaylistItems(playlistId, fromIndex, toIndex) {
-    const playlist = savedPlaylists.find(p => p.id === playlistId);
-    if (!playlist) return;
-
-    const [item] = playlist.items.splice(fromIndex, 1);
-    playlist.items.splice(toIndex, 0, item);
-
-    playlist.updatedAt = new Date().toISOString();
-    savePlaylistsToStorage();
-}
-
-function createPlaylist(name, description = '') {
-    const playlist = {
-        id: `playlist_${Date.now()}`,
-        name: name,
-        description: description,
-        items: [],
-        totalDuration: 0,
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString(),
-        playCount: 0
-    };
-
-    savedPlaylists.push(playlist);
-    savePlaylistsToStorage();
-    renderPlaylistsList();
-    showStatus(`✅ Playlist "${name}" created!`);
-    return playlist.id;
-}
-
-function deletePlaylist(playlistId) {
-    const playlist = savedPlaylists.find(p => p.id === playlistId);
-    if (!playlist) return;
-
-    if (confirm(`Delete playlist "${playlist.name}"?`)) {
-        savedPlaylists = savedPlaylists.filter(p => p.id !== playlistId);
-        savePlaylistsToStorage();
-        renderPlaylistsList();
-        showStatus('🗑 Playlist deleted');
-    }
-}
-
-async function addCurrentToPlaylist() {
-    if (!currentTrack) {
-        showStatus('No track loaded');
-        return;
-    }
-
-    if (loopStart >= loopEnd) {
-        showStatus('Invalid loop settings');
-        return;
-    }
-
-    const item = {
-        type: loopEnabled ? 'loop' : 'track',
-        uri: currentTrack.uri,
-        trackUri: currentTrack.uri,
-        name: currentTrack.name,
-        artist: currentTrack.artist,
-        duration: duration,
-        playCount: loopTarget,
-        ...(loopEnabled && {
-            start: loopStart,
-            end: loopEnd
-        })
-    };
-
-    pendingPlaylistItem = item;
-    showAddToPlaylistPopup();
-}
-
+// Add to Playlist Popup
 function showAddToPlaylistPopup() {
-    renderPlaylistSelectionList();
-    els.addToPlaylistPopup.classList.add('show');
+    loadSavedPlaylists(); // Ensure latest playlists
+    
+    const popup = els.addToPlaylistPopup;
+    const list = els.playlistSelectionList;
+    
+    if (savedPlaylists.length === 0) {
+        list.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--light-gray);">No playlists yet. Create one first!</div>';
+    } else {
+        list.innerHTML = savedPlaylists.map(playlist => `
+            <div class="playlist-selection-item" data-playlist-id="${playlist.id}">
+                <div class="playlist-selection-icon">🎵</div>
+                <div class="playlist-selection-info">
+                    <div class="playlist-selection-name">${playlist.name}</div>
+                    <div class="playlist-selection-count">${playlist.items.length} items</div>
+                </div>
+            </div>
+        `).join('');
+    }
+    
+    popup.classList.remove('hidden');
 }
 
 function hideAddToPlaylistPopup() {
-    els.addToPlaylistPopup.classList.remove('show');
+    els.addToPlaylistPopup.classList.add('hidden');
     pendingPlaylistItem = null;
 }
 
-function renderPlaylistSelectionList() {
-    if (savedPlaylists.length === 0) {
-        els.playlistSelectionList.innerHTML = '<div style="text-align: center; padding: 20px; color: var(--light-gray);">No playlists yet</div>';
-        return;
-    }
-
-    els.playlistSelectionList.innerHTML = savedPlaylists.map(playlist => `
-        <button class="playlist-selection-item" data-playlist-id="${playlist.id}">
-            <div class="playlist-selection-info">
-                <div class="playlist-selection-name">${playlist.name}</div>
-                <div class="playlist-selection-count">${playlist.items.length} items</div>
-            </div>
-        </button>
-    `).join('');
-}
-
-function addToSelectedPlaylist(playlistId) {
-    if (!pendingPlaylistItem) return;
-
-    const playlist = savedPlaylists.find(p => p.id === playlistId);
-    if (!playlist) return;
-
-    playlist.items.push(pendingPlaylistItem);
-
-    // Update total duration
-    const itemDuration = pendingPlaylistItem.type === 'loop'
-        ? (pendingPlaylistItem.end - pendingPlaylistItem.start) * pendingPlaylistItem.playCount
-        : pendingPlaylistItem.duration * pendingPlaylistItem.playCount;
-    playlist.totalDuration += itemDuration;
-    playlist.updatedAt = new Date().toISOString();
-
-    savePlaylistsToStorage();
-    hideAddToPlaylistPopup();
-    showStatus(`✅ Added to "${playlist.name}"`);
-}
-
-function showCreatePlaylistForm(withPendingItem = false) {
-    els.playlistFormTitle.textContent = 'Create Playlist';
+// Playlist Form
+function showCreatePlaylistForm(quickCreate = false) {
+    els.playlistFormPopup.classList.remove('hidden');
+    els.playlistFormTitle.textContent = quickCreate ? 'Quick Create Playlist' : 'Create New Playlist';
     els.playlistNameInput.value = '';
     els.playlistDescriptionInput.value = '';
-    els.playlistFormPopup.classList.add('show');
+    els.playlistNameInput.focus();
 }
 
 function hideCreatePlaylistForm() {
-    els.playlistFormPopup.classList.remove('show');
+    els.playlistFormPopup.classList.add('hidden');
 }
 
-function handleCreatePlaylistSubmit() {
+function savePlaylistFromForm() {
     const name = els.playlistNameInput.value.trim();
+    const description = els.playlistDescriptionInput.value.trim();
+    
     if (!name) {
         showStatus('Please enter a playlist name');
         return;
     }
-
-    const description = els.playlistDescriptionInput.value.trim();
-    const playlistId = createPlaylist(name, description);
-
-    if (pendingPlaylistItem) {
-        addToSelectedPlaylist(playlistId);
-    }
-
+    
+    const playlist = createPlaylist(name, description);
     hideCreatePlaylistForm();
-}
-
-async function sharePlaylist(playlistId) {
-    const playlist = savedPlaylists.find(p => p.id === playlistId);
-    if (!playlist) return;
-
-    const shareText = `🎵 Check out my "${playlist.name}" playlist on LOOOPZ!\n\n${playlist.items.length} tracks • ${Math.round(playlist.totalDuration / 60)} minutes\n\nCreate your own playlists at https://looopz.vercel.app`;
-
-    if (navigator.share) {
-        try {
-            await navigator.share({
-                title: `LOOOPZ - ${playlist.name}`,
-                text: shareText,
-                url: 'https://looopz.vercel.app'
-            });
-        } catch (error) {
-            console.log('Share cancelled or failed');
-        }
-    } else {
-        try {
-            await navigator.clipboard.writeText(shareText);
-            showStatus('📋 Playlist details copied to clipboard!');
-        } catch (error) {
-            showStatus('❌ Could not copy to clipboard');
-        }
+    
+    // If we have a pending item, add it immediately
+    if (pendingPlaylistItem) {
+        addItemToPlaylist(playlist.id, pendingPlaylistItem);
+        hideAddToPlaylistPopup();
+        pendingPlaylistItem = null;
     }
 }
 
-// ===== SEARCH FUNCTIONS =====
-
-async function searchTracks(query) {
-    if (!query.trim()) {
-        els.searchResults.innerHTML = '';
-        return;
-    }
-
-    searchState.query = query;
-
-    try {
-        showStatus('Searching...');
-        const response = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=10&offset=${searchState.currentOffset}`, {
-            headers: { 'Authorization': `Bearer ${spotifyAccessToken}` }
-        });
-
-        if (!response.ok) throw new Error('Search failed');
-
-        const data = await response.json();
+// Event Listeners Setup
+function setupEventListeners() {
+    // Main click event delegation
+    document.addEventListener('click', async (e) => {
+        const target = e.target;
         
-        if (searchState.currentOffset === 0) {
-            currentSearchResults = data.tracks.items;
-        } else {
-            currentSearchResults = [...currentSearchResults, ...data.tracks.items];
-        }
-
-        searchState.totalTracks = data.tracks.total;
-        searchState.hasMore = currentSearchResults.length < data.tracks.total;
-
-        displaySearchResults(currentSearchResults, searchState.hasMore);
-        showStatus(`Found ${data.tracks.total} tracks`);
-
-    } catch (error) {
-        console.error('🚨 Search failed:', error);
-        showStatus('Search failed. Please try again.');
-    }
-}
-
-async function loadMoreTracks() {
-    if (!searchState.hasMore || !searchState.query) return;
-
-    searchState.currentOffset += 10;
-    showStatus('Loading more tracks...');
-    await searchTracks(searchState.query);
-}
-
-function displaySearchResults(tracks, hasMore = false) {
-    if (tracks.length === 0) {
-        els.searchResults.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--light-gray);">No results found</div>';
-        return;
-    }
-
-    let html = tracks.map((track, index) => `
-        <div class="track-item" data-track-index="${index}">
-            <img src="${track.album.images[2]?.url || ''}" alt="Album cover" class="track-cover" onerror="this.style.display='none'">
-            <div class="track-info">
-                <div class="track-name">${track.name}</div>
-                <div class="track-artist">${track.artists[0].name}</div>
-            </div>
-            <div class="track-duration">${formatTime(track.duration_ms / 1000, false)}</div>
-            <div class="track-actions">
-                <button class="track-action-btn play-track-btn" data-track-index="${index}">▶</button>
-                <button class="track-action-btn secondary select-track-btn" data-track-index="${index}">+</button>
-                <button class="track-action-btn menu track-menu-btn" data-track-index="${index}">⋮</button>
-            </div>
-        </div>
-    `).join('');
-
-    if (hasMore) {
-        html += `
-            <button class="load-more-btn" id="load-more-tracks">
-                Load More Tracks (${searchState.totalTracks - currentSearchResults.length} remaining)
-            </button>
-        `;
-    }
-
-    els.searchResults.innerHTML = html;
-
-    if (currentTrack) updateSearchTrackHighlighting(currentTrack.uri);
-}
-
-function updateSearchTrackHighlighting(uri, isSelected = false) {
-    document.querySelectorAll('.track-item').forEach(item => {
-        item.classList.remove('playing', 'selected');
-    });
-
-    if (uri && currentSearchResults) {
-        const trackIndex = currentSearchResults.findIndex(track => track.uri === uri);
-        if (trackIndex !== -1) {
-            const trackElement = document.querySelector(`[data-track-index="${trackIndex}"]`);
-            if (trackElement) {
-                trackElement.classList.add(isSelected ? 'selected' : 'playing');
+        try {
+            // Login
+            if (target.matches('#connect-btn')) {
+                e.preventDefault();
+                login();
             }
-        }
-    }
-}
-
-// ===== SPOTIFY AUTH =====
-
-function getHashParams() {
-    const hashParams = {};
-    const hash = window.location.hash.substring(1);
-    const pairs = hash.split('&');
-    
-    for (let i = 0; i < pairs.length; i++) {
-        const pair = pairs[i].split('=');
-        hashParams[pair[0]] = decodeURIComponent(pair[1] || '');
-    }
-    
-    return hashParams;
-}
-
-function checkAuth() {
-    const hashParams = getHashParams();
-    
-    if (hashParams.access_token) {
-        spotifyAccessToken = hashParams.access_token;
-        history.replaceState({}, document.title, '/');
-        initializeSpotify();
-    } else {
-        showView('login');
-    }
-}
-
-function connectToSpotify() {
-    const authUrl = `https://accounts.spotify.com/authorize?` +
-        `client_id=${SPOTIFY_CLIENT_ID}&` +
-        `response_type=token&` +
-        `redirect_uri=${encodeURIComponent(SPOTIFY_REDIRECT_URI)}&` +
-        `scope=${encodeURIComponent(SPOTIFY_SCOPES)}`;
-    
-    window.location.href = authUrl;
-}
-
-function disconnect() {
-    spotifyAccessToken = null;
-    isConnected = false;
-    if (spotifyPlayer) {
-        spotifyPlayer.disconnect();
-        spotifyPlayer = null;
-    }
-    stopProgressUpdates();
-    showView('login');
-    showStatus('Disconnected from Spotify');
-}
-
-// ===== SPOTIFY PLAYER INITIALIZATION =====
-
-function initializeSpotify() {
-    window.onSpotifyWebPlaybackSDKReady = () => {
-        spotifyPlayer = new Spotify.Player({
-            name: 'LOOOPZ Player',
-            getOAuthToken: cb => cb(spotifyAccessToken),
-            volume: 0.8
-        });
-
-        spotifyPlayer.addListener('ready', ({ device_id }) => {
-            console.log('🎵 Spotify Player ready:', device_id);
-            spotifyDeviceId = device_id;
-            isConnected = true;
-            updateConnectionStatus();
-            showView('search');
-            showStatus('✅ Connected to Spotify!');
-        });
-
-        spotifyPlayer.addListener('not_ready', ({ device_id }) => {
-            console.log('⚠️ Spotify Player not ready:', device_id);
-            isConnected = false;
-            updateConnectionStatus();
-        });
-
-        spotifyPlayer.addListener('player_state_changed', (state) => {
-            if (!state) return;
-
-            isPlaying = !state.paused;
-            currentTime = state.position / 1000;
             
-            if (state.track_window?.current_track) {
-                const track = state.track_window.current_track;
-                duration = state.duration / 1000;
+            // Navigation
+            else if (target.matches('#nav-search')) {
+                e.preventDefault();
+                showView('search');
+            }
+            else if (target.matches('#nav-player')) {
+                e.preventDefault();
+                if (currentTrack) showView('player');
+                else showStatus('No track selected');
+            }
+            else if (target.matches('#nav-library')) {
+                e.preventDefault();
+                showView('library');
+            }
+            else if (target.matches('#nav-playlists')) {
+                e.preventDefault();
+                showView('playlists');
+            }
+            
+            // Mini player
+            else if (target.closest('.now-playing-indicator')) {
+                e.preventDefault();
+                if (currentTrack) showView('player');
+            }
+            
+            // Track actions in search
+            else if (target.matches('.play-track-btn')) {
+                e.preventDefault();
+                const trackIndex = parseInt(target.dataset.trackIndex);
+                const track = currentSearchResults[trackIndex];
+                if (track) await playTrackInBackground(track);
+            }
+            else if (target.matches('.select-track-btn')) {
+                e.preventDefault();
+                const trackIndex = parseInt(target.dataset.trackIndex);
+                const track = currentSearchResults[trackIndex];
+                if (track) await selectTrack(track.uri);
+            }
+            else if (target.matches('.track-menu-btn')) {
+                e.preventDefault();
+                const trackIndex = parseInt(target.dataset.trackIndex);
+                showTrackContextMenu(trackIndex, target);
+            }
+            
+            // Context menu
+            else if (target.matches('#discover-moments-btn')) {
+                e.preventDefault();
+                await handleDiscoverMoments();
+            }
+            else if (target.matches('#add-to-playlist-btn-menu')) {
+                e.preventDefault();
+                await handleAddToPlaylist();
+            }
+            else if (target.matches('#play-in-background-btn')) {
+                e.preventDefault();
+                await handlePlayInBackground();
+            }
+            else if (target.matches('.context-menu-overlay')) {
+                e.preventDefault();
+                hideTrackContextMenu();
+            }
+            
+            // Player controls
+            else if (target.matches('#play-pause-btn')) {
+                e.preventDefault();
+                await togglePlayPause();
+            }
+            else if (target.matches('#backward-btn')) {
+                e.preventDefault();
+                await seekBackward();
+            }
+            else if (target.matches('#forward-btn')) {
+                e.preventDefault();
+                await seekForward();
+            }
+            
+            // Loop controls - FIX 2: Changed from start-loop-btn to set-loop-btn
+            else if (target.matches('#start-loop-btn')) {
+                e.preventDefault();
+                await setLoop();
+            }
+            else if (target.matches('#save-loop-btn')) {
+                e.preventDefault();
+                saveCurrentLoop();
+            }
+            else if (target.matches('#add-to-playlist-btn')) {
+                e.preventDefault();
+                if (!currentTrack) {
+                    showStatus('No track selected');
+                    return;
+                }
                 
-                if (!currentTrack || currentTrack.uri !== track.uri) {
-                    currentTrack = {
-                        uri: track.uri,
-                        name: track.name,
-                        artist: track.artists[0]?.name || 'Unknown Artist',
-                        duration_ms: state.duration
-                    };
+                pendingPlaylistItem = {
+                    type: 'loop',
+                    uri: currentTrack.uri,
+                    trackId: currentTrack.uri.split(':')[2],
+                    name: currentTrack.name,
+                    artist: currentTrack.artist,
+                    image: currentTrack.image,
+                    start: loopStart,
+                    end: loopEnd,
+                    duration: currentTrack.duration,
+                    playCount: loopTarget
+                };
+                
+                showAddToPlaylistPopup();
+            }
+            
+            // Repeat controls
+            else if (target.matches('#repeat-decrease')) {
+                e.preventDefault();
+                if (loopTarget > 1) {
+                    loopTarget--;
+                    updateRepeatDisplay();
+                    loopCount = 0;
                 }
             }
-
-            updateProgress();
-            updatePlayPauseButton();
-            updateNowPlayingIndicator(currentTrack);
-
-            if (isPlaying && !updateTimer) {
-                startProgressUpdates();
-            } else if (!isPlaying && updateTimer) {
-                stopProgressUpdates();
+            else if (target.matches('#repeat-increase')) {
+                e.preventDefault();
+                if (loopTarget < 99) {
+                    loopTarget++;
+                    updateRepeatDisplay();
+                    loopCount = 0;
+                }
             }
-        });
-
-        spotifyPlayer.connect();
-    };
-
-    if (window.Spotify) window.onSpotifyWebPlaybackSDKReady();
-}
-
-// ===== EVENT LISTENERS =====
-
-function setupEventListeners() {
-    // Main navigation
-    els.connectBtn.addEventListener('click', connectToSpotify);
-    els.disconnectBtn.addEventListener('click', disconnect);
-
-    // Navigation buttons
-    els.navSearch.addEventListener('click', () => showView('search'));
-    els.navPlayer.addEventListener('click', () => showView('player'));
-    els.navLibrary.addEventListener('click', () => showView('library'));
-    els.navPlaylists.addEventListener('click', () => showView('playlists'));
-    els.navDiscovery.addEventListener('click', () => window.open('/discovery.html', '_blank'));
-
-    // Player controls - FIXED: Updated startLoop to setLoop
-    els.playPauseBtn.addEventListener('click', togglePlayPause);
-    els.backwardBtn.addEventListener('click', skipBackward);
-    els.forwardBtn.addEventListener('click', skipForward);
-    els.startLoopBtn.addEventListener('click', setLoop); // FIXED: renamed function
-    els.saveLoopBtn.addEventListener('click', saveCurrentLoop);
-    els.addToPlaylistBtn.addEventListener('click', addCurrentToPlaylist);
-
-    // Loop controls
+            
+            // Precision popup
+            else if (target.matches('#precision-btn')) {
+                e.preventDefault();
+                els.precisionPopup.classList.remove('hidden');
+            }
+            else if (target.matches('#precision-close')) {
+                e.preventDefault();
+                els.precisionPopup.classList.add('hidden');
+            }
+            else if (target.matches('.precision-popup') && !target.closest('.precision-popup-content')) {
+                e.preventDefault();
+                els.precisionPopup.classList.add('hidden');
+            }
+            
+            // Search navigation
+            else if (target.matches('#search-back-btn')) {
+                e.preventDefault();
+                goBackToMainSearch();
+            }
+            
+            // Load more
+            else if (target.matches('#load-more-tracks')) {
+                e.preventDefault();
+                await loadMoreTracks();
+            }
+            
+            // Library actions
+            else if (target.matches('.load-btn')) {
+                e.preventDefault();
+                const loopId = target.dataset.loopId;
+                await loadSavedLoop(loopId);
+            }
+            else if (target.matches('.edit-btn')) {
+                e.preventDefault();
+                const loopId = target.dataset.loopId;
+                editLoop(loopId);
+            }
+            else if (target.matches('.share-btn')) {
+                e.preventDefault();
+                const loopId = target.dataset.loopId;
+                shareLoop(loopId);
+            }
+            else if (target.matches('.delete-btn')) {
+                e.preventDefault();
+                const loopId = target.dataset.loopId;
+                deleteLoop(loopId);
+            }
+            else if (target.matches('.add-to-playlist-btn')) {
+                e.preventDefault();
+                const loopId = target.dataset.loopId;
+                const loop = savedLoops.find(l => l.id === loopId);
+                if (loop) {
+                    pendingPlaylistItem = {
+                        type: 'loop',
+                        uri: loop.track.uri,
+                        trackId: loop.track.uri.split(':')[2],
+                        name: loop.track.name,
+                        artist: loop.track.artist,
+                        image: loop.track.image,
+                        start: loop.loop.start,
+                        end: loop.loop.end,
+                        duration: loop.track.duration,
+                        playCount: loop.loop.repeat
+                    };
+                    showAddToPlaylistPopup();
+                }
+            }
+            
+            // Playlist controls
+            else if (target.matches('#create-playlist-btn')) {
+                e.preventDefault();
+                showCreatePlaylistForm();
+            }
+            else if (target.matches('.play-playlist-btn')) {
+                e.preventDefault();
+                const playlistId = target.dataset.playlistId;
+                await playPlaylist(playlistId);
+            }
+            else if (target.matches('.edit-playlist-btn')) {
+                e.preventDefault();
+                const playlistId = target.dataset.playlistId;
+                showPlaylistEditor(playlistId);
+            }
+            else if (target.matches('.share-playlist-btn')) {
+                e.preventDefault();
+                showStatus('Playlist sharing coming soon!');
+            }
+            else if (target.matches('.delete-playlist-btn')) {
+                e.preventDefault();
+                const playlistId = target.dataset.playlistId;
+                deletePlaylist(playlistId);
+            }
+            
+            // Playlist mode controls
+            else if (target.matches('#playlist-prev-btn')) {
+                e.preventDefault();
+                if (playlistEngine && currentPlaylistIndex > 0) {
+                    playlistEngine.currentIndex = currentPlaylistIndex - 1;
+                    playlistEngine.playCurrentItem();
+                }
+            }
+            else if (target.matches('#playlist-stop-btn')) {
+                e.preventDefault();
+                stopPlaylistMode();
+                showStatus('Playlist stopped');
+            }
+            else if (target.matches('#playlist-next-btn')) {
+                e.preventDefault();
+                if (playlistEngine && currentPlaylist && currentPlaylistIndex < currentPlaylist.items.length - 1) {
+                    playlistEngine.currentIndex = currentPlaylistIndex + 1;
+                    playlistEngine.playCurrentItem();
+                }
+            }
+            
+            // Add to playlist popup
+            else if (target.matches('#add-to-playlist-close')) {
+                e.preventDefault();
+                hideAddToPlaylistPopup();
+            }
+            else if (target.matches('#quick-create-playlist')) {
+                e.preventDefault();
+                showCreatePlaylistForm(true);
+            }
+            else if (target.closest('.playlist-selection-item')) {
+                e.preventDefault();
+                const item = target.closest('.playlist-selection-item');
+                const playlistId = item.dataset.playlistId;
+                if (pendingPlaylistItem) {
+                    addItemToPlaylist(playlistId, pendingPlaylistItem);
+                    hideAddToPlaylistPopup();
+                    pendingPlaylistItem = null;
+                }
+            }
+            
+            // Playlist form
+            else if (target.matches('#playlist-form-close')) {
+                e.preventDefault();
+                hideCreatePlaylistForm();
+            }
+            else if (target.matches('#playlist-form-cancel')) {
+                e.preventDefault();
+                hideCreatePlaylistForm();
+            }
+            
+            // Progress bar click
+            else if (target.matches('#progress-container') || target.closest('#progress-container')) {
+                if (isDragging) return;
+                if (target.classList.contains('loop-handle') || target.closest('.loop-handle')) return;
+                
+                e.preventDefault();
+                const rect = els.progressContainer.getBoundingClientRect();
+                const percent = (e.clientX - rect.left) / rect.width;
+                const newTime = percent * duration;
+                await seekToPosition(newTime * 1000);
+            }
+        } catch (error) {
+            console.error('🚨 Event handler error:', error);
+            showStatus('Action failed: ' + error.message);
+        }
+    });
+    
+    // Other specific event listeners
     els.loopToggle.addEventListener('change', function() {
         loopEnabled = this.checked;
+        loopCount = 0;
+        els.startLoopBtn.disabled = !loopEnabled;
+        updateLoopVisuals(); // FIX 6: Update visuals when toggling
         showStatus(loopEnabled ? `Loop enabled: ${loopTarget} time(s)` : 'Loop disabled');
     });
-
-    // Search
+    
     els.searchInput.addEventListener('input', function() {
         clearTimeout(this.searchTimeout);
         this.searchTimeout = setTimeout(() => {
+            // Reset search state for new query
             searchState.currentOffset = 0;
             searchTracks(this.value);
         }, 300);
     });
-
-    // Precision controls
+    
     els.precisionStart.addEventListener('change', function() {
         const newStart = parseTimeInput(this.value);
         if (newStart >= 0 && newStart < loopEnd && newStart <= duration) {
@@ -1530,7 +2289,7 @@ function setupEventListeners() {
             this.value = formatTime(loopStart);
         }
     });
-
+    
     els.precisionEnd.addEventListener('change', function() {
         const newEnd = parseTimeInput(this.value);
         if (newEnd > loopStart && newEnd <= duration) {
@@ -1540,8 +2299,8 @@ function setupEventListeners() {
             this.value = formatTime(loopEnd);
         }
     });
-
-    // Fine-tune buttons
+    
+    // Fine-tune buttons - simple click only
     document.addEventListener('click', (e) => {
         if (e.target.matches('.fine-tune-btn')) {
             e.preventDefault();
@@ -1555,224 +2314,36 @@ function setupEventListeners() {
             updateLoopVisuals();
         }
     });
-
-    // Repeat controls
-    els.repeatValue.addEventListener('click', function() {
-        const newTarget = prompt('Set repeat count:', loopTarget);
-        if (newTarget && !isNaN(newTarget) && newTarget > 0) {
-            loopTarget = parseInt(newTarget);
-            updateRepeatDisplay();
-        }
-    });
-
-    // Precision popup
-    els.precisionBtn.addEventListener('click', () => els.precisionPopup.classList.add('show'));
-    els.precisionClose.addEventListener('click', () => els.precisionPopup.classList.remove('show'));
-
-    // Context menu
-    els.contextMenuOverlay.addEventListener('click', hideTrackContextMenu);
-
-    // Playlist forms
-    els.addToPlaylistClose.addEventListener('click', hideAddToPlaylistPopup);
-    els.playlistFormClose.addEventListener('click', hideCreatePlaylistForm);
-    els.playlistFormCancel.addEventListener('click', hideCreatePlaylistForm);
-    els.playlistFormSave.addEventListener('click', handleCreatePlaylistSubmit);
-    els.quickCreatePlaylist.addEventListener('click', () => showCreatePlaylistForm(true));
-    els.createPlaylistBtn.addEventListener('click', () => showCreatePlaylistForm(false));
-
-    // Delegated event handling
-    document.addEventListener('click', async (e) => {
-        const target = e.target;
-
-        // Search results
-        if (target.matches('.play-track-btn')) {
-            e.preventDefault();
-            const trackIndex = parseInt(target.dataset.trackIndex);
-            const track = currentSearchResults[trackIndex];
-            if (track) await playTrackInBackground(track, trackIndex);
-        }
-        else if (target.matches('.select-track-btn')) {
-            e.preventDefault();
-            const trackIndex = parseInt(target.dataset.trackIndex);
-            const track = currentSearchResults[trackIndex];
-            if (track) await selectTrack(track.uri, trackIndex);
-        }
-        else if (target.matches('.track-menu-btn')) {
-            e.preventDefault();
-            const trackIndex = parseInt(target.dataset.trackIndex);
-            showTrackContextMenu(trackIndex, target);
-        }
-        else if (target.matches('#load-more-tracks')) {
-            e.preventDefault();
-            await loadMoreTracks();
-        }
-
-        // Loop actions
-        else if (target.matches('.load-btn')) {
-            e.preventDefault();
-            const loopId = target.dataset.loopId;
-            loadLoop(loopId);
-        }
-        else if (target.matches('.edit-btn')) {
-            e.preventDefault();
-            const loopId = target.dataset.loopId;
-            editLoop(loopId);
-        }
-        else if (target.matches('.share-btn')) {
-            e.preventDefault();
-            const loopId = target.dataset.loopId;
-            await shareLoop(loopId);
-        }
-        else if (target.matches('.delete-btn')) {
-            e.preventDefault();
-            const loopId = target.dataset.loopId;
-            deleteLoop(loopId);
-        }
-        else if (target.matches('.add-to-playlist-btn[data-loop-id]')) {
-            e.preventDefault();
-            const loopId = target.dataset.loopId;
-            const loop = savedLoops.find(l => l.id === loopId);
-            if (loop) {
-                pendingPlaylistItem = {
-                    type: 'loop',
-                    uri: loop.track.uri,
-                    trackUri: loop.track.uri,
-                    name: loop.track.name,
-                    artist: loop.track.artist,
-                    duration: loop.track.duration_ms / 1000,
-                    start: loop.loop.start,
-                    end: loop.loop.end,
-                    playCount: loop.loop.repeat
-                };
-                showAddToPlaylistPopup();
-            }
-        }
-        else if (target.matches('#clear-all-loops')) {
-            e.preventDefault();
-            clearAllLoops();
-        }
-
-        // Playlist actions
-        else if (target.matches('.play-playlist-btn')) {
-            e.preventDefault();
-            const playlistId = target.dataset.playlistId;
-            await playPlaylist(playlistId);
-        }
-        else if (target.matches('.edit-playlist-btn')) {
-            e.preventDefault();
-            const playlistId = target.dataset.playlistId;
-            editPlaylist(playlistId);
-        }
-        else if (target.matches('.share-playlist-btn')) {
-            e.preventDefault();
-            const playlistId = target.dataset.playlistId;
-            await sharePlaylist(playlistId);
-        }
-        else if (target.matches('.delete-playlist-btn')) {
-            e.preventDefault();
-            const playlistId = target.dataset.playlistId;
-            deletePlaylist(playlistId);
-        }
-
-        // Playlist controls (when in playlist mode)
-        else if (target.matches('#playlist-prev-btn')) {
-            e.preventDefault();
-            if (isPlaylistMode && currentPlaylistIndex > 0) {
-                currentPlaylistIndex--;
-                const prevItem = currentPlaylist.items[currentPlaylistIndex];
-                await loadPlaylistItem(prevItem);
-            }
-        }
-        else if (target.matches('#playlist-stop-btn')) {
-            e.preventDefault();
-            stopPlaylistMode();
-        }
-        else if (target.matches('#playlist-next-btn')) {
-            e.preventDefault();
-            if (isPlaylistMode) {
-                await moveToNextPlaylistItem();
-            }
-        }
-
-        // Playlist selection
-        else if (target.matches('.playlist-selection-item')) {
-            e.preventDefault();
-            const playlistId = target.dataset.playlistId;
-            addToSelectedPlaylist(playlistId);
-        }
-
-        // Context menu actions
-        else if (target.matches('#context-play')) {
-            e.preventDefault();
-            if (currentContextMenuTrackIndex !== null) {
-                const track = currentSearchResults[currentContextMenuTrackIndex];
-                if (track) await playTrackInBackground(track, currentContextMenuTrackIndex);
-            }
-            hideTrackContextMenu();
-        }
-        else if (target.matches('#context-select')) {
-            e.preventDefault();
-            if (currentContextMenuTrackIndex !== null) {
-                const track = currentSearchResults[currentContextMenuTrackIndex];
-                if (track) await selectTrack(track.uri, currentContextMenuTrackIndex);
-            }
-            hideTrackContextMenu();
-        }
-        else if (target.matches('#context-add-playlist')) {
-            e.preventDefault();
-            if (currentContextMenuTrackIndex !== null) {
-                const track = currentSearchResults[currentContextMenuTrackIndex];
-                if (track) {
-                    pendingPlaylistItem = {
-                        type: 'track',
-                        uri: track.uri,
-                        name: track.name,
-                        artist: track.artists[0].name,
-                        duration: track.duration_ms / 1000,
-                        playCount: 1
-                    };
-                    showAddToPlaylistPopup();
-                }
-            }
-            hideTrackContextMenu();
-        }
-    });
 }
 
-// ===== GLOBAL FUNCTION EXPORTS =====
-// Make functions available globally for onclick handlers
-window.editLoop = editLoop;
-window.cancelEdit = cancelEdit;
+// Global edit functions for inline editing
 window.saveLoopEdits = saveLoopEdits;
-window.cancelPlaylistEdit = cancelPlaylistEdit;
-window.savePlaylistEdits = savePlaylistEdits;
+window.cancelEdit = cancelEdit;
+window.hidePlaylistEditor = hidePlaylistEditor;
 window.removeFromPlaylist = removeFromPlaylist;
 
-// ===== INITIALIZATION =====
-
+// Initialization
 function init() {
-    console.log('🚀 Initializing LOOOPZ with Unified Loop System...');
-
-    // Cache all elements
+    console.log('🚀 Initializing LOOOPZ...');
+    
     els = {
         loginScreen: document.getElementById('login-screen'),
         searchSection: document.getElementById('search-section'),
         playerSection: document.getElementById('player-section'),
         librarySection: document.getElementById('library-section'),
         playlistsSection: document.getElementById('playlists-section'),
-        connectBtn: document.getElementById('connect-btn'),
-        disconnectBtn: document.getElementById('disconnect-btn'),
-        connectionStatus: document.getElementById('connection-status'),
-        statusBar: document.getElementById('status-bar'),
-        statusText: document.getElementById('status-text'),
-        nowPlayingIndicator: document.getElementById('now-playing-indicator'),
-        miniTrackTitle: document.getElementById('mini-track-title'),
-        miniTrackArtist: document.getElementById('mini-track-artist'),
         searchInput: document.getElementById('search-input'),
         searchResults: document.getElementById('search-results'),
         searchBackBtn: document.getElementById('search-back-btn'),
         currentTrack: document.getElementById('current-track'),
         currentArtist: document.getElementById('current-artist'),
+        albumCover: document.getElementById('album-cover'),
+        statusBar: document.getElementById('status-bar'),
+        statusText: document.getElementById('status-text'),
+        connectionStatus: document.getElementById('connection-status'),
+        nowPlayingIndicator: document.getElementById('now-playing-indicator'),
+        miniTrackTitle: document.getElementById('mini-track-title'),
+        miniTrackArtist: document.getElementById('mini-track-artist'),
         progressContainer: document.getElementById('progress-container'),
         progressBar: document.getElementById('progress-bar'),
         loopRegion: document.getElementById('loop-region'),
@@ -1819,15 +2390,17 @@ function init() {
         playlistDescriptionInput: document.getElementById('playlist-description-input'),
         createPlaylistBtn: document.getElementById('create-playlist-btn')
     };
-
+    
     setupEventListeners();
     setupLoopHandles();
     checkAuth();
     loadSavedLoops();
     loadSavedPlaylists();
-
-    console.log('✅ LOOOPZ initialization complete with Unified Loop System!');
+    
+    // Initialize loop handles visibility
+    updateLoopVisuals();
+    
+    console.log('✅ LOOOPZ initialization complete with Playlist Management!');
 }
 
-// Initialize when DOM is ready
 document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', init) : init();
