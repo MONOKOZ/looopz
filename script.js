@@ -745,6 +745,7 @@ class PlaylistTransitionEngine {
 
       // FIX 3: Use more precise timing threshold
       if (currentTime >= this.currentLoop.end - LOOP_END_THRESHOLD) {
+          // Increment loop count
           this.currentLoopCount++;
 
           // Notify UI of loop progress
@@ -752,12 +753,15 @@ class PlaylistTransitionEngine {
               this.onLoopProgress(this.currentLoopCount, this.currentLoopTarget);
           }
 
+          console.log(`🔄 Loop progress: ${this.currentLoopCount}/${this.currentLoopTarget}`);
+
           if (this.currentLoopCount >= this.currentLoopTarget) {
               // Loop complete, move to next item
               console.log(`✅ Loop complete: ${this.currentLoopCount}/${this.currentLoopTarget}`);
               await this.skipToNext();
           } else {
-              // Continue looping
+              // Continue looping - perform seek back to start
+              console.log(`🔄 Continuing loop ${this.currentLoopCount + 1}/${this.currentLoopTarget}`);
               await this.performLoopSeek();
           }
       }
@@ -979,8 +983,8 @@ function initializeSpotifyPlayer() {
           updatePlayPauseButton();
           updateNowPlayingIndicator(currentTrack);
 
-          // Handle playlist mode progress
-          if (isPlaylistMode && playlistEngine) {
+          // Handle playlist mode progress - check more frequently
+          if (isPlaylistMode && playlistEngine && isPlaying) {
               playlistEngine.handlePlaybackProgress(currentTime);
           }
 
@@ -1056,6 +1060,11 @@ function startProgressUpdates() {
                   // FIX 5 & 9: Unified loop end handling
                   if (loopEnabled && !isPlaylistMode) {
                       await checkLoopEnd();
+                  }
+                  
+                  // Also check playlist loops during progress updates
+                  if (isPlaylistMode && playlistEngine && isPlaying) {
+                      await playlistEngine.handlePlaybackProgress(currentTime);
                   }
               }
           } catch (error) {
