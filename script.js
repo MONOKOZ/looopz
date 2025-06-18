@@ -577,7 +577,7 @@ async function seekToPosition(positionMs) {
   }
 }
 
-// Playlist Transition Engine Integration - FIXED TIMING
+// Playlist Transition Engine Integration - SIMPLIFIED APPROACH
 class PlaylistTransitionEngine {
   constructor(spotifyPlayer, spotifyAccessToken, spotifyDeviceId) {
       this.spotifyPlayer = spotifyPlayer;
@@ -589,22 +589,12 @@ class PlaylistTransitionEngine {
       this.currentItemIndex = 0;
       this.isPlaying = false;
 
-      // Loop state for current item
-      this.currentLoopCount = 0;
-      this.currentLoopTarget = 1;
-      this.loopStartTime = 0;
-      this.isLooping = false;
-
-      // Transition management
-      this.nextTrackPreloaded = false;
+      // We DON'T track loops here - let main player handle it
       this.transitionInProgress = false;
 
       // Event callbacks
       this.onItemChange = null;
       this.onPlaylistComplete = null;
-      this.onLoopProgress = null;
-
-      this.setupEventListeners();
   }
 
   // Initialize playlist playback
@@ -614,7 +604,6 @@ class PlaylistTransitionEngine {
 
           this.currentPlaylist = playlist;
           this.currentItemIndex = startIndex;
-          this.currentLoopCount = 0;
 
           if (playlist.items.length === 0) {
               throw new Error('Empty playlist');
@@ -622,11 +611,6 @@ class PlaylistTransitionEngine {
 
           // Load first track
           await this.loadPlaylistItem(this.currentItemIndex);
-
-          // Pre-load next track if exists
-          if (this.currentItemIndex + 1 < playlist.items.length) {
-              this.preloadNextTrack();
-          }
 
           console.log('✅ Playlist loaded and ready');
           return true;
@@ -649,11 +633,6 @@ class PlaylistTransitionEngine {
       console.log('🔄 Loading playlist item:', item);
 
       try {
-          // Reset loop state
-          this.currentLoopCount = 0;
-          this.currentLoopTarget = item.playCount || 1;
-          this.loopStartTime = Date.now();
-
           // Load track into Spotify
           const startPosition = item.type === 'loop' ? item.start * 1000 : 0;
 
@@ -665,123 +644,17 @@ class PlaylistTransitionEngine {
               image: item.image || ''
           }, startPosition);
 
-          // Set up loop parameters if this is a loop item
-          if (item.type === 'loop') {
-              this.setupLoopItem(item);
-          }
-
-          // Notify UI of track change
+          // Notify UI of track change - let main player handle the loop logic
           if (this.onItemChange) {
               this.onItemChange(item, itemIndex);
           }
 
-          console.log('✅ Playlist item loaded');
+          console.log('✅ Playlist item loaded - main player will handle loops');
 
       } catch (error) {
           console.error('🚨 Failed to load playlist item:', error);
           // Skip to next item on error
           await this.skipToNext();
-      }
-  }
-
-  // Setup loop parameters for loop items
-  setupLoopItem(loopItem) {
-      // These would integrate with existing loop variables
-      // For now, store in class properties
-      this.currentLoop = {
-          start: loopItem.start,
-          end: loopItem.end,
-          duration: loopItem.end - loopItem.start
-      };
-
-      console.log(`🔄 Loop setup: ${formatTime(loopItem.start)} - ${formatTime(loopItem.end)} × ${this.currentLoopTarget}`);
-  }
-
-  // Pre-load next track for seamless transition
-  async preloadNextTrack() {
-      const nextIndex = this.currentItemIndex + 1;
-      if (nextIndex >= this.currentPlaylist.items.length) {
-          return; // No next track
-      }
-
-      const nextItem = this.currentPlaylist.items[nextIndex];
-      const trackUri = nextItem.type === 'loop' ? nextItem.trackUri : nextItem.uri;
-
-      try {
-          // Queue next track in Spotify (this prepares it for instant transition)
-          await fetch(`https://api.spotify.com/v1/me/player/queue?uri=${encodeURIComponent(trackUri)}&device_id=${this.spotifyDeviceId}`, {
-              method: 'POST',
-              headers: {
-                  'Authorization': `Bearer ${this.spotifyAccessToken}`
-              }
-          });
-
-          this.nextTrackPreloaded = true;
-          console.log('⚡ Next track pre-loaded:', trackUri);
-
-      } catch (error) {
-          console.log('⚠️ Pre-load failed (non-critical):', error.message);
-      }
-  }
-
-  // Handle track progression and loop logic - FIXED
-  async handlePlaybackProgress(currentTime) {
-      if (!this.currentPlaylist || this.transitionInProgress) return;
-
-      const currentItem = this.currentPlaylist.items[this.currentItemIndex];
-
-      // Handle loop items
-      if (currentItem.type === 'loop' && this.currentLoop) {
-          await this.handleLoopProgress(currentTime, currentItem);
-      }
-
-      // Handle full track completion (will be caught by Spotify SDK events)
-      // This is backup logic for precise timing
-  }
-
-  // Handle loop progression within a loop item - FIXED
-  async handleLoopProgress(currentTime) {
-      if (this.isLooping) return; // Prevent re-entry during seek
-
-      // FIX 3: Use more precise timing threshold
-      if (currentTime >= this.currentLoop.end - LOOP_END_THRESHOLD) {
-          // Increment loop count
-          this.currentLoopCount++;
-
-          // Notify UI of loop progress
-          if (this.onLoopProgress) {
-              this.onLoopProgress(this.currentLoopCount, this.currentLoopTarget);
-          }
-
-          console.log(`🔄 Loop progress: ${this.currentLoopCount}/${this.currentLoopTarget}`);
-
-          if (this.currentLoopCount >= this.currentLoopTarget) {
-              // Loop complete, move to next item
-              console.log(`✅ Loop complete: ${this.currentLoopCount}/${this.currentLoopTarget}`);
-              await this.skipToNext();
-          } else {
-              // Continue looping - perform seek back to start
-              console.log(`🔄 Continuing loop ${this.currentLoopCount + 1}/${this.currentLoopTarget}`);
-              await this.performLoopSeek();
-          }
-      }
-  }
-
-  // Perform the actual loop seek - FIXED with debouncing
-  async performLoopSeek() {
-      try {
-          this.isLooping = true;
-          this.loopStartTime = Date.now();
-
-          // Use existing SDK seek function with debouncing
-          await seekToPosition(this.currentLoop.start * 1000);
-
-          console.log(`🔄 Loop ${this.currentLoopCount + 1}/${this.currentLoopTarget} - seek to ${formatTime(this.currentLoop.start)}`);
-
-      } catch (error) {
-          console.error('🚨 Loop seek error:', error);
-      } finally {
-          this.isLooping = false;
       }
   }
 
@@ -802,11 +675,6 @@ class PlaylistTransitionEngine {
 
           // Load next item
           await this.loadPlaylistItem(this.currentItemIndex);
-
-          // Pre-load the following track
-          if (this.currentItemIndex + 1 < this.currentPlaylist.items.length) {
-              this.preloadNextTrack();
-          }
 
       } catch (error) {
           console.error('🚨 Skip to next error:', error);
@@ -831,51 +699,6 @@ class PlaylistTransitionEngine {
       }
   }
 
-  // Jump to specific playlist item
-  async jumpToItem(itemIndex) {
-      if (this.transitionInProgress || !this.currentPlaylist) return;
-      if (itemIndex < 0 || itemIndex >= this.currentPlaylist.items.length) return;
-
-      this.transitionInProgress = true;
-      this.currentItemIndex = itemIndex;
-
-      try {
-          await this.loadPlaylistItem(this.currentItemIndex);
-
-          // Pre-load next track
-          if (this.currentItemIndex + 1 < this.currentPlaylist.items.length) {
-              this.preloadNextTrack();
-          }
-
-      } catch (error) {
-          console.error('🚨 Jump to item error:', error);
-      } finally {
-          this.transitionInProgress = false;
-      }
-  }
-
-  // Setup Spotify player event listeners
-  setupEventListeners() {
-      if (!this.spotifyPlayer) return;
-
-      // Handle track end (natural progression)
-      this.spotifyPlayer.addListener('player_state_changed', async (state) => {
-          if (!state || !this.currentPlaylist) return;
-
-          // Track ended naturally (not during a loop)
-          if (state.position === 0 && !this.isLooping && this.isPlaying) {
-              const currentItem = this.currentPlaylist.items[this.currentItemIndex];
-
-              // If this is a full track (not a loop), move to next
-              if (currentItem.type === 'track') {
-                  await this.skipToNext();
-              }
-          }
-
-          this.isPlaying = !state.paused;
-      });
-  }
-
   // Get current playlist state
   getPlaylistState() {
       if (!this.currentPlaylist) return null;
@@ -883,42 +706,21 @@ class PlaylistTransitionEngine {
       return {
           playlist: this.currentPlaylist,
           currentIndex: this.currentItemIndex,
-          currentItem: this.currentPlaylist.items[this.currentItemIndex],
-          loopProgress: {
-              current: this.currentLoopCount,
-              target: this.currentLoopTarget
-          },
-          isPlaying: this.isPlaying
+          currentItem: this.currentPlaylist.items[this.currentItemIndex]
       };
   }
 
-  // Pause/Resume playlist
-  async pausePlaylist() {
-      try {
-          await this.spotifyPlayer.pause();
-          this.isPlaying = false;
-      } catch (error) {
-          console.error('🚨 Pause error:', error);
-      }
-  }
-
-  async resumePlaylist() {
-      try {
-          await this.spotifyPlayer.resume();
-          this.isPlaying = true;
-      } catch (error) {
-          console.error('🚨 Resume error:', error);
-      }
+  // Notify that current item is complete (called by main player)
+  async notifyItemComplete() {
+      console.log('📢 Main player notified item complete');
+      await this.skipToNext();
   }
 
   // Stop playlist and cleanup
   stopPlaylist() {
       this.currentPlaylist = null;
       this.currentItemIndex = 0;
-      this.currentLoopCount = 0;
-      this.isPlaying = false;
       this.transitionInProgress = false;
-      this.nextTrackPreloaded = false;
       console.log('⏹️ Playlist stopped');
   }
 }
@@ -984,11 +786,6 @@ function initializeSpotifyPlayer() {
           updatePlayPauseButton();
           updateNowPlayingIndicator(currentTrack);
 
-          // Handle playlist mode progress - check more frequently
-          if (isPlaylistMode && playlistEngine && isPlaying) {
-              playlistEngine.handlePlaybackProgress(currentTime);
-          }
-
           if (state.track_window.current_track) {
               const track = state.track_window.current_track;
               duration = track.duration_ms / 1000;
@@ -1022,12 +819,13 @@ function setupPlaylistEngineCallbacks() {
       console.log('🎵 Playlist item changed:', item);
       updatePlaylistNowPlaying(item, index);
 
-      // Update main player UI
+      // Update main player UI and let it handle the loops
       if (item.type === 'loop') {
           loopStart = item.start;
           loopEnd = item.end;
           loopTarget = item.playCount || 1;
           loopEnabled = true;
+          loopCount = 0; // Reset loop count
           els.loopToggle.checked = true;
           updateRepeatDisplay();
           updateLoopVisuals();
@@ -1036,11 +834,6 @@ function setupPlaylistEngineCallbacks() {
           els.loopToggle.checked = false;
           updateLoopVisuals(); // This will hide handles
       }
-  };
-
-  playlistEngine.onLoopProgress = (current, target) => {
-      console.log(`🔄 Playlist loop progress: ${current}/${target}`);
-      showStatus(`Loop ${current}/${target}`);
   };
 
   playlistEngine.onPlaylistComplete = () => {
@@ -1061,14 +854,9 @@ function startProgressUpdates() {
                   currentTime = state.position / 1000;
                   updateProgress();
                   
-                  // FIX 5 & 9: Unified loop end handling
-                  if (loopEnabled && !isPlaylistMode) {
+                  // Check loops for both regular and playlist mode
+                  if (loopEnabled) {
                       await checkLoopEnd();
-                  }
-                  
-                  // Also check playlist loops during progress updates
-                  if (isPlaylistMode && playlistEngine && isPlaying) {
-                      await playlistEngine.handlePlaybackProgress(currentTime);
                   }
               }
           } catch (error) {
@@ -1103,8 +891,16 @@ async function handleLoopEnd() {
       loopCount++;
 
       if (loopCount >= loopTarget) {
-          await togglePlayPause();
-          showStatus(`Loop completed! Played ${loopTarget} time(s)`);
+          // Check if we're in playlist mode
+          if (isPlaylistMode && playlistEngine) {
+              // Notify playlist engine to move to next item
+              console.log('🎵 Playlist item complete, moving to next');
+              await playlistEngine.notifyItemComplete();
+          } else {
+              // Regular loop mode - just pause
+              await togglePlayPause();
+              showStatus(`Loop completed! Played ${loopTarget} time(s)`);
+          }
           loopCount = 0;
       } else {
           showStatus(`Loop ${loopCount + 1}/${loopTarget}`);
