@@ -42,212 +42,188 @@
             <div class="login-icon">⚡</div>
             <h1 class="login-title">Welcome to LOOOPZ</h1>
             <p class="login-subtitle">Create perfect loops from any Spotify track.<br>Precision timing. Endless possibilities.</p>
-            <button id="auth-btn" class="btn auth-btn">Connect with Spotify</button>
-            
-            <div class="demo-section">
-                <div class="demo-title">✨ Try the Demo</div>
-                <p class="demo-desc">Experience the power of perfect loops without connecting to Spotify.</p>
-                <button id="demo-btn" class="btn secondary">Launch Demo Mode</button>
-            </div>
+            <button class="btn" id="connect-btn">Connect Spotify Premium</button>
+            <p style="color: var(--light-gray); font-size: 13px; margin-top: 12px;">Requires Spotify Premium for full track playback</p>
         </div>
 
         <!-- Search -->
-        <div id="search-screen" class="screen hidden">
-            <div class="search-container">
-                <div class="search-header">
-                    <button class="back-btn hidden" id="search-back-btn">←</button>
-                    <input type="text" id="search-input" class="search-input" placeholder="Search for songs, artists, albums..." autocomplete="off" spellcheck="false">
+        <div id="search-section" class="hidden">
+            <div class="card">
+                <div class="search-container">
+                    <div class="search-header" id="search-header">
+                        <button class="back-btn hidden" id="search-back-btn">←</button>
+                        <input type="text" class="search-input" id="search-input" placeholder="Search for any song..." autocomplete="off">
+                    </div>
                 </div>
-                <div id="search-results" class="search-results"></div>
+                <div id="search-results">
+                    <div style="text-align: center; padding: 40px; color: var(--light-gray);">Search for tracks to start creating loops</div>
+                </div>
             </div>
         </div>
 
         <!-- Player -->
-        <div id="player-screen" class="screen hidden">
-            <div class="player-card card">
-                <div class="track-display">
-                    <img id="album-art" class="album-art" src="" alt="Album art">
-                    <div class="track-details">
-                        <div id="track-title" class="track-title">No track loaded</div>
-                        <div id="track-artist" class="track-artist">Select a track to begin</div>
-                        <div id="album-name" class="album-name"></div>
+        <div id="player-section" class="hidden">
+            <div class="card">
+                <div class="now-playing">
+                    <div class="current-track" id="current-track">No track selected</div>
+                    <div class="current-artist" id="current-artist"></div>
+                </div>
+
+                <div class="album-cover-container">
+                    <img id="album-cover" class="album-cover" src="" alt="Album Cover" style="display: none;">
+                </div>
+
+                <div class="progress-container" id="progress-container">
+                    <div class="loop-region" id="loop-region"></div>
+                    <div class="progress-bar" id="progress-bar"></div>
+                    <div class="loop-handle start" id="loop-start-handle">
+                        <div class="time-popup" id="start-popup">0:00.000</div>
+                    </div>
+                    <div class="loop-handle end" id="loop-end-handle">
+                        <div class="time-popup" id="end-popup">0:30.000</div>
                     </div>
                 </div>
 
-                <div class="progress-container">
-                    <div class="time-display">
-                        <span id="current-time">0:00</span>
-                        <span id="duration">0:00</span>
+                <div class="time-display">
+                    <span id="current-time">0:00.000</span>
+                    <span id="duration">0:00.000</span>
+                </div>
+
+                <div class="main-controls">
+                    <div class="playback-controls">
+                        <button class="control-btn" id="backward-btn">⏪</button>
+                        <button class="control-btn play-pause-btn" id="play-pause-btn">▶</button>
+                        <button class="control-btn" id="forward-btn">⏩</button>
                     </div>
-                    <div class="progress-bar" id="progress-bar">
-                        <div class="progress" id="progress"></div>
-                        <div class="loop-region" id="loop-region"></div>
-                        <div class="loop-handle start" id="loop-start-handle">
-                            <div class="time-popup" id="start-popup">0:00</div>
+
+                    <div class="loop-controls">
+                        <div class="loop-section">
+                            <label class="loop-label">Loop Mode</label>
+                            <div class="toggle-switch">
+                                <input type="checkbox" id="loop-toggle">
+                                <span class="toggle-slider"></span>
+                            </div>
                         </div>
-                        <div class="loop-handle end" id="loop-end-handle">
-                            <div class="time-popup" id="end-popup">0:30</div>
+
+                        <div class="loop-actions">
+                            <button class="btn start-loop-btn" id="start-loop-btn" disabled>Set Loop</button>
+                            <button class="btn secondary" id="save-loop-btn">💾 Save</button>
+                            <button class="btn secondary" id="add-to-playlist-btn">+ Playlist</button>
                         </div>
-                    </div>
-                </div>
 
-                <div class="controls">
-                    <button class="control-btn secondary" id="prev-btn">⏮</button>
-                    <button class="control-btn play" id="play-btn">▶</button>
-                    <button class="control-btn secondary" id="next-btn">⏭</button>
-                </div>
-
-                <div class="loop-controls">
-                    <button class="loop-btn" id="start-loop-btn">Set Loop</button>
-                    <button class="loop-btn secondary" id="disable-loop-btn">Clear Loop</button>
-                    <button class="loop-btn secondary" id="save-loop-btn">Save Loop</button>
-                </div>
-
-                <div class="precision-controls">
-                    <div class="precision-group">
-                        <label>Start</label>
-                        <input type="text" id="precision-start" class="precision-input" placeholder="0:00.00">
-                    </div>
-                    <div class="precision-group">
-                        <label>End</label>
-                        <input type="text" id="precision-end" class="precision-input" placeholder="0:30.00">
-                    </div>
-                    <button class="apply-btn" id="apply-precision">Apply</button>
-                </div>
-
-                <div class="repeat-controls">
-                    <label class="repeat-label">Repeat</label>
-                    <div class="repeat-selector">
-                        <button class="repeat-btn" id="repeat-minus">−</button>
-                        <span class="repeat-value" id="repeat-value">∞×</span>
-                        <button class="repeat-btn" id="repeat-plus">+</button>
+                        <div class="repeat-counter">
+                            <button class="repeat-btn" id="repeat-decrease">−</button>
+                            <span class="repeat-value" id="repeat-value">1×</span>
+                            <button class="repeat-btn" id="repeat-increase">+</button>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <!-- Playlist Mode Controls -->
-            <div class="playlist-mode-controls card hidden" id="playlist-mode-controls">
-                <div class="card-title">
-                    <span>Playlist Mode Active</span>
-                    <button class="btn danger" id="exit-playlist-mode">Exit Mode</button>
+            <!-- Fine-tune controls -->
+            <div class="fine-tune-section">
+                <button class="btn precision-btn" id="precision-btn">⚡ Precision Editor</button>
+                <div class="fine-tune-grid">
+                    <button class="fine-tune-btn" data-target="start" data-amount="-0.1">−0.1s</button>
+                    <button class="fine-tune-btn" data-target="start" data-amount="-0.01">−0.01s</button>
+                    <button class="fine-tune-btn" data-target="start" data-amount="0.01">+0.01s</button>
+                    <button class="fine-tune-btn" data-target="start" data-amount="0.1">+0.1s</button>
+                    <button class="fine-tune-btn" data-target="end" data-amount="-0.1">−0.1s</button>
+                    <button class="fine-tune-btn" data-target="end" data-amount="-0.01">−0.01s</button>
+                    <button class="fine-tune-btn" data-target="end" data-amount="0.01">+0.01s</button>
+                    <button class="fine-tune-btn" data-target="end" data-amount="0.1">+0.1s</button>
                 </div>
-                <div class="playlist-status">
-                    <div class="playlist-progress">
-                        <span id="playlist-current-item">1</span> / <span id="playlist-total-items">0</span>
+            </div>
+
+            <!-- Playlist Now Playing (initially hidden) -->
+            <div class="card playlist-now-playing hidden" id="playlist-now-playing">
+                <div class="playlist-now-playing-header">
+                    <span class="playlist-mode-label">PLAYLIST MODE</span>
+                    <span class="playlist-progress" id="playlist-progress">1/0</span>
+                </div>
+                <div class="playlist-current-item">
+                    <img id="playlist-current-icon" class="playlist-current-icon" src="" alt="">
+                    <div class="playlist-current-info">
+                        <div id="playlist-current-name" class="playlist-current-name">Track Name</div>
+                        <div id="playlist-current-type" class="playlist-current-type">Loop: 0:00 - 0:30 (3×)</div>
                     </div>
-                    <div class="playlist-controls">
-                        <button class="playlist-nav-btn" id="playlist-prev">⏮</button>
-                        <button class="playlist-nav-btn" id="playlist-toggle">⏸</button>
-                        <button class="playlist-nav-btn" id="playlist-next">⏭</button>
-                    </div>
+                </div>
+                <div class="playlist-playback-controls">
+                    <button class="playlist-control-btn" id="playlist-prev-btn">⏮</button>
+                    <button class="playlist-control-btn" id="playlist-stop-btn">⏹</button>
+                    <button class="playlist-control-btn" id="playlist-next-btn">⏭</button>
                 </div>
             </div>
         </div>
 
         <!-- Library -->
-        <div id="library-screen" class="screen hidden">
+        <div id="library-section" class="hidden">
             <div class="card">
-                <h2 class="card-title">Your Saved Loops</h2>
-                <div id="saved-loops" class="saved-loops"></div>
+                <h2 class="section-title">Library</h2>
+                <div id="loops-list"></div>
             </div>
         </div>
 
         <!-- Playlists -->
-        <div id="playlists-screen" class="screen hidden">
+        <div id="playlists-section" class="hidden">
             <div class="card">
-                <div class="card-title">
-                    <span>Your Playlists</span>
-                    <button class="btn" id="create-playlist-btn">+ Create</button>
+                <div class="section-header">
+                    <h2 class="section-title">Playlists</h2>
+                    <button class="btn create-playlist-btn" id="create-playlist-btn">+ Create</button>
                 </div>
-                <div id="playlists-container" class="playlists-container"></div>
+                <div id="playlists-list"></div>
             </div>
         </div>
 
         <!-- Discovery -->
-        <div id="discovery-screen" class="screen hidden">
+        <div id="discovery-section" class="hidden">
             <div class="card">
-                <h2 class="card-title">Discover Moments</h2>
-                <div class="discovery-content">
-                    <p style="text-align: center; color: var(--light-gray); padding: 40px;">
-                        Coming soon: AI-powered moment discovery
-                    </p>
+                <h2 class="section-title">Discovery</h2>
+                <div style="text-align: center; padding: 60px 20px;">
+                    <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.4;">🔮</div>
+                    <div style="color: var(--light-gray); font-size: 16px; margin-bottom: 8px;">Coming Soon</div>
+                    <div style="color: var(--light-gray); font-size: 13px;">AI-powered moment discovery and beat analysis</div>
                 </div>
             </div>
         </div>
     </div>
 
-    <!-- Bottom Navigation -->
-    <nav class="bottom-nav">
-        <button class="nav-item active" id="nav-search">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="8"></circle>
-                <path d="m21 21-4.35-4.35"></path>
-            </svg>
-            <span>Search</span>
-        </button>
-        <button class="nav-item" id="nav-player">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <polygon points="10 8 16 12 10 16 10 8"></polygon>
-            </svg>
-            <span>Player</span>
-        </button>
-        <button class="nav-item" id="nav-library">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"></path>
-                <path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"></path>
-            </svg>
-            <span>Library</span>
-        </button>
-        <button class="nav-item" id="nav-playlists">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <line x1="8" y1="6" x2="21" y2="6"></line>
-                <line x1="8" y1="12" x2="21" y2="12"></line>
-                <line x1="8" y1="18" x2="21" y2="18"></line>
-                <line x1="3" y1="6" x2="3.01" y2="6"></line>
-                <line x1="3" y1="12" x2="3.01" y2="12"></line>
-                <line x1="3" y1="18" x2="3.01" y2="18"></line>
-            </svg>
-            <span>Playlists</span>
-            <span class="badge" id="playlist-count-badge">0</span>
-        </button>
-        <button class="nav-item" id="nav-discovery">
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <path d="M12 2v20M2 12h20"></path>
-            </svg>
-            <span>Discover</span>
-        </button>
-    </nav>
+    <!-- Precision Popup -->
+    <div class="precision-popup hidden" id="precision-popup">
+        <div class="precision-popup-content">
+            <div class="precision-header">
+                <h3>Precision Loop Editor</h3>
+                <button class="close-btn" id="precision-close">×</button>
+            </div>
+            <div class="precision-inputs">
+                <div class="precision-field">
+                    <label>Start Time</label>
+                    <input type="text" id="precision-start" placeholder="0:00.000" autocomplete="off">
+                </div>
+                <div class="precision-field">
+                    <label>End Time</label>
+                    <input type="text" id="precision-end" placeholder="0:30.000" autocomplete="off">
+                </div>
+            </div>
+            <div class="precision-tips">
+                <p>💡 Tip: Use format M:SS.mmm (e.g., 1:23.456)</p>
+            </div>
+        </div>
+    </div>
 
-    <!-- Context Menu -->
+    <!-- Track Context Menu -->
     <div class="track-context-menu" id="track-context-menu">
         <button class="context-menu-item" id="discover-moments-btn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"></circle>
-                <path d="M12 2v20M2 12h20"></path>
-            </svg>
+            <span class="context-menu-icon">🔍</span>
             Discover moments
         </button>
-        <button class="context-menu-item" id="add-to-playlist-btn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M12 5v14M5 12h14"></path>
-            </svg>
+        <button class="context-menu-item" id="add-to-playlist-btn-menu">
+            <span class="context-menu-icon">➕</span>
             Add to playlist
         </button>
-        <button class="context-menu-item" id="view-artist-btn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                <circle cx="12" cy="7" r="4"></circle>
-            </svg>
-            View artist
-        </button>
-        <button class="context-menu-item" id="view-album-btn">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                <circle cx="12" cy="12" r="3"></circle>
-            </svg>
-            View album
+        <button class="context-menu-item" id="play-in-background-btn">
+            <span class="context-menu-icon">▶️</span>
+            Play in background
         </button>
     </div>
     <div class="context-menu-overlay" id="context-menu-overlay"></div>
@@ -271,7 +247,7 @@
                 <h3 id="playlist-form-title">Create Playlist</h3>
                 <button class="close-btn" id="playlist-form-close">×</button>
             </div>
-            <form class="create-playlist-form" id="playlist-form">
+            <form class="create-playlist-form" id="playlist-form" onsubmit="event.preventDefault(); savePlaylistFromForm();">
                 <div class="form-field">
                     <label for="playlist-name-input" class="form-label">Name</label>
                     <input type="text" id="playlist-name-input" class="form-input" placeholder="My Awesome Playlist" required>
@@ -288,105 +264,35 @@
         </div>
     </div>
 
+    <!-- Navigation -->
+    <div class="navigation">
+        <div class="nav-container">
+            <button class="nav-btn active" id="nav-search">
+                <div class="nav-icon">🔍</div>
+                <div class="nav-label">Search</div>
+            </button>
+            <button class="nav-btn" id="nav-player">
+                <div class="nav-icon">▶️</div>
+                <div class="nav-label">Player</div>
+            </button>
+            <button class="nav-btn" id="nav-library">
+                <div class="nav-icon">📚</div>
+                <div class="nav-label">Library</div>
+                <span class="loop-count-badge" id="loop-count-badge">0</span>
+            </button>
+            <button class="nav-btn" id="nav-playlists">
+                <div class="nav-icon">🎵</div>
+                <div class="nav-label">Playlists</div>
+                <span class="playlist-count-badge" id="playlist-count-badge">0</span>
+            </button>
+            <button class="nav-btn" id="nav-discovery">
+                <div class="nav-icon">💬</div>
+                <div class="nav-label">Discovery</div>
+            </button>
+        </div>
+    </div>
+
     <script src="https://sdk.scdn.co/spotify-player.js"></script>
     <script src="script.js"></script>
-    <script>
-        // Quick initialization check
-        function init() {
-    if (window.initializationComplete) {
-        console.log('⚠️ Initialization already complete, skipping duplicate init');
-        return;
-    }
-    window.initializationComplete = true;
-
-    console.log('🚀 Initializing LOOOPZ with Playlist Management...');
-
-    // Cache all DOM elements - now including playlist elements
-    els = {
-        loginScreen: document.getElementById('login-screen'),
-        authBtn: document.getElementById('auth-btn'),
-        demoBtn: document.getElementById('demo-btn'),
-        searchScreen: document.getElementById('search-screen'),
-        searchInput: document.getElementById('search-input'),
-        searchResults: document.getElementById('search-results'),
-        searchBackBtn: document.getElementById('search-back-btn'),
-        playerScreen: document.getElementById('player-screen'),
-        albumArt: document.getElementById('album-art'),
-        trackTitle: document.getElementById('track-title'),
-        trackArtist: document.getElementById('track-artist'),
-        albumName: document.getElementById('album-name'),
-        currentTimeEl: document.getElementById('current-time'),
-        durationEl: document.getElementById('duration'),
-        progressBar: document.getElementById('progress-bar'),
-        progress: document.getElementById('progress'),
-        loopRegion: document.getElementById('loop-region'),
-        loopStartHandle: document.getElementById('loop-start-handle'),
-        loopEndHandle: document.getElementById('loop-end-handle'),
-        startPopup: document.getElementById('start-popup'),
-        endPopup: document.getElementById('end-popup'),
-        prevBtn: document.getElementById('prev-btn'),
-        playBtn: document.getElementById('play-btn'),
-        nextBtn: document.getElementById('next-btn'),
-        startLoopBtn: document.getElementById('start-loop-btn'),
-        disableLoopBtn: document.getElementById('disable-loop-btn'),
-        saveLoopBtn: document.getElementById('save-loop-btn'),
-        precisionStart: document.getElementById('precision-start'),
-        precisionEnd: document.getElementById('precision-end'),
-        applyPrecision: document.getElementById('apply-precision'),
-        repeatMinus: document.getElementById('repeat-minus'),
-        repeatValue: document.getElementById('repeat-value'),
-        repeatPlus: document.getElementById('repeat-plus'),
-        libraryScreen: document.getElementById('library-screen'),
-        savedLoopsContainer: document.getElementById('saved-loops'),
-        statusBar: document.getElementById('status-bar'),
-        statusText: document.getElementById('status-text'),
-        connectionStatus: document.getElementById('connection-status'),
-        disconnectBtn: document.getElementById('disconnect-btn'),
-        nowPlayingIndicator: document.getElementById('now-playing-indicator'),
-        miniTrackTitle: document.getElementById('mini-track-title'),
-        miniTrackArtist: document.getElementById('mini-track-artist'),
-        playlistsScreen: document.getElementById('playlists-screen'),
-        playlistsContainer: document.getElementById('playlists-container'),
-        playlistModeControls: document.getElementById('playlist-mode-controls'),
-        exitPlaylistMode: document.getElementById('exit-playlist-mode'),
-        playlistCurrentItem: document.getElementById('playlist-current-item'),
-        playlistTotalItems: document.getElementById('playlist-total-items'),
-        playlistPrev: document.getElementById('playlist-prev'),
-        playlistToggle: document.getElementById('playlist-toggle'),
-        playlistNext: document.getElementById('playlist-next'),
-        discoveryScreen: document.getElementById('discovery-screen'),
-        playlistCountBadge: document.getElementById('playlist-count-badge'),
-        navSearch: document.getElementById('nav-search'),
-        navPlayer: document.getElementById('nav-player'),
-        navLibrary: document.getElementById('nav-library'),
-        navPlaylists: document.getElementById('nav-playlists'),
-        navDiscovery: document.getElementById('nav-discovery'),
-        contextMenu: document.getElementById('track-context-menu'),
-        contextMenuOverlay: document.getElementById('context-menu-overlay'),
-        addToPlaylistPopup: document.getElementById('add-to-playlist-popup'),
-        addToPlaylistClose: document.getElementById('add-to-playlist-close'),
-        playlistSelectionList: document.getElementById('playlist-selection-list'),
-        quickCreatePlaylist: document.getElementById('quick-create-playlist'),
-        playlistFormPopup: document.getElementById('playlist-form-popup'),
-        playlistFormTitle: document.getElementById('playlist-form-title'),
-        playlistFormClose: document.getElementById('playlist-form-close'),
-        playlistFormSave: document.getElementById('playlist-form-save'),
-        playlistFormCancel: document.getElementById('playlist-form-cancel'),
-        playlistNameInput: document.getElementById('playlist-name-input'),
-        playlistDescriptionInput: document.getElementById('playlist-description-input'),
-        createPlaylistBtn: document.getElementById('create-playlist-btn')
-    };
-
-    setupEventListeners();
-    setupLoopHandles();
-    checkAuth();
-    loadSavedLoops();
-    loadSavedPlaylists();
-
-    console.log('✅ LOOOPZ initialization complete with Playlist Management!');
-}
-
-document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', init) : init();
-    </script>
 </body>
 </html>
