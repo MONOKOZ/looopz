@@ -764,7 +764,7 @@ function checkAuth() {
 }
 
 function login() {
-    const clientId = '72b77eb226d94b14b97a9e4c3ca80a5f';
+    const clientId = '46637d8f5adb41c0a4be34e0df0c1597';
     const redirectUri = window.location.origin + window.location.pathname;
     const scopes = [
         'streaming',
