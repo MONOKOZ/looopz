@@ -144,21 +144,13 @@ function updateLoopVisuals() {
 
 // FIX 6: Show/hide loop handles based on loop enabled state
 if (loopEnabled) {
-    // Reset all inline styles to let CSS take control
-    els.loopStartHandle.style.display = '';
-    els.loopStartHandle.style.opacity = '';
-    els.loopStartHandle.style.visibility = '';
-    
-    els.loopEndHandle.style.display = '';
-    els.loopEndHandle.style.opacity = '';
-    els.loopEndHandle.style.visibility = '';
-    
-    els.loopRegion.style.display = '';
-    els.loopRegion.style.opacity = '1';
+    els.loopStartHandle.classList.add('show');
+    els.loopEndHandle.classList.add('show');
+    els.loopRegion.classList.add('show');
 } else {
-    els.loopStartHandle.style.display = 'none';
-    els.loopEndHandle.style.display = 'none';
-    els.loopRegion.style.display = 'none';
+    els.loopStartHandle.classList.remove('show');
+    els.loopEndHandle.classList.remove('show');
+    els.loopRegion.classList.remove('show');
 }
 }
 
