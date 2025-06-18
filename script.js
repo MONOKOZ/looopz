@@ -926,6 +926,7 @@ class PlaylistTransitionEngine {
 function initializeSpotifyPlayer() {
   showStatus('Connecting to Spotify...');
 
+  // Define the callback function in the global scope BEFORE loading the SDK
   window.onSpotifyWebPlaybackSDKReady = () => {
       spotifyPlayer = new Spotify.Player({
           name: 'LOOOPZ Player',
@@ -1008,7 +1009,10 @@ function initializeSpotifyPlayer() {
       spotifyPlayer.connect();
   };
 
-  if (window.Spotify) window.onSpotifyWebPlaybackSDKReady();
+  // Check if Spotify SDK is already loaded
+  if (window.Spotify) {
+      window.onSpotifyWebPlaybackSDKReady();
+  }
 }
 
 function setupPlaylistEngineCallbacks() {
@@ -3031,6 +3035,11 @@ window.removeFromPlaylist = removeFromPlaylist;
 // Init
 function init() {
   console.log('🚀 Initializing LOOOPZ with Playlist Management...');
+
+  // Define the Spotify callback early in case SDK loads before we're ready
+  window.onSpotifyWebPlaybackSDKReady = window.onSpotifyWebPlaybackSDKReady || function() {
+      console.log('⚠️ Spotify SDK ready but player not initialized yet');
+  };
 
   // Cache all elements
   els = {
