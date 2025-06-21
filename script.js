@@ -1,4 +1,5 @@
 // SPOTIFY INTEGRATION - WITH SEAMLESS SEARCH-TO-PLAYER TRANSITION AND PLAYLIST MANAGEMENT
+// ENHANCED WITH SMART DJ TRANSITIONS AND BEAT ALIGNMENT
 
 // Config
 const SPOTIFY_CLIENT_ID = '46637d8f5adb41c0a4be34e0df0c1597';
@@ -13,11 +14,6 @@ let loopEnabled = false, loopCount = 0, loopTarget = 1, loopStartTime = 0;
 let updateTimer = null, savedLoops = [], isLooping = false, isDragging = false;
 let currentView = 'login', currentSearchResults = [], currentEditingLoopId = null;
 let currentContextMenuTrackIndex = null;
-
-// UNIFIED LOOP SYSTEM - Fixed timing and state management
-let lastSeekTime = 0; // For debouncing seeks
-const SEEK_DEBOUNCE_MS = 500; // Minimum time between seeks
-const LOOP_END_THRESHOLD = 0.05; // More precise timing (50ms)
 
 // Playlist state
 let savedPlaylists = [];
@@ -38,6 +34,10 @@ let searchState = {
   hasMore: false,
   query: ''
 };
+
+// NEW: Audio Analysis Cache for Smart Transitions
+let audioAnalysisCache = new Map();
+let trackFeaturesCache = new Map();
 
 // Elements
 let els = {};
@@ -141,17 +141,175 @@ function updateLoopVisuals() {
   els.endPopup.textContent = formatTime(loopEnd);
   els.precisionStart.value = formatTime(loopStart);
   els.precisionEnd.value = formatTime(loopEnd);
-
-// FIX 6: Show/hide loop handles based on loop enabled state
-if (loopEnabled) {
-    els.loopStartHandle.classList.add('show');
-    els.loopEndHandle.classList.add('show');
-    els.loopRegion.classList.add('show');
-} else {
-    els.loopStartHandle.classList.remove('show');
-    els.loopEndHandle.classList.remove('show');
-    els.loopRegion.classList.remove('show');
 }
+
+// NEW: Smart DJ Helper Functions
+async function getAudioAnalysis(trackId) {
+  if (audioAnalysisCache.has(trackId)) {
+      return audioAnalysisCache.get(trackId);
+  }
+
+  try {
+      const response = await fetch(`https://api.spotify.com/v1/audio-analysis/${trackId}`, {
+          headers: { 'Authorization': `Bearer ${spotifyAccessToken}` }
+      });
+
+      if (response.ok) {
+          const analysis = await response.json();
+          audioAnalysisCache.set(trackId, analysis);
+          return analysis;
+      }
+  } catch (error) {
+      console.warn('Audio analysis failed:', error);
+  }
+  return null;
+}
+
+async function getAudioFeatures(trackId) {
+  if (trackFeaturesCache.has(trackId)) {
+      return trackFeaturesCache.get(trackId);
+  }
+
+  try {
+      const response = await fetch(`https://api.spotify.com/v1/audio-features/${trackId}`, {
+          headers: { 'Authorization': `Bearer ${spotifyAccessToken}` }
+      });
+
+      if (response.ok) {
+          const features = await response.json();
+          trackFeaturesCache.set(trackId, features);
+          return features;
+      }
+  } catch (error) {
+      console.warn('Audio features failed:', error);
+  }
+  return null;
+}
+
+function calculateOptimalCrossfade(fromFeatures, toFeatures) {
+  // Base crossfade duration
+  let duration = 4.0;
+
+  // Tempo compatibility
+  const tempoDiff = Math.abs(fromFeatures.tempo - toFeatures.tempo);
+  if (tempoDiff < 5) duration = 3.0;  // Very compatible
+  else if (tempoDiff > 20) duration = 6.0;  // Less compatible
+
+  // Key compatibility (Circle of Fifths)
+  const keyDiff = Math.abs(fromFeatures.key - toFeatures.key);
+  if (keyDiff === 0 || keyDiff === 7) duration -= 1.0;  // Same key or perfect fifth
+  else if (keyDiff === 5 || keyDiff === 2) duration -= 0.5;  // Compatible keys
+
+  // Energy difference
+  const energyDiff = Math.abs(fromFeatures.energy - toFeatures.energy);
+  if (energyDiff > 0.5) duration += 2.0;  // Big energy jump needs more time
+
+  // Clamp between 2-12 seconds
+  return Math.max(2.0, Math.min(12.0, duration));
+}
+
+function assessTransitionQuality(fromFeatures, toFeatures) {
+  let score = 100;
+  const reasons = [];
+
+  // Tempo compatibility (40 points)
+  const tempoDiff = Math.abs(fromFeatures.tempo - toFeatures.tempo);
+  const tempoRatio = Math.max(fromFeatures.tempo, toFeatures.tempo) / Math.min(fromFeatures.tempo, toFeatures.tempo);
+  
+  if (tempoDiff < 5) {
+      // Perfect tempo match
+  } else if (tempoRatio === 2 || tempoRatio === 0.5) {
+      score -= 10; // Half/double time is OK
+      reasons.push('half-time compatible');
+  } else if (tempoDiff < 10) {
+      score -= 20;
+      reasons.push('small tempo difference');
+  } else {
+      score -= 40;
+      reasons.push('large tempo difference');
+  }
+
+  // Key compatibility (30 points)
+  const keyDiff = Math.abs(fromFeatures.key - toFeatures.key);
+  if (keyDiff === 0) {
+      // Same key - perfect
+  } else if (keyDiff === 7) {
+      score -= 5; // Perfect fifth
+      reasons.push('perfect fifth');
+  } else if (keyDiff === 5 || keyDiff === 2) {
+      score -= 15; // Fourth or second
+      reasons.push('compatible key');
+  } else {
+      score -= 30;
+      reasons.push('incompatible key');
+  }
+
+  // Energy flow (30 points)
+  const energyDiff = toFeatures.energy - fromFeatures.energy;
+  if (Math.abs(energyDiff) < 0.2) {
+      // Similar energy - good
+  } else if (energyDiff > 0 && energyDiff < 0.4) {
+      score -= 10; // Building energy is good
+      reasons.push('energy builds');
+  } else if (energyDiff < 0 && energyDiff > -0.3) {
+      score -= 15; // Dropping energy is OK
+      reasons.push('energy drops');
+  } else {
+      score -= 30;
+      reasons.push('large energy gap');
+  }
+
+  const quality = score >= 80 ? 'excellent' : 
+                 score >= 60 ? 'good' : 
+                 score >= 40 ? 'fair' : 'poor';
+
+  return { score, quality, reasons };
+}
+
+function findBeatAlignedEndPoint(analysis, targetTime) {
+  if (!analysis || !analysis.beats) return targetTime;
+  
+  // Find the beat closest to target time
+  let closestBeat = targetTime;
+  let minDiff = Infinity;
+  
+  for (const beat of analysis.beats) {
+      const diff = Math.abs(beat.start - targetTime);
+      if (diff < minDiff && beat.start <= targetTime) {
+          minDiff = diff;
+          closestBeat = beat.start;
+      }
+  }
+  
+  return closestBeat;
+}
+
+function findBeatAlignedStartPoint(analysis, targetTime) {
+  if (!analysis || !analysis.beats) return targetTime;
+  
+  // Find the beat closest to target time
+  let closestBeat = targetTime;
+  let minDiff = Infinity;
+  
+  for (const beat of analysis.beats) {
+      const diff = Math.abs(beat.start - targetTime);
+      if (diff < minDiff && beat.start >= targetTime) {
+          minDiff = diff;
+          closestBeat = beat.start;
+      }
+  }
+  
+  return closestBeat;
+}
+
+async function performSmoothCrossfade(fromVolume, toVolume, durationMs, midpointCallback) {
+  // This would integrate with Spotify Web API's volume control
+  // For now, it's a placeholder for the crossfade logic
+  console.log(`🎛️ Crossfading from ${fromVolume}% to ${toVolume}% over ${durationMs}ms`);
+  
+  if (midpointCallback) {
+      setTimeout(midpointCallback, durationMs / 2);
+  }
 }
 
 // Context Menu Functions - IMPROVED
@@ -358,7 +516,7 @@ function disconnectSpotify() {
   showStatus('Disconnected from Spotify');
 }
 
-// Find the loadTrackIntoSpotify function (around line 416) and replace it with:
+// Load track with optional start position
 async function loadTrackIntoSpotify(track, startPositionMs = 0) {
   if (!spotifyDeviceId || !spotifyAccessToken) {
       throw new Error('Spotify not ready');
@@ -366,25 +524,6 @@ async function loadTrackIntoSpotify(track, startPositionMs = 0) {
 
   try {
       console.log('🎵 Loading track:', track.name, 'at position:', startPositionMs);
-
-      // FIX: Set currentTrack IMMEDIATELY - don't wait for sync
-      currentTrack = {
-          uri: track.uri,
-          name: track.name,
-          artist: track.artist,
-          duration: track.duration || 180, // Default 3 min if not provided
-          image: track.image || ''
-      };
-      
-      // Update UI IMMEDIATELY
-      duration = currentTrack.duration;
-      els.currentTrack.textContent = track.name;
-      els.currentArtist.textContent = track.artist;
-      updateProgress();
-      updatePlayPauseButton();
-      
-      // Enable the play/pause button right away
-      els.playPauseBtn.disabled = false;
 
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       if (isMobile && spotifyPlayer) {
@@ -423,22 +562,7 @@ async function loadTrackIntoSpotify(track, startPositionMs = 0) {
                   synced = true;
                   isPlaying = !state.paused;
                   currentTime = state.position / 1000;
-                  
-                  // Update duration if we get a more accurate one from SDK
-                  if (state.track_window.current_track.duration_ms) {
-                      duration = state.track_window.current_track.duration_ms / 1000;
-                      currentTrack.duration = duration;
-                  }
-                  
-                  // Update everything with SDK data
-                  updateProgress();
-                  updatePlayPauseButton();
-                  updateNowPlayingIndicator(currentTrack);
-                  
-                  // Start progress updates if playing
-                  if (isPlaying) {
-                      startProgressUpdates();
-                  }
+                  duration = state.track_window.current_track.duration_ms / 1000;
               }
           } catch (e) {
               console.log(`⏳ Sync attempt ${attempts + 1} failed`);
@@ -448,19 +572,13 @@ async function loadTrackIntoSpotify(track, startPositionMs = 0) {
 
       if (!synced) {
           console.warn('⚠️ SDK sync incomplete, but track should be loaded');
-          // Assume playing since we just sent play command
-          isPlaying = true;
-          updatePlayPauseButton();
-          updateNowPlayingIndicator(currentTrack);
-          startProgressUpdates();
       }
 
-      console.log('✅ Track loaded and ready for control');
+      console.log('✅ Track loaded and ready for SDK control');
       return true;
 
   } catch (error) {
       console.error('🚨 Track loading error:', error);
-      // Even on error, we have currentTrack set for UI
       throw error;
   }
 }
@@ -584,16 +702,8 @@ async function playFromPosition(positionMs = 0) {
   }
 }
 
-// Quick seeking with debouncing
+// Quick seeking
 async function seekToPosition(positionMs) {
-  // FIX 4: Implement seek debouncing
-  const now = Date.now();
-  if (now - lastSeekTime < SEEK_DEBOUNCE_MS) {
-      console.log('⏳ Seek debounced - too soon after last seek');
-      return;
-  }
-  lastSeekTime = now;
-
   try {
       if (spotifyPlayer) {
           await spotifyPlayer.seek(positionMs);
@@ -617,7 +727,7 @@ async function seekToPosition(positionMs) {
   }
 }
 
-// Playlist Transition Engine Integration - SIMPLIFIED APPROACH WITH PRE-LOADING
+// ENHANCED: Playlist Transition Engine with Smart DJ Features
 class PlaylistTransitionEngine {
   constructor(spotifyPlayer, spotifyAccessToken, spotifyDeviceId) {
       this.spotifyPlayer = spotifyPlayer;
@@ -629,13 +739,29 @@ class PlaylistTransitionEngine {
       this.currentItemIndex = 0;
       this.isPlaying = false;
 
-      // We DON'T track loops here - let main player handle it
-      this.transitionInProgress = false;
+      // Loop state for current item
+      this.currentLoopCount = 0;
+      this.currentLoopTarget = 1;
+      this.loopStartTime = 0;
+      this.isLooping = false;
+
+      // NEW: Smart transition state
+      this.smartTransitionsEnabled = true;
+      this.isTransitioning = false;
+      this.currentTransitionData = null;
+      this.crossfadeInProgress = false;
+
+      // Transition management
       this.nextTrackPreloaded = false;
+      this.transitionInProgress = false;
 
       // Event callbacks
       this.onItemChange = null;
       this.onPlaylistComplete = null;
+      this.onLoopProgress = null;
+      this.onSmartTransition = null; // NEW: Smart transition callback
+
+      this.setupEventListeners();
   }
 
   // Initialize playlist playback
@@ -645,6 +771,7 @@ class PlaylistTransitionEngine {
 
           this.currentPlaylist = playlist;
           this.currentItemIndex = startIndex;
+          this.currentLoopCount = 0;
 
           if (playlist.items.length === 0) {
               throw new Error('Empty playlist');
@@ -652,11 +779,9 @@ class PlaylistTransitionEngine {
 
           // Load first track
           await this.loadPlaylistItem(this.currentItemIndex);
-          
-          // Pre-load next track if exists
-          if (this.currentItemIndex + 1 < playlist.items.length) {
-              this.preloadNextTrack();
-          }
+
+          // NEW: Pre-analyze upcoming tracks for smart transitions
+          this.preAnalyzeUpcomingTracks();
 
           console.log('✅ Playlist loaded and ready');
           return true;
@@ -667,7 +792,26 @@ class PlaylistTransitionEngine {
       }
   }
 
-  // Load specific playlist item (track or loop)
+  // NEW: Pre-analyze upcoming tracks for optimal transitions
+  async preAnalyzeUpcomingTracks() {
+      if (!this.currentPlaylist || !this.smartTransitionsEnabled) return;
+
+      const upcomingItems = this.currentPlaylist.items.slice(
+          this.currentItemIndex, 
+          Math.min(this.currentItemIndex + 3, this.currentPlaylist.items.length)
+      );
+
+      for (const item of upcomingItems) {
+          const trackId = this.extractTrackId(item.type === 'loop' ? item.trackUri : item.uri);
+          if (trackId) {
+              // Fetch analysis and features in background (fire and forget)
+              getAudioAnalysis(trackId).catch(() => {});
+              getAudioFeatures(trackId).catch(() => {});
+          }
+      }
+  }
+
+  // Load specific playlist item (track or loop) with ENHANCED transition planning
   async loadPlaylistItem(itemIndex) {
       if (!this.currentPlaylist || itemIndex >= this.currentPlaylist.items.length) {
           console.log('📝 Playlist complete');
@@ -679,6 +823,16 @@ class PlaylistTransitionEngine {
       console.log('🔄 Loading playlist item:', item);
 
       try {
+          // Reset loop state
+          this.currentLoopCount = 0;
+          this.currentLoopTarget = item.playCount || 1;
+          this.loopStartTime = Date.now();
+
+          // NEW: Calculate smart transition if coming from previous item
+          if (itemIndex > 0 && this.smartTransitionsEnabled) {
+              await this.prepareSmartTransition(itemIndex - 1, itemIndex);
+          }
+
           // Load track into Spotify
           const startPosition = item.type === 'loop' ? item.start * 1000 : 0;
 
@@ -690,12 +844,17 @@ class PlaylistTransitionEngine {
               image: item.image || ''
           }, startPosition);
 
-          // Notify UI of track change - let main player handle the loop logic
+          // Set up loop parameters if this is a loop item
+          if (item.type === 'loop') {
+              this.setupLoopItem(item);
+          }
+
+          // Notify UI of track change
           if (this.onItemChange) {
               this.onItemChange(item, itemIndex);
           }
 
-          console.log('✅ Playlist item loaded - main player will handle loops');
+          console.log('✅ Playlist item loaded');
 
       } catch (error) {
           console.error('🚨 Failed to load playlist item:', error);
@@ -704,31 +863,178 @@ class PlaylistTransitionEngine {
       }
   }
 
-  // Pre-load next track for seamless transition
-  async preloadNextTrack() {
-      const nextIndex = this.currentItemIndex + 1;
-      if (nextIndex >= this.currentPlaylist.items.length) {
-          return; // No next track
-      }
-
-      const nextItem = this.currentPlaylist.items[nextIndex];
-      const trackUri = nextItem.type === 'loop' ? nextItem.trackUri : nextItem.uri;
-
+  // NEW: Prepare smart transition between two playlist items
+  async prepareSmartTransition(fromIndex, toIndex) {
       try {
-          // Queue next track in Spotify (this prepares it for instant transition)
-          await fetch(`https://api.spotify.com/v1/me/player/queue?uri=${encodeURIComponent(trackUri)}&device_id=${this.spotifyDeviceId}`, {
-              method: 'POST',
-              headers: {
-                  'Authorization': `Bearer ${this.spotifyAccessToken}`
-              }
-          });
+          const fromItem = this.currentPlaylist.items[fromIndex];
+          const toItem = this.currentPlaylist.items[toIndex];
 
-          this.nextTrackPreloaded = true;
-          console.log('⚡ Next track pre-loaded:', nextItem.name);
+          const fromTrackId = this.extractTrackId(fromItem.type === 'loop' ? fromItem.trackUri : fromItem.uri);
+          const toTrackId = this.extractTrackId(toItem.type === 'loop' ? toItem.trackUri : toItem.uri);
+
+          if (!fromTrackId || !toTrackId) return;
+
+          // Get audio analysis and features for both tracks
+          const [fromFeatures, toFeatures, fromAnalysis, toAnalysis] = await Promise.all([
+              getAudioFeatures(fromTrackId),
+              getAudioFeatures(toTrackId),
+              getAudioAnalysis(fromTrackId),
+              getAudioAnalysis(toTrackId)
+          ]);
+
+          if (fromFeatures && toFeatures) {
+              // Calculate transition parameters
+              const crossfadeDuration = calculateOptimalCrossfade(fromFeatures, toFeatures);
+              const transitionQuality = assessTransitionQuality(fromFeatures, toFeatures);
+
+              // Calculate beat-aligned points
+              const fromEndTime = fromItem.type === 'loop' ? fromItem.end : fromItem.duration;
+              const toStartTime = toItem.type === 'loop' ? toItem.start : 0;
+
+              const optimalFromEnd = findBeatAlignedEndPoint(fromAnalysis, fromEndTime);
+              const optimalToStart = findBeatAlignedStartPoint(toAnalysis, toStartTime);
+
+              this.currentTransitionData = {
+                  fromItem,
+                  toItem,
+                  fromEndTime: optimalFromEnd,
+                  toStartTime: optimalToStart,
+                  crossfadeDuration,
+                  transitionQuality,
+                  fromFeatures,
+                  toFeatures
+              };
+
+              console.log(`🎛️ Smart transition prepared: ${crossfadeDuration}s crossfade, ${transitionQuality.quality} quality`);
+
+              if (this.onSmartTransition) {
+                  this.onSmartTransition(this.currentTransitionData);
+              }
+          }
 
       } catch (error) {
-          console.log('⚠️ Pre-load failed (non-critical):', error.message);
-          this.nextTrackPreloaded = false;
+          console.warn('🎛️ Smart transition preparation failed:', error.message);
+          this.currentTransitionData = null;
+      }
+  }
+
+  // Setup loop parameters for loop items
+  setupLoopItem(loopItem) {
+      // These would integrate with existing loop variables
+      // For now, store in class properties
+      this.currentLoop = {
+          start: loopItem.start,
+          end: loopItem.end,
+          duration: loopItem.end - loopItem.start
+      };
+
+      console.log(`🔄 Loop setup: ${formatTime(loopItem.start)} - ${formatTime(loopItem.end)} × ${this.currentLoopTarget}`);
+  }
+
+  // ENHANCED: Handle track progression and loop logic with smart transitions
+  async handlePlaybackProgress(currentTime) {
+      if (!this.currentPlaylist || this.transitionInProgress || this.crossfadeInProgress) return;
+
+      const currentItem = this.currentPlaylist.items[this.currentItemIndex];
+
+      // Handle loop items
+      if (currentItem.type === 'loop' && this.currentLoop) {
+          await this.handleLoopProgress(currentTime, currentItem);
+      }
+
+      // NEW: Handle smart transition timing for full tracks
+      if (currentItem.type === 'track' && this.currentTransitionData && this.smartTransitionsEnabled) {
+          await this.handleSmartTransitionTiming(currentTime);
+      }
+  }
+
+  // NEW: Handle smart transition timing
+  async handleSmartTransitionTiming(currentTime) {
+      if (!this.currentTransitionData || this.crossfadeInProgress) return;
+
+      const { fromEndTime, crossfadeDuration } = this.currentTransitionData;
+      const crossfadeStartTime = fromEndTime - crossfadeDuration;
+
+      // Check if it's time to start the crossfade
+      if (currentTime >= crossfadeStartTime - 0.1 && currentTime <= crossfadeStartTime + 0.1) {
+          console.log('🎛️ Starting smart crossfade transition');
+          await this.executeSmartCrossfade();
+      }
+  }
+
+  // NEW: Execute smart crossfade transition
+  async executeSmartCrossfade() {
+      if (this.crossfadeInProgress || !this.currentTransitionData) return;
+
+      try {
+          this.crossfadeInProgress = true;
+          const { toItem, toStartTime, crossfadeDuration, transitionQuality } = this.currentTransitionData;
+
+          console.log(`🎛️ Executing ${crossfadeDuration}s crossfade (${transitionQuality.quality} quality)`);
+
+          // Start crossfade: fade out current, fade in next
+          await performSmoothCrossfade(100, 0, crossfadeDuration * 1000, async () => {
+              // At midpoint: switch to next track
+              await this.loadPlaylistItem(this.currentItemIndex + 1);
+              await seekToPosition(toStartTime * 1000);
+              
+              // Start fading in the new track
+              await performSmoothCrossfade(0, 100, (crossfadeDuration / 2) * 1000);
+          });
+
+          this.currentItemIndex++;
+          this.currentTransitionData = null;
+
+          showStatus(`🎛️ Smart transition complete (${transitionQuality.quality})`);
+
+      } catch (error) {
+          console.error('🎛️ Smart crossfade failed:', error);
+          // Fallback to regular transition
+          await this.skipToNext();
+      } finally {
+          this.crossfadeInProgress = false;
+      }
+  }
+
+  // Handle loop progression within a loop item
+  async handleLoopProgress(currentTime) {
+      if (this.isLooping) return; // Prevent re-entry during seek
+
+      // Check if we've reached the loop end (reduced buffer for precision)
+      if (currentTime >= this.currentLoop.end - 0.05) {
+          this.currentLoopCount++;
+
+          // Notify UI of loop progress
+          if (this.onLoopProgress) {
+              this.onLoopProgress(this.currentLoopCount, this.currentLoopTarget);
+          }
+
+          if (this.currentLoopCount >= this.currentLoopTarget) {
+              // Loop complete, move to next item
+              console.log(`✅ Loop complete: ${this.currentLoopCount}/${this.currentLoopTarget}`);
+              await this.skipToNext();
+          } else {
+              // Continue looping
+              await this.performLoopSeek();
+          }
+      }
+  }
+
+  // Perform the actual loop seek
+  async performLoopSeek() {
+      try {
+          this.isLooping = true;
+          this.loopStartTime = Date.now();
+
+          // Use existing SDK seek function
+          await this.spotifyPlayer.seek(this.currentLoop.start * 1000);
+
+          console.log(`🔄 Loop ${this.currentLoopCount + 1}/${this.currentLoopTarget} - seek to ${formatTime(this.currentLoop.start)}`);
+
+      } catch (error) {
+          console.error('🚨 Loop seek error:', error);
+      } finally {
+          this.isLooping = false;
       }
   }
 
@@ -738,7 +1044,6 @@ class PlaylistTransitionEngine {
 
       this.transitionInProgress = true;
       this.currentItemIndex++;
-      this.nextTrackPreloaded = false; // Reset flag
 
       try {
           if (this.currentItemIndex >= this.currentPlaylist.items.length) {
@@ -748,18 +1053,11 @@ class PlaylistTransitionEngine {
               return;
           }
 
-          // If next track was pre-loaded, we might get faster transition
-          if (this.nextTrackPreloaded) {
-              console.log('⚡ Using pre-loaded track for faster transition');
-          }
-
           // Load next item
           await this.loadPlaylistItem(this.currentItemIndex);
-          
-          // Pre-load the following track
-          if (this.currentItemIndex + 1 < this.currentPlaylist.items.length) {
-              this.preloadNextTrack();
-          }
+
+          // Continue pre-analysis for upcoming tracks
+          this.preAnalyzeUpcomingTracks();
 
       } catch (error) {
           console.error('🚨 Skip to next error:', error);
@@ -774,20 +1072,70 @@ class PlaylistTransitionEngine {
 
       this.transitionInProgress = true;
       this.currentItemIndex--;
-      this.nextTrackPreloaded = false; // Reset flag
 
       try {
           await this.loadPlaylistItem(this.currentItemIndex);
-          
-          // Pre-load next track after loading previous
-          if (this.currentItemIndex + 1 < this.currentPlaylist.items.length) {
-              this.preloadNextTrack();
-          }
       } catch (error) {
           console.error('🚨 Skip to previous error:', error);
       } finally {
           this.transitionInProgress = false;
       }
+  }
+
+  // Jump to specific playlist item
+  async jumpToItem(itemIndex) {
+      if (this.transitionInProgress || !this.currentPlaylist) return;
+      if (itemIndex < 0 || itemIndex >= this.currentPlaylist.items.length) return;
+
+      this.transitionInProgress = true;
+      this.currentItemIndex = itemIndex;
+
+      try {
+          await this.loadPlaylistItem(this.currentItemIndex);
+
+          // Pre-analyze upcoming tracks
+          this.preAnalyzeUpcomingTracks();
+
+      } catch (error) {
+          console.error('🚨 Jump to item error:', error);
+      } finally {
+          this.transitionInProgress = false;
+      }
+  }
+
+  // NEW: Extract track ID from Spotify URI
+  extractTrackId(uri) {
+      if (!uri) return null;
+      const parts = uri.split(':');
+      return parts.length >= 3 ? parts[2] : null;
+  }
+
+  // NEW: Toggle smart transitions
+  setSmartTransitions(enabled) {
+      this.smartTransitionsEnabled = enabled;
+      console.log(`🎛️ Smart transitions ${enabled ? 'enabled' : 'disabled'}`);
+  }
+
+  // Setup Spotify player event listeners
+  setupEventListeners() {
+      if (!this.spotifyPlayer) return;
+
+      // Handle track end (natural progression)
+      this.spotifyPlayer.addListener('player_state_changed', async (state) => {
+          if (!state || !this.currentPlaylist) return;
+
+          // Track ended naturally (not during a loop)
+          if (state.position === 0 && !this.isLooping && this.isPlaying) {
+              const currentItem = this.currentPlaylist.items[this.currentItemIndex];
+
+              // If this is a full track (not a loop), move to next
+              if (currentItem.type === 'track') {
+                  await this.skipToNext();
+              }
+          }
+
+          this.isPlaying = !state.paused;
+      });
   }
 
   // Get current playlist state
@@ -797,21 +1145,45 @@ class PlaylistTransitionEngine {
       return {
           playlist: this.currentPlaylist,
           currentIndex: this.currentItemIndex,
-          currentItem: this.currentPlaylist.items[this.currentItemIndex]
+          currentItem: this.currentPlaylist.items[this.currentItemIndex],
+          loopProgress: {
+              current: this.currentLoopCount,
+              target: this.currentLoopTarget
+          },
+          isPlaying: this.isPlaying,
+          smartTransitionsEnabled: this.smartTransitionsEnabled,
+          currentTransition: this.currentTransitionData
       };
   }
 
-  // Notify that current item is complete (called by main player)
-  async notifyItemComplete() {
-      console.log('📢 Main player notified item complete');
-      await this.skipToNext();
+  // Pause/Resume playlist
+  async pausePlaylist() {
+      try {
+          await this.spotifyPlayer.pause();
+          this.isPlaying = false;
+      } catch (error) {
+          console.error('🚨 Pause error:', error);
+      }
+  }
+
+  async resumePlaylist() {
+      try {
+          await this.spotifyPlayer.resume();
+          this.isPlaying = true;
+      } catch (error) {
+          console.error('🚨 Resume error:', error);
+      }
   }
 
   // Stop playlist and cleanup
   stopPlaylist() {
       this.currentPlaylist = null;
       this.currentItemIndex = 0;
+      this.currentLoopCount = 0;
+      this.isPlaying = false;
       this.transitionInProgress = false;
+      this.crossfadeInProgress = false;
+      this.currentTransitionData = null;
       this.nextTrackPreloaded = false;
       console.log('⏹️ Playlist stopped');
   }
@@ -820,7 +1192,6 @@ class PlaylistTransitionEngine {
 function initializeSpotifyPlayer() {
   showStatus('Connecting to Spotify...');
 
-  // Define the callback function in the global scope BEFORE loading the SDK
   window.onSpotifyWebPlaybackSDKReady = () => {
       spotifyPlayer = new Spotify.Player({
           name: 'LOOOPZ Player',
@@ -878,6 +1249,11 @@ function initializeSpotifyPlayer() {
           updatePlayPauseButton();
           updateNowPlayingIndicator(currentTrack);
 
+          // Handle playlist mode progress
+          if (isPlaylistMode && playlistEngine) {
+              playlistEngine.handlePlaybackProgress(currentTime);
+          }
+
           if (state.track_window.current_track) {
               const track = state.track_window.current_track;
               duration = track.duration_ms / 1000;
@@ -898,10 +1274,7 @@ function initializeSpotifyPlayer() {
       spotifyPlayer.connect();
   };
 
-  // Check if Spotify SDK is already loaded
-  if (window.Spotify) {
-      window.onSpotifyWebPlaybackSDKReady();
-  }
+  if (window.Spotify) window.onSpotifyWebPlaybackSDKReady();
 }
 
 function setupPlaylistEngineCallbacks() {
@@ -911,26 +1284,24 @@ function setupPlaylistEngineCallbacks() {
       console.log('🎵 Playlist item changed:', item);
       updatePlaylistNowPlaying(item, index);
 
-      // Update main player UI and let it handle the loops
+      // Update main player UI
       if (item.type === 'loop') {
           loopStart = item.start;
           loopEnd = item.end;
           loopTarget = item.playCount || 1;
           loopEnabled = true;
-          loopCount = 0; // Reset loop count
-          loopStartTime = Date.now(); // Reset loop timer
           els.loopToggle.checked = true;
           updateRepeatDisplay();
           updateLoopVisuals();
-          
-          console.log(`📢 Main player loop enabled: ${formatTime(loopStart)} - ${formatTime(loopEnd)} (${loopTarget}×)`);
       } else {
-          // Full track - disable looping
           loopEnabled = false;
-          loopCount = 0;
           els.loopToggle.checked = false;
-          updateLoopVisuals(); // This will hide handles
       }
+  };
+
+  playlistEngine.onLoopProgress = (current, target) => {
+      console.log(`🔄 Playlist loop progress: ${current}/${target}`);
+      showStatus(`Loop ${current}/${target}`);
   };
 
   playlistEngine.onPlaylistComplete = () => {
@@ -938,9 +1309,16 @@ function setupPlaylistEngineCallbacks() {
       showStatus('Playlist finished!');
       stopPlaylistMode();
   };
+
+  // NEW: Smart transition callback
+  playlistEngine.onSmartTransition = (transitionData) => {
+      const { transitionQuality, crossfadeDuration } = transitionData;
+      console.log(`🎛️ Smart transition: ${transitionQuality.quality} (${crossfadeDuration}s)`);
+      // Could update UI to show transition quality
+  };
 }
 
-// FIX 7: Increased update frequency for better precision
+// IMPROVED: Progress updates with higher frequency
 function startProgressUpdates() {
   stopProgressUpdates();
   updateTimer = setInterval(async () => {
@@ -950,17 +1328,17 @@ function startProgressUpdates() {
               if (state && state.position !== undefined) {
                   currentTime = state.position / 1000;
                   updateProgress();
-                  
-                  // Check loops for both regular and playlist mode
-                  if (loopEnabled) {
-                      await checkLoopEnd();
+                  // Handle loop end with reduced buffer (0.05s instead of 0.1s)
+                  if (loopEnabled && currentTime >= loopEnd - 0.05 && loopCount < loopTarget && !isPlaylistMode) {
+                      const timeSinceLoopStart = Date.now() - loopStartTime;
+                      if (timeSinceLoopStart > 800) await handleLoopEnd();
                   }
               }
           } catch (error) {
               console.warn('State check failed:', error.message);
           }
       }
-  }, 50); // Changed from 100ms to 50ms for better precision
+  }, 50); // Increased frequency from 100ms to 50ms
 }
 
 function stopProgressUpdates() {
@@ -970,47 +1348,33 @@ function stopProgressUpdates() {
   }
 }
 
-// FIX 9: Unified loop end handling function
-async function checkLoopEnd() {
-  // Debug logging for playlist loops
-  if (isPlaylistMode && loopEnabled) {
-      console.log(`🔍 Checking playlist loop: time=${currentTime.toFixed(3)}s, end=${loopEnd.toFixed(3)}s, threshold=${LOOP_END_THRESHOLD}s, loopCount=${loopCount}/${loopTarget}`);
-  }
-  
-  // Check if we've reached the loop end with precise timing
-  if (currentTime >= loopEnd - LOOP_END_THRESHOLD && loopCount < loopTarget) {
-      const timeSinceLoopStart = Date.now() - loopStartTime;
-      if (timeSinceLoopStart > 800) {
-          console.log(`🎯 Loop endpoint detected at ${currentTime.toFixed(3)}s!`);
-          await handleLoopEnd();
-      }
-  }
-}
-
-// FIX 5: Unified loop end handling with debouncing
 async function handleLoopEnd() {
   try {
       isLooping = true;
       loopCount++;
 
       if (loopCount >= loopTarget) {
-          // Check if we're in playlist mode
-          if (isPlaylistMode && playlistEngine) {
-              // Notify playlist engine to move to next item
-              console.log('🎵 Playlist item complete, moving to next');
-              await playlistEngine.notifyItemComplete();
-          } else {
-              // Regular loop mode - just pause
-              await togglePlayPause();
-              showStatus(`Loop completed! Played ${loopTarget} time(s)`);
-          }
+          await togglePlayPause();
+          showStatus(`Loop completed! Played ${loopTarget} time(s)`);
           loopCount = 0;
       } else {
           showStatus(`Loop ${loopCount + 1}/${loopTarget}`);
           loopStartTime = Date.now();
 
-          // Use debounced seek function
-          await seekToPosition(loopStart * 1000);
+          try {
+              await spotifyPlayer.seek(loopStart * 1000);
+              currentTime = loopStart;
+              updateProgress();
+              console.log('✅ Fast loop seek via SDK');
+          } catch (sdkError) {
+              console.log('⚠️ SDK loop seek failed, using API:', sdkError.message);
+              await fetch(`https://api.spotify.com/v1/me/player/seek?position_ms=${loopStart * 1000}&device_id=${spotifyDeviceId}`, {
+                  method: 'PUT',
+                  headers: { 'Authorization': `Bearer ${spotifyAccessToken}` }
+              });
+              currentTime = loopStart;
+              updateProgress();
+          }
       }
   } catch (error) {
       console.error('🚨 Loop error:', error);
@@ -2612,14 +2976,16 @@ function setupEventListeners() {
               await seekToPosition(newTime * 1000);
           }
 
-          // FIX 2: Changed "Start Loop" to "Set Loop" behavior
+          // Loop controls - FIXED: Set Loop button
           else if (target.matches('#start-loop-btn')) {
               e.preventDefault();
-              if (!currentTrack || !loopEnabled) {
-                  showStatus('Please select a track and enable loop mode');
+              if (!currentTrack) {
+                  showStatus('Please select a track first');
                   return;
               }
-              // Just enable the loop, don't seek to start
+              // Simply enable loop mode, don't seek
+              loopEnabled = true;
+              els.loopToggle.checked = true;
               loopCount = 0;
               loopStartTime = Date.now();
               showStatus(`Loop set: ${formatTime(loopStart)} - ${formatTime(loopEnd)} (${loopTarget}×)`);
@@ -2874,7 +3240,6 @@ function setupEventListeners() {
       loopEnabled = this.checked;
       loopCount = 0;
       els.startLoopBtn.disabled = !loopEnabled;
-      updateLoopVisuals(); // FIX 6: This will show/hide handles
       showStatus(loopEnabled ? `Loop enabled: ${loopTarget} time(s)` : 'Loop disabled');
   });
 
@@ -2933,12 +3298,7 @@ window.removeFromPlaylist = removeFromPlaylist;
 
 // Init
 function init() {
-  console.log('🚀 Initializing LOOOPZ with Playlist Management...');
-
-  // Define the Spotify callback early in case SDK loads before we're ready
-  window.onSpotifyWebPlaybackSDKReady = window.onSpotifyWebPlaybackSDKReady || function() {
-      console.log('⚠️ Spotify SDK ready but player not initialized yet');
-  };
+  console.log('🚀 Initializing LOOOPZ with Smart DJ Transitions...');
 
   // Cache all elements
   els = {
@@ -3013,7 +3373,7 @@ function init() {
   loadSavedLoops();
   loadSavedPlaylists();
 
-  console.log('✅ LOOOPZ initialization complete with Playlist Management!');
+  console.log('✅ LOOOPZ initialization complete with Smart DJ Transitions!');
 }
 
 document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', init) : init();
