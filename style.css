@@ -456,8 +456,13 @@ body {
    pointer-events: none;
    border: 2px solid rgba(29, 185, 84, 0.6);
    z-index: 2;
-   opacity: 0;
+   opacity: 0.7;
    transition: opacity 0.3s ease;
+}
+
+.progress-container:hover .loop-handle,
+.loop-handle.dragging {
+    opacity: 1;
 }
 
 /* Show loop region when loop is enabled */
