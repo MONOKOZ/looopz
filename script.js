@@ -139,8 +139,17 @@ function updateLoopVisuals() {
 
   els.startPopup.textContent = formatTime(loopStart);
   els.endPopup.textContent = formatTime(loopEnd);
-  els.precisionStart.value = formatTime(loopStart);
-  els.precisionEnd.value = formatTime(loopEnd);
+  
+  if (els.precisionStart) els.precisionStart.value = formatTime(loopStart);
+  if (els.precisionEnd) els.precisionEnd.value = formatTime(loopEnd);
+
+  // Make handles and region always visible when a track is loaded
+  // They will be controlled by CSS hover states and loop enabled state
+  if (duration > 0) {
+      els.loopStartHandle.style.display = 'block';
+      els.loopEndHandle.style.display = 'block';
+      els.loopRegion.style.display = 'block';
+  }
 }
 
 // NEW: Smart DJ Helper Functions
@@ -936,10 +945,15 @@ class PlaylistTransitionEngine {
       if (!this.currentPlaylist || this.transitionInProgress || this.crossfadeInProgress) return;
 
       const currentItem = this.currentPlaylist.items[this.currentItemIndex];
+      
+      // Debug logging
+      if (currentItem.type === 'loop') {
+          console.log(`🔄 Checking loop progress: ${currentTime.toFixed(2)}s / ${this.currentLoop.end}s`);
+      }
 
       // Handle loop items
       if (currentItem.type === 'loop' && this.currentLoop) {
-          await this.handleLoopProgress(currentTime, currentItem);
+          await this.handleLoopProgress(currentTime);
       }
 
       // NEW: Handle smart transition timing for full tracks
@@ -1253,6 +1267,10 @@ function initializeSpotifyPlayer() {
           if (isPlaylistMode && playlistEngine) {
               playlistEngine.handlePlaybackProgress(currentTime);
           }
+          // Also handle regular loop mode
+          else if (loopEnabled && !isPlaylistMode) {
+              // This is handled in startProgressUpdates
+          }
 
           if (state.track_window.current_track) {
               const track = state.track_window.current_track;
@@ -1290,12 +1308,18 @@ function setupPlaylistEngineCallbacks() {
           loopEnd = item.end;
           loopTarget = item.playCount || 1;
           loopEnabled = true;
-          els.loopToggle.checked = true;
+          loopCount = 0; // Reset loop count
+          loopStartTime = Date.now();
+          
+          if (els.loopToggle) els.loopToggle.checked = true;
           updateRepeatDisplay();
           updateLoopVisuals();
+          
+          console.log(`🔄 Loop item loaded: ${formatTime(loopStart)} - ${formatTime(loopEnd)} × ${loopTarget}`);
       } else {
           loopEnabled = false;
-          els.loopToggle.checked = false;
+          if (els.loopToggle) els.loopToggle.checked = false;
+          updateLoopVisuals();
       }
   };
 
@@ -1328,7 +1352,8 @@ function startProgressUpdates() {
               if (state && state.position !== undefined) {
                   currentTime = state.position / 1000;
                   updateProgress();
-                  // Handle loop end with reduced buffer (0.05s instead of 0.1s)
+                  
+                  // Handle loop end for regular mode (not playlist mode)
                   if (loopEnabled && currentTime >= loopEnd - 0.05 && loopCount < loopTarget && !isPlaylistMode) {
                       const timeSinceLoopStart = Date.now() - loopStartTime;
                       if (timeSinceLoopStart > 800) await handleLoopEnd();
@@ -1624,9 +1649,17 @@ async function selectTrack(uri, name, artist, durationMs, imageUrl) {
           showStatus(`✅ Selected: ${name}`);
       }
 
+      // Ensure loop visuals are properly initialized
       updateLoopVisuals();
       updateProgress();
+      
+      // Make sure the player section shows the loop controls
       showView('player');
+
+      // If loop was enabled before, make sure handles are visible
+      if (loopEnabled && els.loopToggle) {
+          els.loopToggle.checked = true;
+      }
 
   } catch (error) {
       console.error('🚨 Track selection error:', error);
@@ -1666,6 +1699,9 @@ function showView(view) {
 // Loop Handles
 function setupLoopHandles() {
   let dragTarget = null;
+
+  // Initial visibility based on loop state
+  updateLoopVisuals();
 
   function startDrag(e, target) {
       isDragging = true;
@@ -3240,6 +3276,7 @@ function setupEventListeners() {
       loopEnabled = this.checked;
       loopCount = 0;
       els.startLoopBtn.disabled = !loopEnabled;
+      updateLoopVisuals(); // Make sure to update visuals when toggling
       showStatus(loopEnabled ? `Loop enabled: ${loopTarget} time(s)` : 'Loop disabled');
   });
 
