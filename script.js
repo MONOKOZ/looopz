@@ -142,16 +142,16 @@ function updateLoopVisuals() {
   els.precisionStart.value = formatTime(loopStart);
   els.precisionEnd.value = formatTime(loopEnd);
 
-  // FIX 6: Show/hide loop handles based on loop enabled state
-  if (loopEnabled) {
-      els.loopStartHandle.style.display = 'block';
-      els.loopEndHandle.style.display = 'block';
-      els.loopRegion.style.display = 'block';
-  } else {
-      els.loopStartHandle.style.display = 'none';
-      els.loopEndHandle.style.display = 'none';
-      els.loopRegion.style.display = 'none';
-  }
+// FIX 6: Show/hide loop handles based on loop enabled state
+if (loopEnabled) {
+    els.loopStartHandle.classList.add('show');    // add() is a method!
+    els.loopEndHandle.classList.add('show');
+    els.loopRegion.classList.add('show');
+} else {
+    els.loopStartHandle.classList.remove('show');  // remove in else block!
+    els.loopEndHandle.classList.remove('show');
+    els.loopRegion.classList.remove('show');
+}
 }
 
 // Context Menu Functions - IMPROVED
