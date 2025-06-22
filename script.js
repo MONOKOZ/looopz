@@ -851,7 +851,7 @@ function setupLoopHandles() {
   document.addEventListener('touchend', stopDrag, { passive: false });
 }
 
-// Authentication functions
+// PKCE Auth
 function generateCodeVerifier() {
   const array = new Uint8Array(32);
   crypto.getRandomValues(array);
@@ -910,9 +910,9 @@ async function exchangeCodeForToken(code) {
       localStorage.removeItem('code_verifier');
       window.history.replaceState({}, document.title, window.location.pathname);
       initializeSpotifyPlayer();
-      showStatus('Successfully authenticated! Setting up player...');
+      showStatus('Successfully authenticated!');
   } else {
-      throw new Error(data.error_description || 'Authentication failed');
+      throw new Error(data.error_description || 'Token exchange failed');
   }
 }
 
