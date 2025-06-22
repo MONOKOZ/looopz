@@ -927,7 +927,6 @@ function disconnectSpotify() {
   showView('login');
   showStatus('Disconnected from Spotify');
 }
-}
 
 // Complete enhanced event listeners
 function setupEnhancedEventListeners() {
