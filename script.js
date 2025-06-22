@@ -1,9 +1,7 @@
-// Spotify Configuration
-const SPOTIFY_CLIENT_ID = '00c5bfadb97c4d4580faca4b1d0ae33f';
-const SPOTIFY_REDIRECT_URI = window.location.hostname === 'localhost' 
-    ? 'http://localhost:5173/' 
-    : 'https://looopz.vercel.app/';
-const SPOTIFY_SCOPES = 'streaming user-read-email user-read-private user-library-read user-library-modify user-read-playback-state user-modify-playback-state';
+// Config
+const SPOTIFY_CLIENT_ID = '46637d8f5adb41c0a4be34e0df0c1597';
+const SPOTIFY_REDIRECT_URI = 'https://looopz.vercel.app/';
+const SPOTIFY_SCOPES = 'streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state';
 
 // App State
 let spotifyAccessToken = null;
