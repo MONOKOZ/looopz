@@ -405,7 +405,7 @@ async function loadTrackIntoSpotify(track, startPositionMs = 0) {
                   isPlaying = !state.paused;
                   currentTime = state.position / 1000;
                   duration = state.track_window.current_track.duration_ms / 1000;
-                  
+
                   // Update current track info
                   currentTrack = {
                       uri: track.uri,
@@ -414,14 +414,14 @@ async function loadTrackIntoSpotify(track, startPositionMs = 0) {
                       duration: duration,
                       image: track.image
                   };
-                  
+
                   // Update UI
                   els.currentTrack.textContent = track.name;
                   els.currentArtist.textContent = track.artist;
                   updateProgress();
                   updatePlayPauseButton();
                   updateNowPlayingIndicator(currentTrack);
-                  
+
                   // Start progress updates if playing
                   if (isPlaying) {
                       startProgressUpdates();
@@ -602,7 +602,7 @@ async function seekToPosition(positionMs) {
   }
 }
 
-// Playlist Transition Engine Integration - SIMPLIFIED APPROACH WITH PRE-LOADING
+// Playlist Transition Engine Integration - SIMPLIFIED APPROACH
 class PlaylistTransitionEngine {
   constructor(spotifyPlayer, spotifyAccessToken, spotifyDeviceId) {
       this.spotifyPlayer = spotifyPlayer;
@@ -616,7 +616,6 @@ class PlaylistTransitionEngine {
 
       // We DON'T track loops here - let main player handle it
       this.transitionInProgress = false;
-      this.nextTrackPreloaded = false;
 
       // Event callbacks
       this.onItemChange = null;
@@ -637,11 +636,6 @@ class PlaylistTransitionEngine {
 
           // Load first track
           await this.loadPlaylistItem(this.currentItemIndex);
-          
-          // Pre-load next track if exists
-          if (this.currentItemIndex + 1 < playlist.items.length) {
-              this.preloadNextTrack();
-          }
 
           console.log('✅ Playlist loaded and ready');
           return true;
@@ -689,41 +683,12 @@ class PlaylistTransitionEngine {
       }
   }
 
-  // Pre-load next track for seamless transition
-  async preloadNextTrack() {
-      const nextIndex = this.currentItemIndex + 1;
-      if (nextIndex >= this.currentPlaylist.items.length) {
-          return; // No next track
-      }
-
-      const nextItem = this.currentPlaylist.items[nextIndex];
-      const trackUri = nextItem.type === 'loop' ? nextItem.trackUri : nextItem.uri;
-
-      try {
-          // Queue next track in Spotify (this prepares it for instant transition)
-          await fetch(`https://api.spotify.com/v1/me/player/queue?uri=${encodeURIComponent(trackUri)}&device_id=${this.spotifyDeviceId}`, {
-              method: 'POST',
-              headers: {
-                  'Authorization': `Bearer ${this.spotifyAccessToken}`
-              }
-          });
-
-          this.nextTrackPreloaded = true;
-          console.log('⚡ Next track pre-loaded:', nextItem.name);
-
-      } catch (error) {
-          console.log('⚠️ Pre-load failed (non-critical):', error.message);
-          this.nextTrackPreloaded = false;
-      }
-  }
-
   // Skip to next playlist item
   async skipToNext() {
       if (this.transitionInProgress) return;
 
       this.transitionInProgress = true;
       this.currentItemIndex++;
-      this.nextTrackPreloaded = false; // Reset flag
 
       try {
           if (this.currentItemIndex >= this.currentPlaylist.items.length) {
@@ -733,18 +698,8 @@ class PlaylistTransitionEngine {
               return;
           }
 
-          // If next track was pre-loaded, we might get faster transition
-          if (this.nextTrackPreloaded) {
-              console.log('⚡ Using pre-loaded track for faster transition');
-          }
-
           // Load next item
           await this.loadPlaylistItem(this.currentItemIndex);
-          
-          // Pre-load the following track
-          if (this.currentItemIndex + 1 < this.currentPlaylist.items.length) {
-              this.preloadNextTrack();
-          }
 
       } catch (error) {
           console.error('🚨 Skip to next error:', error);
@@ -759,15 +714,9 @@ class PlaylistTransitionEngine {
 
       this.transitionInProgress = true;
       this.currentItemIndex--;
-      this.nextTrackPreloaded = false; // Reset flag
 
       try {
           await this.loadPlaylistItem(this.currentItemIndex);
-          
-          // Pre-load next track after loading previous
-          if (this.currentItemIndex + 1 < this.currentPlaylist.items.length) {
-              this.preloadNextTrack();
-          }
       } catch (error) {
           console.error('🚨 Skip to previous error:', error);
       } finally {
@@ -797,7 +746,6 @@ class PlaylistTransitionEngine {
       this.currentPlaylist = null;
       this.currentItemIndex = 0;
       this.transitionInProgress = false;
-      this.nextTrackPreloaded = false;
       console.log('⏹️ Playlist stopped');
   }
 }
@@ -907,7 +855,7 @@ function setupPlaylistEngineCallbacks() {
           els.loopToggle.checked = true;
           updateRepeatDisplay();
           updateLoopVisuals();
-          
+
           console.log(`📢 Main player loop enabled: ${formatTime(loopStart)} - ${formatTime(loopEnd)} (${loopTarget}×)`);
       } else {
           // Full track - disable looping
@@ -935,7 +883,7 @@ function startProgressUpdates() {
               if (state && state.position !== undefined) {
                   currentTime = state.position / 1000;
                   updateProgress();
-                  
+
                   // Check loops for both regular and playlist mode
                   if (loopEnabled) {
                       await checkLoopEnd();
@@ -961,7 +909,7 @@ async function checkLoopEnd() {
   if (isPlaylistMode && loopEnabled) {
       console.log(`🔍 Checking playlist loop: time=${currentTime.toFixed(3)}s, end=${loopEnd.toFixed(3)}s, threshold=${LOOP_END_THRESHOLD}s, loopCount=${loopCount}/${loopTarget}`);
   }
-  
+
   // Check if we've reached the loop end with precise timing
   if (currentTime >= loopEnd - LOOP_END_THRESHOLD && loopCount < loopTarget) {
       const timeSinceLoopStart = Date.now() - loopStartTime;
