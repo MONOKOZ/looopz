@@ -87,7 +87,9 @@ function updateProgress() {
 }
 
 function updatePlayPauseButton() {
-  els.playPauseBtn.textContent = isPlaying ? '⏸' : '▶';
+  els.playPauseBtn.innerHTML = isPlaying 
+    ? '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-pause"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>' 
+    : '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-play"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>';
 }
 
 function updateNowPlayingIndicator(track = null) {
@@ -1027,9 +1029,15 @@ function displaySearchResults(tracks, hasMore = false) {
           </div>
           <div class="track-duration">${formatTime(track.duration_ms / 1000, false)}</div>
           <div class="track-actions">
-              <button class="track-action-btn play-track-btn" data-track-index="${index}">▶</button>
-              <button class="track-action-btn secondary select-track-btn" data-track-index="${index}">+</button>
-              <button class="track-action-btn menu track-menu-btn" data-track-index="${index}">⋮</button>
+              <button class="track-action-btn play-track-btn" data-track-index="${index}">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-play"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+              </button>
+              <button class="track-action-btn secondary select-track-btn" data-track-index="${index}">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-plus"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+              </button>
+              <button class="track-action-btn menu track-menu-btn" data-track-index="${index}">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-more-vertical"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+              </button>
           </div>
       </div>
   `).join('');
@@ -1369,7 +1377,9 @@ function renderLoopsList() {
   if (savedLoops.length === 0) {
       els.loopsList.innerHTML = `
           <div style="text-align: center; padding: 60px 20px;">
-              <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.4;">📦</div>
+              <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.4;">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-archive"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+              </div>
               <div style="color: var(--light-gray); font-size: 16px; margin-bottom: 8px;">No saved loops yet</div>
               <div style="color: var(--light-gray); font-size: 13px;">Create and save loops to build your collection</div>
           </div>
@@ -1389,15 +1399,21 @@ function renderLoopsList() {
 
           <div class="loop-stats">
               <div class="loop-stat">
-                  <span class="loop-stat-icon">⏱</span>
+                  <span class="loop-stat-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-clock"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                  </span>
                   <span>${formatTime(loop.loop.start, false)} - ${formatTime(loop.loop.end, false)}</span>
               </div>
               <div class="loop-stat">
-                  <span class="loop-stat-icon">🔄</span>
+                  <span class="loop-stat-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-repeat"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+                  </span>
                   <span>${loop.loop.repeat}×</span>
               </div>
               <div class="loop-stat">
-                  <span class="loop-stat-icon">📅</span>
+                  <span class="loop-stat-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-calendar"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                  </span>
                   <span>${new Date(loop.savedAt).toLocaleDateString()}</span>
               </div>
           </div>
@@ -1849,7 +1865,9 @@ function renderPlaylistsList() {
   if (savedPlaylists.length === 0) {
       els.playlistsList.innerHTML = `
           <div style="text-align: center; padding: 60px 20px;">
-              <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.4;">🎵</div>
+              <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.4;">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-music"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+              </div>
               <div style="color: var(--light-gray); font-size: 16px; margin-bottom: 8px;">No playlists yet</div>
               <div style="color: var(--light-gray); font-size: 13px;">Create playlists to mix loops and full tracks</div>
           </div>
@@ -1860,7 +1878,9 @@ function renderPlaylistsList() {
   els.playlistsList.innerHTML = savedPlaylists.map((playlist) => `
       <div class="playlist-card" data-playlist-id="${playlist.id}">
           <div class="playlist-header">
-              <div class="playlist-icon">🎵</div>
+              <div class="playlist-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-music"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+              </div>
               <div class="playlist-details">
                   <div class="playlist-name">${playlist.name}</div>
                   <div class="playlist-description">${playlist.description || `${playlist.items.length} items`}</div>
@@ -1869,21 +1889,30 @@ function renderPlaylistsList() {
 
           <div class="playlist-stats">
               <div class="playlist-stat">
-                  <span class="playlist-stat-icon">🎵</span>
+                  <span class="playlist-stat-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-list"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                  </span>
                   <span>${playlist.items.length} items</span>
               </div>
               <div class="playlist-stat">
-                  <span class="playlist-stat-icon">⏱</span>
+                  <span class="playlist-stat-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-clock"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                  </span>
                   <span>${formatTime(playlist.totalDuration, false)}</span>
               </div>
               <div class="playlist-stat">
-                  <span class="playlist-stat-icon">▶</span>
+                  <span class="playlist-stat-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-play"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                  </span>
                   <span>${playlist.playCount || 0} plays</span>
               </div>
           </div>
 
           <div class="playlist-actions">
-              <button class="playlist-action-btn play-playlist-btn" data-playlist-id="${playlist.id}">▶ Play</button>
+              <button class="playlist-action-btn play-playlist-btn" data-playlist-id="${playlist.id}">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-play"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                Play
+              </button>
               <button class="playlist-action-btn edit-playlist-btn" data-playlist-id="${playlist.id}">Edit</button>
               <button class="playlist-action-btn share-playlist-btn" data-playlist-id="${playlist.id}">Share</button>
               <button class="playlist-action-btn danger delete-playlist-btn" data-playlist-id="${playlist.id}">Delete</button>
@@ -2038,7 +2067,9 @@ function showAddToPlaylistPopup() {
   } else {
       list.innerHTML = savedPlaylists.map(playlist => `
           <div class="playlist-selection-item" data-playlist-id="${playlist.id}">
-              <div class="playlist-selection-icon">🎵</div>
+              <div class="playlist-selection-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-music"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+              </div>
               <div class="playlist-selection-info">
                   <div class="playlist-selection-name">${playlist.name}</div>
                   <div class="playlist-selection-count">${playlist.items.length} items</div>
