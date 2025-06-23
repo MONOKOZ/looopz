@@ -11,7 +11,7 @@
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://looopz.vercel.app/">
     <meta property="og:image" content="https://looopz.vercel.app/og-image.png">
-    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='40' fill='none' stroke='%231DB954' stroke-width='6'/%3E%3Ccircle cx='50' cy='50' r='25' fill='none' stroke='%231DB954' stroke-width='4'/%3E%3Ccircle cx='50' cy='50' r='10' fill='%231DB954'/%3E%3C/svg%3E">
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='none' stroke='%231DB954' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='1 4 1 10 7 10'%3E%3C/polyline%3E%3Cpolyline points='23 20 23 14 17 14'%3E%3C/polyline%3E%3Cpath d='M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15'%3E%3C/path%3E%3C/svg%3E">
     <link rel="stylesheet" href="style.css" />
    
 </head>
@@ -39,7 +39,9 @@
     <div class="main-container">
         <!-- Login -->
         <div id="login-screen" class="login-screen">
-            <div class="login-icon">⚡</div>
+            <div class="login-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#1DB954" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-zap"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+            </div>
             <h1 class="login-title">Welcome to LOOOPZ</h1>
             <p class="login-subtitle">Create perfect loops from any Spotify track.<br>Precision timing. Endless possibilities.</p>
             <button class="btn" id="connect-btn">Connect Spotify Premium</button>
@@ -51,7 +53,9 @@
             <div class="card">
                 <div class="search-container">
                     <div class="search-header" id="search-header">
-                        <button class="back-btn hidden" id="search-back-btn">←</button>
+                        <button class="back-btn hidden" id="search-back-btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-left"><line x1="19" y1="12" x2="5" y2="12"></line><polyline points="12 19 5 12 12 5"></polyline></svg>
+                        </button>
                         <input type="text" class="search-input" id="search-input" placeholder="Search for any song..." autocomplete="off">
                     </div>
                 </div>
@@ -77,9 +81,15 @@
                             <div class="playlist-current-item-type" id="playlist-current-type">-</div>
                         </div>
                         <div class="playlist-playback-controls">
-                            <button class="playlist-control-btn" id="playlist-prev-btn">⏮</button>
-                            <button class="playlist-control-btn" id="playlist-stop-btn">⏹</button>
-                            <button class="playlist-control-btn" id="playlist-next-btn">⏭</button>
+                            <button class="playlist-control-btn" id="playlist-prev-btn">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-skip-back"><polygon points="19 20 9 12 19 4 19 20"></polygon><line x1="5" y1="19" x2="5" y2="5"></line></svg>
+                            </button>
+                            <button class="playlist-control-btn" id="playlist-stop-btn">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-square"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect></svg>
+                            </button>
+                            <button class="playlist-control-btn" id="playlist-next-btn">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-skip-forward"><polygon points="5 4 15 12 5 20 5 4"></polygon><line x1="19" y1="5" x2="19" y2="19"></line></svg>
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -107,9 +117,15 @@
 
                 <div class="main-controls">
                     <div class="playback-controls">
-                        <button class="control-btn" id="backward-btn">⏪</button>
-                        <button class="control-btn play-pause-btn" id="play-pause-btn">▶</button>
-                        <button class="control-btn" id="forward-btn">⏩</button>
+                        <button class="control-btn" id="backward-btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-rewind"><polygon points="11 19 2 12 11 5 11 19"></polygon><polygon points="22 19 13 12 22 5 22 19"></polygon></svg>
+                        </button>
+                        <button class="control-btn play-pause-btn" id="play-pause-btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-play"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                        </button>
+                        <button class="control-btn" id="forward-btn">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-fast-forward"><polygon points="13 19 22 12 13 5 13 19"></polygon><polygon points="2 19 11 12 2 5 2 19"></polygon></svg>
+                        </button>
                     </div>
 
                     <div class="loop-controls">
@@ -124,9 +140,13 @@
                         <div class="loop-section">
                             <span>Repeat Count</span>
                             <div class="repeat-counter">
-                                <div class="repeat-btn" id="repeat-decrease">−</div>
+                                <div class="repeat-btn" id="repeat-decrease">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-minus"><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                                </div>
                                 <div class="repeat-value" id="repeat-value">1×</div>
-                                <div class="repeat-btn" id="repeat-increase">+</div>
+                                <div class="repeat-btn" id="repeat-increase">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-plus"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                                </div>
                             </div>
                         </div>
 
@@ -134,7 +154,10 @@
                             <button class="btn start-loop-btn" id="start-loop-btn">Set Loop</button>
                             <button class="btn secondary" id="save-loop-btn">Save Loop</button>
                             <button class="btn secondary" id="add-to-playlist-btn">+ Playlist</button>
-                            <button class="btn" id="precision-btn" style="background: linear-gradient(135deg, #444, #333); padding: 10px 16px;">⚙️ Precision</button>
+                            <button class="btn" id="precision-btn" style="background: linear-gradient(135deg, #444, #333); padding: 10px 16px;">
+                                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-settings" style="margin-right: 6px; vertical-align: text-bottom;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                                Precision
+                            </button>
                         </div>
                     </div>
                 </div>
@@ -150,7 +173,9 @@
                 </h2>
                 <div id="loops-list">
                     <div style="text-align: center; padding: 60px 20px;">
-                        <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.4;">📦</div>
+                        <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.4;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-archive"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
+                        </div>
                         <div style="color: var(--light-gray); font-size: 16px; margin-bottom: 8px;">No saved loops yet</div>
                         <div style="color: var(--light-gray); font-size: 13px;">Create and save loops to build your collection</div>
                     </div>
@@ -167,7 +192,9 @@
                 </h2>
                 <div id="playlists-list">
                     <div style="text-align: center; padding: 60px 20px;">
-                        <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.4;">🎵</div>
+                        <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.4;">
+                            <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-music"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+                        </div>
                         <div style="color: var(--light-gray); font-size: 16px; margin-bottom: 8px;">No playlists yet</div>
                         <div style="color: var(--light-gray); font-size: 13px;">Create playlists to mix loops and full tracks</div>
                     </div>
@@ -181,7 +208,9 @@
         <div class="precision-popup-content">
             <div class="precision-popup-header">
                 <h3>Precision Controls</h3>
-                <button class="popup-close" id="precision-close">✕</button>
+                <button class="popup-close" id="precision-close">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-x"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
             </div>
 
             <div class="precision-inputs">
@@ -228,23 +257,33 @@
     <div class="context-menu-overlay" id="context-menu-overlay"></div>
     <div class="track-context-menu" id="track-context-menu">
         <button class="context-menu-item" id="menu-discover-moments">
-            <span class="context-menu-icon">🔍</span>
+            <span class="context-menu-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-search"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            </span>
             <span class="context-menu-text">Discover Moments</span>
         </button>
         <button class="context-menu-item" id="menu-add-playlist">
-            <span class="context-menu-icon">➕</span>
+            <span class="context-menu-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-plus-circle"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="16"></line><line x1="8" y1="12" x2="16" y2="12"></line></svg>
+            </span>
             <span class="context-menu-text">Add to Playlist</span>
         </button>
         <button class="context-menu-item" id="menu-create-loop">
-            <span class="context-menu-icon">🔄</span>
+            <span class="context-menu-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-refresh-ccw"><polyline points="1 4 1 10 7 10"></polyline><polyline points="23 20 23 14 17 14"></polyline><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></svg>
+            </span>
             <span class="context-menu-text">Create Loop</span>
         </button>
         <button class="context-menu-item" id="menu-share">
-            <span class="context-menu-icon">📤</span>
+            <span class="context-menu-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-share-2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
+            </span>
             <span class="context-menu-text">Share</span>
         </button>
         <button class="context-menu-item" id="menu-spotify">
-            <span class="context-menu-icon">🎵</span>
+            <span class="context-menu-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-headphones"><path d="M3 18v-6a9 9 0 0 1 18 0v6"></path><path d="M21 19a2 2 0 0 1-2 2h-1a2 2 0 0 1-2-2v-3a2 2 0 0 1 2-2h3zM3 19a2 2 0 0 0 2 2h1a2 2 0 0 0 2-2v-3a2 2 0 0 0-2-2H3z"></path></svg>
+            </span>
             <span class="context-menu-text">Listen in Spotify</span>
         </button>
     </div>
@@ -254,15 +293,19 @@
         <div class="add-to-playlist-content">
             <div class="add-to-playlist-header">
                 <h3>Add to Playlist</h3>
-                <button class="popup-close" id="add-to-playlist-close">✕</button>
+                <button class="popup-close" id="add-to-playlist-close">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-x"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
             </div>
 <div class="playlist-selection-list" id="playlist-selection-list">
                 <!-- Playlists will be populated here -->
             </div>
-            <button class="create-new-playlist-btn" id="quick-create-playlist">
-                <span>➕</span>
-                <span>Create New Playlist</span>
-            </button>
+                <button class="create-new-playlist-btn" id="quick-create-playlist">
+                    <span>
+                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-plus"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+                    </span>
+                    <span>Create New Playlist</span>
+                </button>
         </div>
     </div>
 
@@ -271,7 +314,9 @@
         <div class="precision-popup-content">
             <div class="precision-popup-header">
                 <h3 id="playlist-form-title">Create Playlist</h3>
-                <button class="popup-close" id="playlist-form-close">✕</button>
+                <button class="popup-close" id="playlist-form-close">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-x"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </button>
             </div>
 
             <div class="create-playlist-form">
@@ -284,8 +329,14 @@
                     <textarea class="form-textarea" id="playlist-description-input" placeholder="Describe your playlist..."></textarea>
                 </div>
                 <div class="edit-actions">
-                    <button class="btn secondary" id="playlist-form-save">💾 Save</button>
-                    <button class="btn" id="playlist-form-cancel">❌ Cancel</button>
+                    <button class="btn secondary" id="playlist-form-save">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-save" style="margin-right: 4px; vertical-align: text-bottom;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
+                        Save
+                    </button>
+                    <button class="btn" id="playlist-form-cancel">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-x" style="margin-right: 4px; vertical-align: text-bottom;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                        Cancel
+                    </button>
                 </div>
             </div>
         </div>
@@ -294,25 +345,35 @@
     <div class="mobile-nav">
         <div class="nav-container">
             <button class="nav-btn" id="nav-search">
-                <div class="nav-icon">🔍</div>
+                <div class="nav-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-search"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+                </div>
                 <div class="nav-label">Search</div>
             </button>
             <button class="nav-btn" id="nav-player">
-                <div class="nav-icon">▶</div>
+                <div class="nav-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-play-circle"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
+                </div>
                 <div class="nav-label">Player</div>
             </button>
             <button class="nav-btn" id="nav-library">
-                <div class="nav-icon">📚</div>
+                <div class="nav-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-book-open"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
+                </div>
                 <div class="nav-label">Library</div>
                 <span class="loop-count-badge" id="loop-count-badge">0</span>
             </button>
             <button class="nav-btn" id="nav-playlists">
-                <div class="nav-icon">🎵</div>
+                <div class="nav-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-music"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+                </div>
                 <div class="nav-label">Playlists</div>
                 <span class="playlist-count-badge" id="playlist-count-badge">0</span>
             </button>
             <button class="nav-btn" id="nav-discovery">
-                <div class="nav-icon">💬</div>
+                <div class="nav-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-message-circle"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
+                </div>
                 <div class="nav-label">Discovery</div>
             </button>
         </div>
