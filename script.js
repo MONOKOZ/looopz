@@ -1996,41 +1996,68 @@ async function handleLoopEnd() {
   try {
       isLooping = true;
       loopCount++;
+      
+      console.log(`🔄 Loop end reached: count=${loopCount}/${loopTarget}, playlistMode=${isPlaylistMode}, samplesEnabled=${transitionSamples.enabled}`);
 
       if (loopCount >= loopTarget) {
+          console.log(`✅ Loop target reached (${loopCount}/${loopTarget}), determining next action...`);
+          
           // Check if we're in playlist mode
           if (isPlaylistMode && playlistEngine) {
-              // Notify playlist engine to move to next item
-              console.log('🎵 Playlist item complete, moving to next');
+              console.log('🎵 Playlist mode active, moving to next playlist item');
+              
               // This will now use sample-enabled transition when enabled
+              if (transitionSamples.enabled) {
+                  console.log('🎵 Using sample-enabled playlist transition');
+              } else {
+                  console.log('🎵 Using standard playlist transition (no samples)');
+              }
+              
               await playlistEngine.notifyItemComplete();
+              
           } else if (transitionSamples.enabled && currentTrack) {
               // Regular loop mode with transition sample
-              console.log('🎵 Playing transition sample at loop end');
-              // Play a transition sample as we finish the loop
+              console.log('🎵 Loop completed with transition sample');
+              
+              // Select the sample to play at loop end
               const sampleKey = 'short'; // Use short sample for loop end
-              await playTransitionSample(sampleKey, true, true);
+              console.log(`🔊 Selected "${sampleKey}" sample for loop end transition`);
+              
+              // Play a transition sample as we finish the loop
+              const sampleDuration = await playTransitionSample(sampleKey, true, true);
+              console.log(`🎵 Transition sample played (duration: ${sampleDuration}ms)`);
+              
               // Then pause
+              console.log('⏸️ Pausing playback after sample completion');
               await togglePlayPause();
               showStatus(`Loop completed with transition! Played ${loopTarget} time(s)`);
+              
           } else {
               // Regular loop mode without samples - just pause
+              console.log('⏸️ Loop completed, pausing playback (no samples)');
               await togglePlayPause();
               showStatus(`Loop completed! Played ${loopTarget} time(s)`);
           }
+          
+          // Reset loop count for next time
           loopCount = 0;
+          console.log('🔄 Loop count reset to 0');
+          
       } else {
-          showStatus(`Loop ${loopCount + 1}/${loopTarget}`);
+          // Still have loops to go
+          console.log(`🔄 Continuing loop: ${loopCount}/${loopTarget}, seeking to ${formatTime(loopStart)}`);
+          showStatus(`Loop ${loopCount}/${loopTarget}`);
           loopStartTime = Date.now();
 
           // Use debounced seek function
           await seekToPosition(loopStart * 1000);
       }
   } catch (error) {
-      console.error('🚨 Loop error:', error);
+      console.error('🚨 Loop end handling error:', error);
       showStatus(`Loop error: ${error.message}`);
   } finally {
       isLooping = false;
+      console.log('✅ Loop end handling complete');
   }
 }
 
