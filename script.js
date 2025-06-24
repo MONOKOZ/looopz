@@ -1123,12 +1123,43 @@ async function loadAudioBuffer(url) {
  * Both audio streams mix naturally in the browser
  */
 async function playTransitionSample(sampleKey = 'short', fadeOut = false, fadeIn = false) {
-    if (!transitionSamples.enabled || !transitionSamples.audioContext) return;
+    if (!transitionSamples.enabled) {
+        console.log('🔇 Transition samples disabled, skipping sample playback');
+        return 0;
+    }
+    
+    if (!transitionSamples.audioContext) {
+        console.warn('⚠️ Audio context not initialized, attempting to initialize now');
+        const initialized = await initializeTransitionSamples();
+        if (!initialized) {
+            console.error('❌ Failed to initialize audio context, cannot play sample');
+            return 0;
+        }
+    }
+    
+    // Resume suspended audio context if needed (browser autoplay policies)
+    if (transitionSamples.audioContext.state === 'suspended') {
+        console.log('🔄 Resuming suspended audio context');
+        try {
+            await transitionSamples.audioContext.resume();
+            console.log('✅ Audio context resumed successfully');
+        } catch (error) {
+            console.warn('⚠️ Could not resume audio context:', error.message);
+        }
+    }
     
     const buffer = transitionSamples.loadedBuffers.get(sampleKey);
     if (!buffer) {
-        console.warn(`Transition sample '${sampleKey}' not loaded`);
-        return;
+        console.warn(`⚠️ Transition sample '${sampleKey}' not loaded, available samples: ${Array.from(transitionSamples.loadedBuffers.keys()).join(', ')}`);
+        
+        // Try to fall back to any available sample
+        const availableSamples = Array.from(transitionSamples.loadedBuffers.keys());
+        if (availableSamples.length > 0) {
+            const fallbackKey = availableSamples[0];
+            console.log(`🔄 Falling back to available sample: ${fallbackKey}`);
+            return playTransitionSample(fallbackKey, fadeOut, fadeIn);
+        }
+        return 0;
     }
     
     try {
@@ -1147,11 +1178,13 @@ async function playTransitionSample(sampleKey = 'short', fadeOut = false, fadeIn
         
         // Apply fades if requested
         if (fadeIn) {
+            console.log(`🔊 Applying fade-in effect to sample ${sampleKey}`);
             gainNode.gain.setValueAtTime(0, now);
             gainNode.gain.linearRampToValueAtTime(transitionSamples.volume, now + 0.1);
         }
         
         if (fadeOut) {
+            console.log(`🔊 Applying fade-out effect to sample ${sampleKey}`);
             const fadeStart = now + buffer.duration - 0.1;
             gainNode.gain.setValueAtTime(transitionSamples.volume, fadeStart);
             gainNode.gain.linearRampToValueAtTime(0, fadeStart + 0.1);
@@ -1160,13 +1193,13 @@ async function playTransitionSample(sampleKey = 'short', fadeOut = false, fadeIn
         // Play the sample
         source.start(0);
         
-        console.log(`🎵 Playing transition sample: ${sampleKey}`);
+        console.log(`🔊 Playing transition sample: ${sampleKey} (duration: ${buffer.duration.toFixed(2)}s, volume: ${Math.round(transitionSamples.volume * 100)}%)`);
         
         // Return duration for timing purposes
         return buffer.duration * 1000; // Convert to milliseconds
         
     } catch (error) {
-        console.error('Error playing transition sample:', error);
+        console.error('❌ Error playing transition sample:', error);
         return 0;
     }
 }
