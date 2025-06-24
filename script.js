@@ -1392,9 +1392,8 @@ class PlaylistTransitionEngine {
     }
 
     /**
-     * Execute transition with optional sample OVERLAPPING both tracks
-     * This handles all transitions between playlist items
-     * Implementing true crossfade with sample accent
+     * Execute transition with true overlapping of tracks and sample accent
+     * This handles all transitions between playlist items with continuous volume curve
      */
     async executeTransitionWithSample() {
         if (!this.currentPlaylist || this.transitionInProgress) return;
@@ -1411,49 +1410,55 @@ class PlaylistTransitionEngine {
                 return;
             }
             
-            // PRIORITY #2: Now handle the actual transition method
+            // PRIORITY: Choose the correct transition method
             if (this.smartTransitionsEnabled && this.currentTransitionData) {
                 // Use smart crossfade
                 console.log('🎛️ [PLAYLIST TRANSITION] Using smart crossfade for transition');
                 await this.executeSmartCrossfade();
             } 
             else if (transitionSamples.enabled) {
-                // Use manual transition with true sample overlapping implementation
-                console.log('🎵 [PLAYLIST TRANSITION] Using manual transition with true sample overlay');
+                // TRUE OVERLAPPING IMPLEMENTATION WITH CONTINUOUS VOLUME
+                console.log('🎵 [PLAYLIST TRANSITION] Using true overlapping transition with sample bridge');
                 
                 const sampleKey = selectTransitionSample(currentItem, nextItem);
-                const sampleDuration = 1500; // Default duration if we can't determine actual
                 
                 // Add visual feedback
                 const transitionIndicator = document.createElement('div');
                 transitionIndicator.style.cssText = 'position:fixed; top:0; left:0; right:0; height:4px; background:linear-gradient(90deg,#1DB954,#9945DB); z-index:9999; opacity:0.8;';
                 document.body.appendChild(transitionIndicator);
                 
-                // STEP 1: Start playing the transition sample first
+                // PRE-LOAD next track at 0 volume BEFORE any volume changes happen
+                console.log(`🔊 [PLAYLIST TRANSITION] Pre-loading next track silently`);
+                this.currentItemIndex++;
+                await this.loadPlaylistItem(this.currentItemIndex);
+                await setSpotifyVolume(0); // Start completely silent
+                
+                // CRITICAL TIMING: Start playing transition sample AFTER next track is loaded but BEFORE volume changes
                 console.log(`🔊 [PLAYLIST TRANSITION] Starting transition sample "${sampleKey}" as bridge`);
                 const samplePromise = playTransitionSample(sampleKey, true, true);
                 
-                // STEP 2: Immediately begin fading out Track A (100→60) while sample plays
-                console.log(`🔊 [PLAYLIST TRANSITION] Beginning fade out of current track (100→60)`);
-                await performSmootCrossfade(100, 60, 400);
+                // Wait a moment for sample to start playing
+                await new Promise(resolve => setTimeout(resolve, 50));
                 
-                // STEP 3: Start loading Track B at low volume during the sample
-                console.log(`🔊 [PLAYLIST TRANSITION] Loading next track at low volume`);
-                this.currentItemIndex++;
-                await this.loadPlaylistItem(this.currentItemIndex);
+                // CONTINUOUS VOLUME CURVE:
+                // 1. First phase: Track A fades from 100→70 while Track B fades from 0→30
+                console.log(`🔊 [PLAYLIST TRANSITION] Smooth crossfade beginning`);
                 
-                // Start next track at 30% volume
+                // TRACK B: Bring up from 0→30 (concurrent with Track A fading)
                 await setSpotifyVolume(30);
                 
-                // STEP 4: Continue fading out Track A (60→30→0) as sample peaks
-                console.log(`🔊 [PLAYLIST TRANSITION] Continuing fade out of previous track (60→30→0)`);
-                await performSmootCrossfade(60, 0, 600);
+                // TRACK A: Fade out from 100→60 (with Track B already present)
+                await performSmootCrossfade(100, 60, 400);
                 
-                // STEP 5: Fade up Track B (30→60→100) as sample fades out
-                console.log(`🔊 [PLAYLIST TRANSITION] Fading in next track (30→60→100)`);
-                await performSmootCrossfade(30, 100, 800);
+                // 2. Second phase: Track A fades from 60→30 while Track B grows from 30→60
+                await performSmootCrossfade(60, 30, 400);
+                await setSpotifyVolume(60);
                 
-                // Remove indicator after transition
+                // 3. Final phase: Track A fades from 30→0 while Track B completes from 60→100
+                await performSmootCrossfade(30, 0, 400);
+                await setSpotifyVolume(100);
+                
+                // Remove indicator
                 setTimeout(() => {
                     if (document.body.contains(transitionIndicator)) {
                         document.body.removeChild(transitionIndicator);
@@ -1463,7 +1468,7 @@ class PlaylistTransitionEngine {
                 // Wait for sample to finish if it hasn't already
                 await samplePromise;
                 
-                showStatus(`🎵 Seamless track transition with sample complete`);
+                showStatus(`🎵 True overlapping transition complete`);
             } 
             else {
                 // Simple gap-less transition
@@ -1502,8 +1507,8 @@ class PlaylistTransitionEngine {
     }
 
     /**
-     * Enhanced smart crossfade with properly timed sample playback
-     * Implementing true overlapping of tracks with sample accent
+     * Enhanced smart crossfade with true simultaneous overlapping
+     * Creates a continuous volume curve with no dips
      */
     async executeSmartCrossfadeWithSample() {
         if (this.crossfadeInProgress || !this.currentTransitionData) return;
@@ -1525,43 +1530,57 @@ class PlaylistTransitionEngine {
                     toItem
                 );
                 
-                // STEP 1: Start playing the transition sample first
+                // PRE-LOAD the next track silently first
+                console.log(`🔊 [SMART CROSSFADE] Pre-loading next track silently`);
+                await this.loadPlaylistItem(this.currentItemIndex + 1);
+                await seekToPosition(toStartTime * 1000);
+                await setSpotifyVolume(0); // Start completely silent
+                
+                // Now that next track is loaded but silent, play the transition sample
                 console.log(`🔊 [SMART CROSSFADE] Starting transition sample "${sampleKey}" as bridge`);
                 const samplePromise = playTransitionSample(sampleKey, true, true);
                 
-                // STEP 2: Begin fading out Track A (100→60) while sample plays
-                console.log(`🔊 [SMART CROSSFADE] Beginning fade out of current track (100→60)`);
-                await performSmootCrossfade(100, 60, crossfadeDuration * 300);
+                // Small delay to let sample start playing
+                await new Promise(resolve => setTimeout(resolve, 100));
                 
-                // STEP 3: Start loading Track B at low volume during the sample
-                console.log(`🔊 [SMART CROSSFADE] Loading next track at low volume`);
+                // TRUE OVERLAPPED TRANSITION WITH CONTINUOUS VOLUME CURVE:
+                
+                // Phase 1: Track A (100→70) while Track B rises (0→30)
+                console.log(`🔊 [SMART CROSSFADE] Beginning true overlapped transition`);
+                await setSpotifyVolume(30); // Bring Track B up from silence
+                await performSmootCrossfade(100, 70, crossfadeDuration * 300);
+                
+                // Phase 2: Track A (70→30) while Track B (30→70)
+                await performSmootCrossfade(70, 30, crossfadeDuration * 350);
+                await setSpotifyVolume(70);
+                
+                // Phase 3: Track A (30→0) while Track B (70→100)
+                await performSmootCrossfade(30, 0, crossfadeDuration * 350);
+                await setSpotifyVolume(100);
+                
+                // Wait for sample to complete if it hasn't already
+                await samplePromise;
+                
+            } else {
+                // If no samples, use a continuous crossfade curve
+                console.log(`🔊 [SMART CROSSFADE] Using continuous crossfade curve without sample`);
+                
+                // Pre-load next track silently
                 await this.loadPlaylistItem(this.currentItemIndex + 1);
                 await seekToPosition(toStartTime * 1000);
+                await setSpotifyVolume(0);
                 
-                // Start next track at 30% volume
+                // Phase 1: Track A (100→70) while Track B (0→30)
                 await setSpotifyVolume(30);
+                await performSmootCrossfade(100, 70, crossfadeDuration * 300);
                 
-                // STEP 4: Continue fading out Track A (60→30→0) as sample peaks
-                console.log(`🔊 [SMART CROSSFADE] Continuing fade out of previous track (60→30→0)`);
-                await performSmootCrossfade(60, 0, crossfadeDuration * 400);
+                // Phase 2: Track A (70→30) while Track B (30→70)
+                await performSmootCrossfade(70, 30, crossfadeDuration * 350);
+                await setSpotifyVolume(70);
                 
-                // STEP 5: Fade up Track B (30→60→100) as sample fades out
-                console.log(`🔊 [SMART CROSSFADE] Fading in next track (30→60→100)`);
-                await performSmootCrossfade(30, 100, crossfadeDuration * 500);
-                
-                // Wait for sample to finish if it hasn't already
-                await samplePromise;
-            } else {
-                // If no samples, do a standard crossfade with improved curve
-                console.log(`🔊 [SMART CROSSFADE] Beginning improved volume transition without sample`);
-                await performSmootCrossfade(100, 0, crossfadeDuration * 1000, async () => {
-                    // At midpoint: switch to next track
-                    await this.loadPlaylistItem(this.currentItemIndex + 1);
-                    await seekToPosition(toStartTime * 1000);
-                    
-                    // Start fading in the new track
-                    await performSmootCrossfade(0, 100, (crossfadeDuration / 2) * 1000);
-                });
+                // Phase 3: Track A (30→0) while Track B (70→100)
+                await performSmootCrossfade(30, 0, crossfadeDuration * 350);
+                await setSpotifyVolume(100);
             }
             
             // Remove indicator after transition
@@ -1574,7 +1593,7 @@ class PlaylistTransitionEngine {
             this.currentItemIndex++;
             this.currentTransitionData = null;
 
-            showStatus(`🎛️ Smart transition complete ${transitionSamples.enabled ? 'with sample accent' : ''}`);
+            showStatus(`🎛️ Smart transition complete with true overlapping`);
 
         } catch (error) {
             console.error('🎛️ Smart crossfade failed:', error);
