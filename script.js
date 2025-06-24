@@ -1451,9 +1451,11 @@ class PlaylistTransitionEngine {
     }
 
     /**
-     * Execute transition using the improved gap-masking approach
-     * Instead of complex volume automation, we use transition samples to mask the gap
-     * with improved timing and sample completion guarantees
+     * Execute transition with volume fading and underlying sample at full volume
+     * This combines the best of both approaches:
+     * 1. Volume fading between tracks for smooth transitions
+     * 2. Full volume sample playing underneath to add character
+     * 3. Sample completion guarantee for professional quality
      */
     async executeTransitionWithSample() {
         if (!this.currentPlaylist || this.transitionInProgress) return;
@@ -1476,38 +1478,41 @@ class PlaylistTransitionEngine {
             document.body.appendChild(transitionIndicator);
             
             if (transitionSamples.enabled) {
-                // SIMPLIFIED TRANSITION IMPLEMENTATION
-                console.log('🎵 [PLAYLIST TRANSITION] Using simplified gap-masking transition');
+                console.log('🎵 [PLAYLIST TRANSITION] Using volume fading with underlying sample');
                 
                 const sampleKey = selectTransitionSample(currentItem, nextItem);
                 
-                // IMPROVED: First pause to create a small gap before sample starts
-                // This creates a more natural transition feeling where the sample feels
-                // like a deliberate accent rather than blending with Track A's end
-                await new Promise(resolve => setTimeout(resolve, 300));
+                // First reduce volume of current track to 70%
+                console.log(`🔊 [PLAYLIST TRANSITION] Reducing volume of track A to 70%`);
+                await setSpotifyVolume(70);
                 
-                // STEP 1: Start playing the transition sample
-                console.log(`🔊 [PLAYLIST TRANSITION] Starting transition sample to mask the gap`);
+                // Brief pause to create separation
+                await new Promise(resolve => setTimeout(resolve, 200));
                 
-                // Play the sample with fade-in and fade-out
+                // STEP 1: Start playing the transition sample at full volume
+                console.log(`🔊 [PLAYLIST TRANSITION] Starting transition sample at full volume`);
                 const samplePromise = playTransitionSample(sampleKey, true, true);
                 
                 // Get sample buffer to calculate timing
                 const buffer = transitionSamples.loadedBuffers.get(sampleKey);
                 const sampleDuration = buffer ? buffer.duration * 1000 : 1000; // Default to 1s if unknown
                 
-                // STEP 2: Load the next track during the sample playback
-                // But wait a bit longer to let the sample establish itself first
+                // Continue reducing volume of current track to 30%
+                console.log(`🔊 [PLAYLIST TRANSITION] Further reducing volume of track A to 30%`);
+                await setSpotifyVolume(30);
+                
+                // STEP 2: Load the next track while sample is playing
                 console.log(`🔊 [PLAYLIST TRANSITION] Loading next track while sample plays`);
-                
-                // IMPROVED: Longer delay to ensure sample is clearly heard
-                // This ensures the scratch sample has time to make its presence felt
-                // before the next track begins loading
-                await new Promise(resolve => setTimeout(resolve, 500));
-                
-                // Increment to next track and load it
                 this.currentItemIndex++;
                 await this.loadPlaylistItem(this.currentItemIndex);
+                
+                // Start next track at 30% volume
+                console.log(`🔊 [PLAYLIST TRANSITION] Starting track B at 30% volume`);
+                await setSpotifyVolume(30);
+                
+                // Increase volume of next track to 70%
+                console.log(`🔊 [PLAYLIST TRANSITION] Increasing volume of track B to 70%`);
+                await setSpotifyVolume(70);
                 
                 // Remove indicator after transition
                 setTimeout(() => {
@@ -1516,20 +1521,31 @@ class PlaylistTransitionEngine {
                     }
                 }, 800);
                 
-                // IMPROVED: Wait for sample to finish completely
-                // This ensures the sample isn't cut off by the transition
+                // Wait for sample to finish completely
                 await samplePromise;
                 
                 // Make absolutely sure all samples are done
                 await waitForActiveSamples();
                 
-                showStatus(`🎵 Clean transition complete`);
+                // Restore full volume for next track
+                console.log(`🔊 [PLAYLIST TRANSITION] Restoring full volume for track B`);
+                await setSpotifyVolume(100);
+                
+                showStatus(`🎵 Smooth transition with sample complete`);
             } 
             else {
-                // Simple gap-less transition
-                console.log('🎵 [PLAYLIST TRANSITION] Using simple gapless transition (no sample)');
+                // Simple crossfade without sample
+                console.log('🎵 [PLAYLIST TRANSITION] Using simple crossfade (no sample)');
+                
+                // Reduce volume of current track
+                await setSpotifyVolume(50);
+                
+                // Load next track
                 this.currentItemIndex++;
                 await this.loadPlaylistItem(this.currentItemIndex);
+                
+                // Restore full volume
+                await setSpotifyVolume(100);
                 
                 // Remove indicator after transition
                 setTimeout(() => {
@@ -1544,6 +1560,7 @@ class PlaylistTransitionEngine {
             // Fallback: just skip to next
             this.currentItemIndex++;
             await this.loadPlaylistItem(this.currentItemIndex);
+            await setSpotifyVolume(100); // Ensure volume is restored
         } finally {
             this.transitionInProgress = false;
         }
@@ -1569,18 +1586,17 @@ class PlaylistTransitionEngine {
     }
 
     /**
-     * Improved smart transition with sample for masking the gap
-     * Avoids complex volume crossfading that conflicts with Spotify's architecture
-     * Uses better timing to ensure sample is clearly heard
+     * Enhanced smart transition with volume fading and underlying sample at full volume
+     * This creates a DJ-quality transition with proper crossfading and sample accents
      */
     async executeSmartCrossfadeWithSample() {
         if (this.crossfadeInProgress || !this.currentTransitionData) return;
 
         try {
             this.crossfadeInProgress = true;
-            const { toItem, toStartTime, transitionQuality } = this.currentTransitionData;
-
-            console.log(`🎛️ [SMART TRANSITION] Starting simplified transition (${transitionQuality.quality} quality)`);
+            const { toItem, toStartTime, transitionQuality, crossfadeDuration } = this.currentTransitionData;
+            
+            console.log(`🎛️ [SMART TRANSITION] Starting enhanced transition (${transitionQuality.quality} quality)`);
 
             // Add visual feedback for transition
             const transitionIndicator = document.createElement('div');
@@ -1593,15 +1609,20 @@ class PlaylistTransitionEngine {
                     toItem
                 );
                 
-                // IMPROVED: Create a brief pause before the sample
-                await new Promise(resolve => setTimeout(resolve, 300));
+                // First reduce volume of current track to prepare for crossfade
+                console.log(`🔊 [SMART TRANSITION] Starting volume fade for track A (${transitionQuality.quality} quality)`);
+                await setSpotifyVolume(70);
                 
-                // Play the transition sample to mask the gap
-                console.log(`🔊 [SMART TRANSITION] Playing transition sample to mask the gap`);
+                // Brief pause for separation
+                await new Promise(resolve => setTimeout(resolve, 200));
+                
+                // Play the transition sample at full volume underneath both tracks
+                console.log(`🔊 [SMART TRANSITION] Playing transition sample at full volume`);
                 const samplePromise = playTransitionSample(sampleKey, true, true);
                 
-                // IMPROVED: Longer delay to allow sample to establish
-                await new Promise(resolve => setTimeout(resolve, 500));
+                // Continue reducing volume
+                console.log(`🔊 [SMART TRANSITION] Continuing volume fade for track A`);
+                await setSpotifyVolume(40);
                 
                 // Load the next track while the sample is playing
                 console.log(`🔊 [SMART TRANSITION] Loading next track at position ${formatTime(toStartTime)}`);
@@ -1612,14 +1633,28 @@ class PlaylistTransitionEngine {
                     await seekToPosition(toStartTime * 1000);
                 }
                 
-                // IMPROVED: Ensure sample completes before finalizing transition
+                // Start next track at lower volume
+                console.log(`🔊 [SMART TRANSITION] Starting volume fade for track B`);
+                await setSpotifyVolume(40);
+                
+                // Wait for sample to finish playing
                 await samplePromise;
                 
                 // Make absolutely sure all samples are done
                 await waitForActiveSamples();
+                
+                // Increase volume of next track
+                console.log(`🔊 [SMART TRANSITION] Completing volume fade for track B`);
+                await setSpotifyVolume(70);
+                await new Promise(resolve => setTimeout(resolve, 300));
+                await setSpotifyVolume(100);
+                
             } else {
-                // Simple transition without sample
-                console.log(`🔊 [SMART TRANSITION] Using simple transition without sample`);
+                // Simple crossfade without sample
+                console.log(`🔊 [SMART TRANSITION] Using simple crossfade (no sample)`);
+                
+                // Reduce volume of current track
+                await setSpotifyVolume(50);
                 
                 // Load next track directly
                 await this.loadPlaylistItem(this.currentItemIndex + 1);
@@ -1628,6 +1663,9 @@ class PlaylistTransitionEngine {
                 if (toStartTime > 0) {
                     await seekToPosition(toStartTime * 1000);
                 }
+                
+                // Restore volume
+                await setSpotifyVolume(100);
             }
             
             // Remove indicator after transition
@@ -1645,6 +1683,7 @@ class PlaylistTransitionEngine {
         } catch (error) {
             console.error('🎛️ Smart transition failed:', error);
             await this.skipToNext();
+            await setSpotifyVolume(100); // Ensure volume is restored
         } finally {
             this.crossfadeInProgress = false;
         }
@@ -2083,7 +2122,7 @@ async function checkLoopEnd() {
   }
 }
 
-// Improved loop end handling with guaranteed sample completion
+// Enhanced loop end handling with volume fading and guaranteed sample completion
 async function handleLoopEnd() {
   try {
       isLooping = true;
@@ -2110,15 +2149,19 @@ async function handleLoopEnd() {
                   }
               }, 1000);
               
-              // This will use the improved approach
+              // This will use the volume fading approach with underlying sample
               await playlistEngine.notifyItemComplete();
               
           } else if (transitionSamples.enabled && currentTrack) {
-              // Regular loop mode with transition sample
-              console.log('🎵 [TRACK END TRANSITION] Loop completed with transition sample');
+              // Regular loop mode with transition sample and volume fading
+              console.log('🎵 [TRACK END TRANSITION] Loop completed with transition sample and volume fade');
               
-              // IMPROVED: Brief pause before playing the sample
-              await new Promise(resolve => setTimeout(resolve, 300));
+              // Reduce volume to prepare for transition
+              console.log('🔊 [TRACK END TRANSITION] Reducing volume for transition');
+              await setSpotifyVolume(70);
+              
+              // Brief pause before playing the sample
+              await new Promise(resolve => setTimeout(resolve, 200));
               
               // Select the sample to play at loop end
               const sampleKey = 'short'; // Use short sample for loop end
@@ -2139,11 +2182,20 @@ async function handleLoopEnd() {
               transitionIndicator.style.cssText = 'position:fixed; top:0; left:0; right:0; height:4px; background:linear-gradient(90deg,#1DB954,#9945DB); z-index:9999; opacity:0.8;';
               document.body.appendChild(transitionIndicator);
               
-              // Play a transition sample as we finish the loop
-              const sampleDuration = await playTransitionSample(sampleKey, true, true);
+              // Continue reducing volume while sample plays
+              await setSpotifyVolume(40);
+              
+              // Play a transition sample at full volume as we finish the loop
+              const samplePromise = playTransitionSample(sampleKey, true, true);
+              
+              // Fade out further while sample is playing
+              await setSpotifyVolume(20);
+              
+              // Wait for sample to complete fully
+              const sampleDuration = await samplePromise;
               console.log(`🎵 [TRACK END TRANSITION] Sample played (duration: ${sampleDuration}ms)`);
               
-              // IMPROVED: Ensure sample completes fully
+              // Make absolutely sure all samples are done
               await waitForActiveSamples();
               
               // Remove indicator after transition completes
@@ -2153,16 +2205,33 @@ async function handleLoopEnd() {
                   }
               }, 800);
               
-              // Then pause
-              console.log('⏸️ [TRACK END TRANSITION] Pausing playback after sample completion');
+              // Complete fade out and pause
+              console.log('⏸️ [TRACK END TRANSITION] Completing fade out and pausing');
+              await setSpotifyVolume(0);
               await togglePlayPause();
-              showStatus(`Loop completed with transition! Played ${loopTarget} time(s)`);
+              
+              // Restore volume for next playback
+              await setSpotifyVolume(100);
+              
+              showStatus(`Loop completed with smooth transition! Played ${loopTarget} time(s)`);
               
           } else {
-              // Regular loop mode without samples - just pause
-              console.log('⏸️ [TRACK END TRANSITION] Loop completed, pausing playback (no samples)');
+              // Regular loop mode without samples - just fade out and pause
+              console.log('⏸️ [TRACK END TRANSITION] Loop completed, fading out and pausing');
+              
+              // Simple fade out
+              await setSpotifyVolume(70);
+              await new Promise(resolve => setTimeout(resolve, 300));
+              await setSpotifyVolume(40);
+              await new Promise(resolve => setTimeout(resolve, 300));
+              await setSpotifyVolume(10);
+              await new Promise(resolve => setTimeout(resolve, 300));
+              
+              // Pause and restore volume
               await togglePlayPause();
-              showStatus(`Loop completed! Played ${loopTarget} time(s)`);
+              await setSpotifyVolume(100);
+              
+              showStatus(`Loop completed with fade out! Played ${loopTarget} time(s)`);
           }
           
           // Reset loop count for next time
@@ -2185,6 +2254,13 @@ async function handleLoopEnd() {
   } catch (error) {
       console.error('🚨 Loop end handling error:', error);
       showStatus(`Loop error: ${error.message}`);
+      
+      // Restore volume in case of error
+      try {
+          await setSpotifyVolume(100);
+      } catch (e) {
+          console.warn('Failed to restore volume after error:', e);
+      }
   } finally {
       isLooping = false;
       console.log('✅ Loop end handling complete');
