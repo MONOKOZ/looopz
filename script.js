@@ -14,9 +14,9 @@ const transitionSamples = {
     enabled: false,
     volume: 0.7, // 0-1 range
     samples: {
-        short: 'assets/sounds/scratch_short.MP3', // 0.5s for short loops
-        medium: 'assets/sounds/scratch_med.MP3', // 1s for medium
-        long: 'assets/sounds/scratch_long.MP3', // 2s for long tracks
+        short: '/assets/sounds/scratch_short.MP3', // 0.5s for short loops
+        medium: '/assets/sounds/scratch_med.MP3', // 1s for medium
+        long: '/assets/sounds/scratch_long.MP3', // 2s for long tracks
         // Add more as needed
     },
     audioContext: null,
@@ -1004,22 +1004,89 @@ const DJFunctions = {
  */
 async function initializeTransitionSamples() {
     try {
+        console.log('🎵 Initializing transition samples system...');
+        
         // Create audio context
         transitionSamples.audioContext = new (window.AudioContext || window.webkitAudioContext)();
+        console.log('✅ Created audio context');
         
         // Load all transition samples
+        let loadedCount = 0;
+        const totalSamples = Object.keys(transitionSamples.samples).length;
+        
         for (const [key, url] of Object.entries(transitionSamples.samples)) {
             try {
+                console.log(`🔄 Attempting to load sample: ${key} from ${url}`);
                 const buffer = await loadAudioBuffer(url);
                 transitionSamples.loadedBuffers.set(key, buffer);
-                console.log(`✅ Loaded transition sample: ${key}`);
+                loadedCount++;
+                console.log(`✅ Loaded transition sample (${loadedCount}/${totalSamples}): ${key} from ${url}`);
             } catch (error) {
-                console.warn(`⚠️ Failed to load transition sample ${key}:`, error);
+                console.warn(`⚠️ Failed to load transition sample ${key} from ${url}:`, error);
+                
+                // Try multiple path variations for maximum compatibility
+                const altPaths = [
+                    // Case sensitivity variations
+                    url.replace('.MP3', '.mp3'),
+                    url.replace('.mp3', '.MP3'),
+                    // Path format variations
+                    url.startsWith('/') ? url.substring(1) : `/${url}`,
+                    // Different directory structure variations
+                    url.includes('/sounds/') ? url : url.replace('assets/', 'assets/sounds/'),
+                    `assets/sounds/${key}.MP3`,
+                    `assets/sounds/${key}.mp3`,
+                    `/assets/sounds/${key}.MP3`,
+                    `/assets/sounds/${key}.mp3`
+                ];
+                
+                let loaded = false;
+                for (const altPath of altPaths) {
+                    if (altPath === url) continue;
+                    
+                    try {
+                        console.log(`🔄 Trying alternate path: ${altPath}`);
+                        const buffer = await loadAudioBuffer(altPath);
+                        transitionSamples.loadedBuffers.set(key, buffer);
+                        loadedCount++;
+                        console.log(`✅ Loaded transition sample with alternate path: ${key} from ${altPath}`);
+                        loaded = true;
+                        
+                        // Update the original path to the working one for future references
+                        transitionSamples.samples[key] = altPath;
+                        break;
+                    } catch (altError) {
+                        console.warn(`⚠️ Alternate path ${altPath} also failed`);
+                    }
+                }
+                
+                if (!loaded) {
+                    console.error(`❌ All paths failed for sample: ${key}`);
+                }
             }
         }
         
-        console.log('🎵 Transition samples initialized');
-        return true;
+        if (loadedCount === 0) {
+            console.error('❌ Failed to load ANY transition samples');
+            return false;
+        }
+        
+        // Display loaded samples for diagnostic purposes
+        console.log(`🎵 Transition samples initialized (${loadedCount}/${totalSamples} samples loaded)`);
+        console.log('📊 Loaded samples:', 
+          Array.from(transitionSamples.loadedBuffers.keys())
+            .map(key => `${key}: ${transitionSamples.samples[key]}`).join(', '));
+            
+        // Test play a sample to verify audio system works
+        if (transitionSamples.loadedBuffers.has('short')) {
+            console.log('🔈 Testing sample playback...');
+            setTimeout(() => {
+                playTransitionSample('short', true, true)
+                    .then(duration => console.log(`✅ Test sample played (${duration}ms)`))
+                    .catch(err => console.error('❌ Test sample failed:', err));
+            }, 1000);
+        }
+        
+        return loadedCount > 0;
     } catch (error) {
         console.error('🚨 Failed to initialize transition samples:', error);
         return false;
@@ -1030,10 +1097,24 @@ async function initializeTransitionSamples() {
  * Load an audio file into a buffer
  */
 async function loadAudioBuffer(url) {
-    const response = await fetch(url);
-    const arrayBuffer = await response.arrayBuffer();
-    const audioBuffer = await transitionSamples.audioContext.decodeAudioData(arrayBuffer);
-    return audioBuffer;
+    console.log(`🔄 Loading audio buffer from: ${url}`);
+    try {
+        // Handle both absolute and relative URLs
+        const fullUrl = url.startsWith('http') ? url : new URL(url, window.location.href).href;
+        console.log(`🔄 Full URL: ${fullUrl}`);
+        
+        const response = await fetch(fullUrl);
+        if (!response.ok) {
+            throw new Error(`Failed to fetch audio file: ${response.status} ${response.statusText}`);
+        }
+        const arrayBuffer = await response.arrayBuffer();
+        const audioBuffer = await transitionSamples.audioContext.decodeAudioData(arrayBuffer);
+        console.log(`✅ Successfully loaded and decoded audio from: ${url}`);
+        return audioBuffer;
+    } catch (error) {
+        console.error(`❌ Error loading audio buffer from ${url}:`, error);
+        throw error;
+    }
 }
 
 /**
@@ -1714,8 +1795,17 @@ function initializeSpotifyPlayer() {
           playlistEngine = new PlaylistTransitionEngine(spotifyPlayer, spotifyAccessToken, spotifyDeviceId);
           setupPlaylistEngineCallbacks();
 
-          // Initialize transition samples if you want them ready
-          initializeTransitionSamples();
+          // Initialize transition samples
+          console.log('🎵 Starting transition samples initialization...');
+          initializeTransitionSamples().then(success => {
+            if (success) {
+              console.log('✅ Transition samples system ready');
+              // Enable transition samples by default
+              toggleTransitionSamples(true);
+            } else {
+              console.error('❌ Failed to initialize transition samples system');
+            }
+          });
 
           setTimeout(() => {
               console.log('🔗 Checking for shared loops after connection...');
