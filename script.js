@@ -14,9 +14,9 @@ const transitionSamples = {
     enabled: false,
     volume: 0.7, // 0-1 range
     samples: {
-        short: 'assets/sounds/scratch_short.MP3', // 0.5s for short loops
-        medium: 'assets/sounds/scratch_med.MP3', // 1s for medium
-        long: 'assets/sounds/scratch_long.MP3', // 2s for long tracks
+        short: '/assets/sounds/scratch_short.MP3', // 0.5s for short loops
+        medium: '/assets/sounds/scratch_med.MP3', // 1s for medium
+        long: '/assets/sounds/scratch_long.MP3', // 2s for long tracks
         // Add more as needed
     },
     audioContext: null,
@@ -1727,7 +1727,14 @@ class PlaylistTransitionEngine {
      */
     async notifyItemComplete() {
         console.log('📢 Main player notified item complete');
-        await this.skipToNext();
+        
+        // Use sample-enabled transition if samples are enabled
+        if (transitionSamples.enabled) {
+            console.log('🎵 Using sample-enabled transition');
+            await this.executeTransitionWithSample();
+        } else {
+            await this.skipToNext();
+        }
     }
 
     /**
@@ -1951,7 +1958,7 @@ async function checkLoopEnd() {
   }
 }
 
-// FIX 5: Unified loop end handling with debouncing
+// FIX 5: Unified loop end handling with debouncing and sample support
 async function handleLoopEnd() {
   try {
       isLooping = true;
@@ -1962,9 +1969,19 @@ async function handleLoopEnd() {
           if (isPlaylistMode && playlistEngine) {
               // Notify playlist engine to move to next item
               console.log('🎵 Playlist item complete, moving to next');
+              // This will now use sample-enabled transition when enabled
               await playlistEngine.notifyItemComplete();
+          } else if (transitionSamples.enabled && currentTrack) {
+              // Regular loop mode with transition sample
+              console.log('🎵 Playing transition sample at loop end');
+              // Play a transition sample as we finish the loop
+              const sampleKey = 'short'; // Use short sample for loop end
+              await playTransitionSample(sampleKey, true, true);
+              // Then pause
+              await togglePlayPause();
+              showStatus(`Loop completed with transition! Played ${loopTarget} time(s)`);
           } else {
-              // Regular loop mode - just pause
+              // Regular loop mode without samples - just pause
               await togglePlayPause();
               showStatus(`Loop completed! Played ${loopTarget} time(s)`);
           }
