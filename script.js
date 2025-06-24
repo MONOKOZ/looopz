@@ -1991,100 +1991,50 @@ async function checkLoopEnd() {
   }
 }
 
-// FIX 5: Enhanced loop end handling with detailed transition sample tracking
+// FIX 5: Unified loop end handling with debouncing and sample support
 async function handleLoopEnd() {
   try {
       isLooping = true;
       loopCount++;
       
-      // Detailed initial logging with transition context
-      console.log(`🔄 Loop end reached: count=${loopCount}/${loopTarget}, playlistMode=${isPlaylistMode}, samplesEnabled=${transitionSamples.enabled}, audioContext=${transitionSamples.audioContext?.state || 'not initialized'}`);
-      
-      // Log audio context state and sample availability
-      if (transitionSamples.enabled) {
-          console.log(`🎵 Transition system state: audioContext=${transitionSamples.audioContext?.state || 'null'}, volume=${transitionSamples.volume}, buffersLoaded=${Array.from(transitionSamples.loadedBuffers.keys()).join(',') || 'none'}`);
-      }
+      console.log(`🔄 Loop end reached: count=${loopCount}/${loopTarget}, playlistMode=${isPlaylistMode}, samplesEnabled=${transitionSamples.enabled}`);
 
       if (loopCount >= loopTarget) {
           console.log(`✅ Loop target reached (${loopCount}/${loopTarget}), determining next action...`);
           
-          // Visual feedback for transition
-          const transitionIndicator = document.createElement('div');
-          transitionIndicator.style.cssText = 'position:fixed; top:0; left:0; right:0; height:3px; background:linear-gradient(90deg,#1DB954,#9945DB); z-index:9999; opacity:0.8;';
-          document.body.appendChild(transitionIndicator);
-          setTimeout(() => document.body.removeChild(transitionIndicator), 1000);
-          
           // Check if we're in playlist mode
           if (isPlaylistMode && playlistEngine) {
-              console.log('🎵 [PLAYLIST TRANSITION] Moving to next playlist item');
+              console.log('🎵 Playlist mode active, moving to next playlist item');
               
               // This will now use sample-enabled transition when enabled
               if (transitionSamples.enabled) {
-                  console.log('🎵 [PLAYLIST TRANSITION] Using sample-enabled playlist transition');
-                  
-                  // Ensure audio context is resumed before playlist transition
-                  if (transitionSamples.audioContext?.state === 'suspended') {
-                      console.log('⚠️ [PLAYLIST TRANSITION] Resuming suspended audio context before playlist transition');
-                      try {
-                          await transitionSamples.audioContext.resume();
-                          console.log('✅ [PLAYLIST TRANSITION] Successfully resumed audio context');
-                      } catch (err) {
-                          console.warn('⚠️ [PLAYLIST TRANSITION] Failed to resume audio context:', err.message);
-                      }
-                  }
+                  console.log('🎵 Using sample-enabled playlist transition');
               } else {
-                  console.log('🎵 [PLAYLIST TRANSITION] Using standard playlist transition (no samples)');
+                  console.log('🎵 Using standard playlist transition (no samples)');
               }
               
               await playlistEngine.notifyItemComplete();
               
           } else if (transitionSamples.enabled && currentTrack) {
               // Regular loop mode with transition sample
-              console.log('🎵 [TRACK END TRANSITION] Loop completed with transition sample');
+              console.log('🎵 Loop completed with transition sample');
               
               // Select the sample to play at loop end
               const sampleKey = 'short'; // Use short sample for loop end
-              console.log(`🔊 [TRACK END TRANSITION] Selected "${sampleKey}" sample for loop end transition`);
+              console.log(`🔊 Selected "${sampleKey}" sample for loop end transition`);
               
-              // Check audio context state before playing
-              if (transitionSamples.audioContext?.state === 'suspended') {
-                  console.log('⚠️ [TRACK END TRANSITION] Resuming suspended audio context before playing sample');
-                  try {
-                      await transitionSamples.audioContext.resume();
-                      console.log('✅ [TRACK END TRANSITION] Successfully resumed audio context');
-                  } catch (err) {
-                      console.warn('⚠️ [TRACK END TRANSITION] Failed to resume audio context:', err.message);
-                  }
-              }
-              
-              // Verify sample exists
-              if (!transitionSamples.loadedBuffers.has(sampleKey)) {
-                  console.warn(`⚠️ [TRACK END TRANSITION] Sample "${sampleKey}" not found in loaded buffers. Available samples: ${Array.from(transitionSamples.loadedBuffers.keys()).join(', ') || 'none'}`);
-              }
-              
-              // Play a transition sample as we finish the loop - capture return value
-              console.log(`🎵 [TRACK END TRANSITION] Playing "${sampleKey}" transition sample at volume ${transitionSamples.volume}...`);
+              // Play a transition sample as we finish the loop
               const sampleDuration = await playTransitionSample(sampleKey, true, true);
-              
-              // Verify sample played successfully
-              if (sampleDuration > 0) {
-                  console.log(`✅ [TRACK END TRANSITION] Transition sample played successfully (duration: ${sampleDuration}ms)`);
-              } else {
-                  console.warn('⚠️ [TRACK END TRANSITION] Transition sample may not have played (duration = 0)');
-              }
+              console.log(`🎵 Transition sample played (duration: ${sampleDuration}ms)`);
               
               // Then pause
-              console.log('⏸️ [TRACK END TRANSITION] Pausing playback after sample completion');
+              console.log('⏸️ Pausing playback after sample completion');
               await togglePlayPause();
               showStatus(`Loop completed with transition! Played ${loopTarget} time(s)`);
               
-          } else if (!transitionSamples.enabled && currentTrack) {
-              // Regular loop mode without samples - just pause
-              console.log('⏸️ [TRACK END] Loop completed, pausing playback (transition samples disabled)');
-              await togglePlayPause();
-              showStatus(`Loop completed! Played ${loopTarget} time(s)`);
           } else {
-              console.log('⚠️ [TRACK END] Loop completed but no transition played (no current track or samples disabled)');
+              // Regular loop mode without samples - just pause
+              console.log('⏸️ Loop completed, pausing playback (no samples)');
               await togglePlayPause();
               showStatus(`Loop completed! Played ${loopTarget} time(s)`);
           }
@@ -2094,56 +2044,12 @@ async function handleLoopEnd() {
           console.log('🔄 Loop count reset to 0');
           
       } else {
-          // Still have loops to go - this is a track-to-track transition point
-          console.log(`🔄 [TRACK-TO-TRACK] Continuing loop: ${loopCount}/${loopTarget}, seeking from ${formatTime(currentTime)} to ${formatTime(loopStart)}`);
-          
-          // Play transition sample for track-to-track loop if enabled
-          if (transitionSamples.enabled) {
-              console.log('🎵 [TRACK-TO-TRACK] Playing transition sample for track-to-track loop point');
-              
-              // Use a different sample for track-to-track transitions to make it distinct
-              const sampleKey = 'medium'; // Medium sample for track-to-track transitions
-              
-              // Check audio context state before playing
-              if (transitionSamples.audioContext?.state === 'suspended') {
-                  console.log('⚠️ [TRACK-TO-TRACK] Resuming suspended audio context');
-                  try {
-                      await transitionSamples.audioContext.resume();
-                      console.log('✅ [TRACK-TO-TRACK] Successfully resumed audio context');
-                  } catch (err) {
-                      console.warn('⚠️ [TRACK-TO-TRACK] Failed to resume audio context:', err.message);
-                  }
-              }
-              
-              // Temporarily increase volume for track-to-track transition to make it more audible
-              const originalVolume = transitionSamples.volume;
-              const trackToTrackVolume = Math.min(1.0, originalVolume * 1.2); // 20% louder but max 1.0
-              
-              console.log(`🔊 [TRACK-TO-TRACK] Playing "${sampleKey}" sample at boosted volume ${trackToTrackVolume} (original: ${originalVolume})`);
-              transitionSamples.volume = trackToTrackVolume;
-              
-              try {
-                  // Play sample with fade-in only (no fade-out)
-                  const sampleDuration = await playTransitionSample(sampleKey, false, true);
-                  
-                  if (sampleDuration > 0) {
-                      console.log(`✅ [TRACK-TO-TRACK] Track-to-track transition sample played successfully (duration: ${sampleDuration}ms)`);
-                  } else {
-                      console.warn('⚠️ [TRACK-TO-TRACK] Track-to-track transition sample may not have played (duration = 0)');
-                  }
-              } catch (err) {
-                  console.error('🚨 [TRACK-TO-TRACK] Error playing transition sample:', err);
-              } finally {
-                  // Restore original volume
-                  transitionSamples.volume = originalVolume;
-              }
-          }
-          
+          // Still have loops to go
+          console.log(`🔄 Continuing loop: ${loopCount}/${loopTarget}, seeking to ${formatTime(loopStart)}`);
           showStatus(`Loop ${loopCount}/${loopTarget}`);
           loopStartTime = Date.now();
 
-          // Use debounced seek function - add a small delay after sample plays
-          console.log(`🔄 [TRACK-TO-TRACK] Seeking to loop start point ${formatTime(loopStart)}`);
+          // Use debounced seek function
           await seekToPosition(loopStart * 1000);
       }
   } catch (error) {
