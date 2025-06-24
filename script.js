@@ -3605,7 +3605,7 @@ function init() {
       playlistFormClose: document.getElementById('playlist-form-close'),
       playlistFormSave: document.getElementById('playlist-form-save'),
       playlistFormCancel: document.getElementById('playlist-form-cancel'),
-      playlistNameInput: document.getElementById('playlist-name-input'),
+      playlistNameInput: document.getElementById('playist-name-input'),
       playlistDescriptionInput: document.getElementById('playlist-description-input'),
       createPlaylistBtn: document.getElementById('create-playlist-btn')
   };
