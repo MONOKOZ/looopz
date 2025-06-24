@@ -2114,74 +2114,16 @@ async function handleLoopEnd() {
           console.log('🔄 Loop count reset to 0');
           
       } else {
-          // Still have loops to go - this is a track-to-track transition point
-          console.log(`🔄 [TRACK-TO-TRACK] Continuing loop: ${loopCount}/${loopTarget}, seeking from ${formatTime(currentTime)} to ${formatTime(loopStart)}`);
+          // Still have loops to go - this is a LOOP-REPETITION (same track continuing)
+          console.log(`🔄 [LOOP-REPETITION] Continuing loop: ${loopCount}/${loopTarget}, seeking from ${formatTime(currentTime)} to ${formatTime(loopStart)}`);
 
           // Update status and prepare loop timing first
           showStatus(`Loop ${loopCount}/${loopTarget}`);
           loopStartTime = Date.now();
 
-          // Play transition sample for track-to-track loop if enabled
-          // CRITICAL: We do this BEFORE seeking to ensure the sample is heard
-          if (transitionSamples.enabled) {
-              console.log('🎵 [TRACK-TO-TRACK] *** PLAYING TRANSITION SAMPLE FOR TRACK-TO-TRACK LOOP ***');
-              
-              // Add stronger visual indication specifically for track-to-track transitions
-              const transitionIndicator = document.createElement('div');
-              transitionIndicator.style.cssText = 'position:fixed; top:0; left:0; right:0; height:6px; background:linear-gradient(90deg,#ff3838,#ff9d00); z-index:9999; opacity:0.9;';
-              document.body.appendChild(transitionIndicator);
-              
-              // Check audio context state before playing
-              if (transitionSamples.audioContext?.state === 'suspended') {
-                  console.log('⚠️ [TRACK-TO-TRACK] Resuming suspended audio context');
-                  try {
-                      await transitionSamples.audioContext.resume();
-                      console.log('✅ [TRACK-TO-TRACK] Successfully resumed audio context');
-                  } catch (err) {
-                      console.warn('⚠️ [TRACK-TO-TRACK] Failed to resume audio context:', err.message);
-                  }
-              }
-              
-              // Significantly increase volume for track-to-track transition to make it more audible
-              const originalVolume = transitionSamples.volume;
-              const trackToTrackVolume = Math.min(1.0, originalVolume * 1.5); // 50% louder but max 1.0
-              
-              // Use shorter, more impactful sample for track-to-track transitions
-              const sampleKey = 'short'; // Use short sample for immediate effect
-              
-              console.log(`🔊 [TRACK-TO-TRACK] Playing "${sampleKey}" sample at BOOSTED volume ${trackToTrackVolume} (original: ${originalVolume})`);
-              transitionSamples.volume = trackToTrackVolume;
-              
-              try {
-                  // Play sample with NO fades for maximum impact
-                  const sampleDuration = await playTransitionSample(sampleKey, false, false);
-                  
-                  if (sampleDuration > 0) {
-                      console.log(`✅ [TRACK-TO-TRACK] Track-to-track transition sample played successfully (duration: ${sampleDuration}ms)`);
-                      
-                      // Add a small delay to ensure sample is heard before seeking
-                      await new Promise(resolve => setTimeout(resolve, 100));
-                      
-                  } else {
-                      console.warn('⚠️ [TRACK-TO-TRACK] Track-to-track transition sample may not have played (duration = 0)');
-                  }
-              } catch (err) {
-                  console.error('🚨 [TRACK-TO-TRACK] Error playing transition sample:', err);
-              } finally {
-                  // Restore original volume
-                  transitionSamples.volume = originalVolume;
-                  
-                  // Remove visual indicator after a delay
-                  setTimeout(() => {
-                      if (document.body.contains(transitionIndicator)) {
-                          document.body.removeChild(transitionIndicator);
-                      }
-                  }, 500); // Remove after 500ms
-              }
-          }
-
-          // IMPORTANT: We seek AFTER playing the sample to ensure the sample is heard
-          console.log(`🔄 [TRACK-TO-TRACK] Seeking to loop start point ${formatTime(loopStart)}`);
+          // SEAMLESS LOOP REPETITION - No transition samples during loop repetitions
+          // This ensures perfect, uninterrupted repetition which is the core purpose of loops
+          console.log(`🔄 [LOOP-REPETITION] Seeking to loop start point ${formatTime(loopStart)} (seamless - no transition sample)`);
           await seekToPosition(loopStart * 1000);
       }
   } catch (error) {
