@@ -5,6 +5,10 @@ const SPOTIFY_CLIENT_ID = '46637d8f5adb41c0a4be34e0df0c1597';
 const SPOTIFY_REDIRECT_URI = 'https://looopz.vercel.app/';
 const SPOTIFY_SCOPES = 'streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state';
 
+// Audio analysis caches
+const audioAnalysisCache = new Map();
+const trackFeaturesCache = new Map();
+
 // State
 let spotifyPlayer = null, spotifyDeviceId = null, spotifyAccessToken = null;
 let isConnected = false, isPlaying = false, currentTrack = null;
@@ -3605,7 +3609,7 @@ function init() {
       playlistFormClose: document.getElementById('playlist-form-close'),
       playlistFormSave: document.getElementById('playlist-form-save'),
       playlistFormCancel: document.getElementById('playlist-form-cancel'),
-      playlistNameInput: document.getElementById('playist-name-input'),
+      playlistNameInput: document.getElementById('playlist-name-input'),
       playlistDescriptionInput: document.getElementById('playlist-description-input'),
       createPlaylistBtn: document.getElementById('create-playlist-btn')
   };
