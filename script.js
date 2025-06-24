@@ -604,152 +604,650 @@ async function seekToPosition(positionMs) {
   }
 }
 
-// Playlist Transition Engine Integration - SIMPLIFIED APPROACH
+// Spotify Audio Analysis Functions
+// Caches to avoid repeated API calls
+const audioAnalysisCache = new Map();
+const audioFeaturesCache = new Map();
+
+/**
+ * Gets detailed audio analysis for a track from Spotify API
+ * @param {string} trackId - Spotify track ID
+ * @returns {Promise<Object>} Audio analysis data
+ */
+async function getAudioAnalysis(trackId) {
+    // Return from cache if available
+    if (audioAnalysisCache.has(trackId)) {
+        return audioAnalysisCache.get(trackId);
+    }
+    
+    try {
+        const response = await fetch(`https://api.spotify.com/v1/audio-analysis/${trackId}`, {
+            headers: { 'Authorization': `Bearer ${spotifyAccessToken}` }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Audio analysis failed: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        audioAnalysisCache.set(trackId, data);
+        return data;
+    } catch (error) {
+        console.warn('🔍 Audio analysis fetch failed:', error.message);
+        return null;
+    }
+}
+
+/**
+ * Gets audio features for a track from Spotify API
+ * @param {string} trackId - Spotify track ID
+ * @returns {Promise<Object>} Audio features data
+ */
+async function getAudioFeatures(trackId) {
+    // Return from cache if available
+    if (audioFeaturesCache.has(trackId)) {
+        return audioFeaturesCache.get(trackId);
+    }
+    
+    try {
+        const response = await fetch(`https://api.spotify.com/v1/audio-features/${trackId}`, {
+            headers: { 'Authorization': `Bearer ${spotifyAccessToken}` }
+        });
+        
+        if (!response.ok) {
+            throw new Error(`Audio features failed: ${response.status}`);
+        }
+        
+        const data = await response.json();
+        audioFeaturesCache.set(trackId, data);
+        return data;
+    } catch (error) {
+        console.warn('🔍 Audio features fetch failed:', error.message);
+        return null;
+    }
+}
+
+/**
+ * Calculates optimal crossfade duration based on track features
+ * @param {Object} fromFeatures - Audio features of the current track
+ * @param {Object} toFeatures - Audio features of the next track
+ * @returns {number} Optimal crossfade duration in seconds
+ */
+function calculateOptimalCrossfade(fromFeatures, toFeatures) {
+    if (!fromFeatures || !toFeatures) {
+        return 3; // Default fallback
+    }
+
+    // Calculate compatibility between tracks
+    const tempoDiff = Math.abs(fromFeatures.tempo - toFeatures.tempo);
+    const keyCompatibility = isKeyCompatible(fromFeatures.key, toFeatures.key);
+    const energyDiff = Math.abs(fromFeatures.energy - toFeatures.energy);
+    
+    // Base crossfade timing on track compatibility
+    if (tempoDiff < 5 && keyCompatibility && energyDiff < 0.2) {
+        // Very compatible tracks - shorter, cleaner crossfade
+        return 2 + energyDiff * 5;
+    } else if (tempoDiff < 15 && energyDiff < 0.4) {
+        // Moderately compatible - medium crossfade
+        return 4 + energyDiff * 5;
+    } else {
+        // Less compatible - longer crossfade to blend
+        return 6 + energyDiff * 10;
+    }
+}
+
+/**
+ * Check if two musical keys are compatible for transition
+ * @param {number} key1 - First key (0-11)
+ * @param {number} key2 - Second key (0-11)
+ * @returns {boolean} Whether keys are compatible
+ */
+function isKeyCompatible(key1, key2) {
+    if (key1 === -1 || key2 === -1) return true; // Unknown key
+    if (key1 === key2) return true; // Same key
+    
+    // Adjacent keys on circle of fifths or relative major/minor
+    const compatible = [
+        [0, 7, 9],     // C: G, A minor
+        [1, 8, 10],    // C#: G#, A# minor
+        [2, 9, 11],    // D: A, B minor
+        [3, 10, 0],    // D#: A#, C minor
+        [4, 11, 1],    // E: B, C# minor
+        [5, 0, 2],     // F: C, D minor
+        [6, 1, 3],     // F#: C#, D# minor
+        [7, 2, 4],     // G: D, E minor
+        [8, 3, 5],     // G#: D#, F minor
+        [9, 4, 6],     // A: E, F# minor
+        [10, 5, 7],    // A#: F, G minor
+        [11, 6, 8]     // B: F#, G# minor
+    ];
+    
+    return compatible[key1].includes(key2);
+}
+
+/**
+ * Assesses transition quality between two tracks
+ * @param {Object} fromFeatures - Audio features of the current track
+ * @param {Object} toFeatures - Audio features of the next track
+ * @returns {Object} Transition quality assessment
+ */
+function assessTransitionQuality(fromFeatures, toFeatures) {
+    if (!fromFeatures || !toFeatures) {
+        return { quality: 'Unknown', score: 0.5 };
+    }
+
+    // Calculate individual compatibility scores
+    const tempoScore = 1 - (Math.abs(fromFeatures.tempo - toFeatures.tempo) / 100);
+    const keyScore = isKeyCompatible(fromFeatures.key, toFeatures.key) ? 1 : 0.3;
+    const energyScore = 1 - Math.abs(fromFeatures.energy - toFeatures.energy);
+    const danceabilityScore = 1 - Math.abs(fromFeatures.danceability - toFeatures.danceability);
+    
+    // Weighted total score
+    const totalScore = (
+        tempoScore * 0.35 + 
+        keyScore * 0.3 + 
+        energyScore * 0.2 + 
+        danceabilityScore * 0.15
+    );
+    
+    // Classify transition quality
+    let quality;
+    if (totalScore > 0.8) quality = 'Excellent';
+    else if (totalScore > 0.65) quality = 'Good';
+    else if (totalScore > 0.5) quality = 'Fair';
+    else quality = 'Challenging';
+    
+    return { quality, score: totalScore };
+}
+
+/**
+ * Finds a beat-aligned end point near the target time
+ * @param {Object} analysis - Audio analysis data
+ * @param {number} targetTime - Target end time in seconds
+ * @returns {number} Beat-aligned end time in seconds
+ */
+function findBeatAlignedEndPoint(analysis, targetTime) {
+    if (!analysis || !analysis.beats || analysis.beats.length === 0) {
+        return targetTime; // No analysis, return target time
+    }
+    
+    // Find the nearest beat before the target time
+    const beats = analysis.beats.map(beat => beat.start);
+    let closestBeat = targetTime;
+    let minDistance = Number.MAX_VALUE;
+    
+    // Look for beats in a 2-second window before target time
+    for (const beat of beats) {
+        if (beat <= targetTime && targetTime - beat < 2) {
+            const distance = targetTime - beat;
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestBeat = beat;
+            }
+        }
+    }
+    
+    return closestBeat;
+}
+
+/**
+ * Finds a beat-aligned start point near the target time
+ * @param {Object} analysis - Audio analysis data
+ * @param {number} targetTime - Target start time in seconds
+ * @returns {number} Beat-aligned start time in seconds
+ */
+function findBeatAlignedStartPoint(analysis, targetTime) {
+    if (!analysis || !analysis.beats || analysis.beats.length === 0) {
+        return targetTime; // No analysis, return target time
+    }
+    
+    // Find the nearest beat after the target time
+    const beats = analysis.beats.map(beat => beat.start);
+    let closestBeat = targetTime;
+    let minDistance = Number.MAX_VALUE;
+    
+    // Look for beats in a 2-second window after target time
+    for (const beat of beats) {
+        if (beat >= targetTime && beat - targetTime < 2) {
+            const distance = beat - targetTime;
+            if (distance < minDistance) {
+                minDistance = distance;
+                closestBeat = beat;
+            }
+        }
+    }
+    
+    return closestBeat;
+}
+
+/**
+ * Executes a smooth volume crossfade 
+ * @param {number} fromVolume - Starting volume (0-100)
+ * @param {number} toVolume - Ending volume (0-100)
+ * @param {number} durationMs - Crossfade duration in milliseconds
+ * @param {Function} midpointCallback - Optional callback to execute at midpoint
+ * @returns {Promise<void>}
+ */
+async function performSmootCrossfade(fromVolume, toVolume, durationMs, midpointCallback = null) {
+    if (!spotifyPlayer) return;
+    
+    try {
+        const steps = Math.max(5, Math.floor(durationMs / 50));
+        const stepDuration = durationMs / steps;
+        const volumeStep = (toVolume - fromVolume) / steps;
+        const midpoint = Math.floor(steps / 2);
+        
+        // Execute the fade
+        for (let i = 0; i < steps; i++) {
+            const currentVolume = fromVolume + volumeStep * i;
+            await spotifyPlayer.setVolume(currentVolume / 100);
+            
+            // Execute midpoint callback if provided
+            if (midpointCallback && i === midpoint) {
+                await midpointCallback();
+            }
+            
+            await new Promise(resolve => setTimeout(resolve, stepDuration));
+        }
+        
+        // Ensure final volume is set
+        await spotifyPlayer.setVolume(toVolume / 100);
+        
+    } catch (error) {
+        console.error('🎛️ Crossfade error:', error);
+        // Reset volume to normal in case of error
+        if (spotifyPlayer) {
+            await spotifyPlayer.setVolume(0.8);
+        }
+    }
+}
+
+// PLAYLIST DJ ENGINE - SMART TRANSITION METHODS
 class PlaylistTransitionEngine {
-  constructor(spotifyPlayer, spotifyAccessToken, spotifyDeviceId) {
-      this.spotifyPlayer = spotifyPlayer;
-      this.spotifyAccessToken = spotifyAccessToken;
-      this.spotifyDeviceId = spotifyDeviceId;
+    constructor(spotifyPlayer, spotifyAccessToken, spotifyDeviceId) {
+        this.spotifyPlayer = spotifyPlayer;
+        this.spotifyAccessToken = spotifyAccessToken;
+        this.spotifyDeviceId = spotifyDeviceId;
 
-      // Playlist state
-      this.currentPlaylist = null;
-      this.currentItemIndex = 0;
-      this.isPlaying = false;
+        // Playlist state
+        this.currentPlaylist = null;
+        this.currentItemIndex = 0;
+        this.isPlaying = false;
+        this.transitionInProgress = false;
+        
+        // Smart transition state
+        this.smartTransitionsEnabled = true;
+        this.isTransitioning = false;
+        this.currentTransitionData = null;
+        this.crossfadeInProgress = false;
 
-      // We DON'T track loops here - let main player handle it
-      this.transitionInProgress = false;
+        // Event callbacks
+        this.onItemChange = null;
+        this.onPlaylistComplete = null;
+        this.onSmartTransition = null;
+    }
 
-      // Event callbacks
-      this.onItemChange = null;
-      this.onPlaylistComplete = null;
-  }
+    /**
+     * Pre-analyzes upcoming tracks for optimal transitions
+     * Caches audio analysis and features in background
+     */
+    async preAnalyzeUpcomingTracks() {
+        if (!this.currentPlaylist || !this.smartTransitionsEnabled) return;
 
-  // Initialize playlist playback
-  async loadPlaylist(playlist, startIndex = 0) {
-      try {
-          console.log('🎵 Loading playlist:', playlist.name);
+        const upcomingItems = this.currentPlaylist.items.slice(
+            this.currentItemIndex, 
+            Math.min(this.currentItemIndex + 3, this.currentPlaylist.items.length)
+        );
 
-          this.currentPlaylist = playlist;
-          this.currentItemIndex = startIndex;
+        for (const item of upcomingItems) {
+            const trackId = this.extractTrackId(item.type === 'loop' ? item.trackUri : item.uri);
+            if (trackId) {
+                // Fetch analysis and features in background (fire and forget)
+                getAudioAnalysis(trackId).catch(() => {});
+                getAudioFeatures(trackId).catch(() => {});
+            }
+        }
+    }
 
-          if (playlist.items.length === 0) {
-              throw new Error('Empty playlist');
-          }
+    /**
+     * Prepares smart transition between two playlist items
+     * @param {number} fromIndex - Current item index
+     * @param {number} toIndex - Next item index
+     */
+    async prepareSmartTransition(fromIndex, toIndex) {
+        try {
+            const fromItem = this.currentPlaylist.items[fromIndex];
+            const toItem = this.currentPlaylist.items[toIndex];
 
-          // Load first track
-          await this.loadPlaylistItem(this.currentItemIndex);
+            const fromTrackId = this.extractTrackId(fromItem.type === 'loop' ? fromItem.trackUri : fromItem.uri);
+            const toTrackId = this.extractTrackId(toItem.type === 'loop' ? toItem.trackUri : toItem.uri);
 
-          console.log('✅ Playlist loaded and ready');
-          return true;
+            if (!fromTrackId || !toTrackId) return;
 
-      } catch (error) {
-          console.error('🚨 Playlist load error:', error);
-          throw error;
-      }
-  }
+            // Get audio analysis and features for both tracks
+            const [fromFeatures, toFeatures, fromAnalysis, toAnalysis] = await Promise.all([
+                getAudioFeatures(fromTrackId),
+                getAudioFeatures(toTrackId),
+                getAudioAnalysis(fromTrackId),
+                getAudioAnalysis(toTrackId)
+            ]);
 
-  // Load specific playlist item (track or loop)
-  async loadPlaylistItem(itemIndex) {
-      if (!this.currentPlaylist || itemIndex >= this.currentPlaylist.items.length) {
-          console.log('📝 Playlist complete');
-          if (this.onPlaylistComplete) this.onPlaylistComplete();
-          return;
-      }
+            if (fromFeatures && toFeatures) {
+                // Calculate transition parameters
+                const crossfadeDuration = calculateOptimalCrossfade(fromFeatures, toFeatures);
+                const transitionQuality = assessTransitionQuality(fromFeatures, toFeatures);
 
-      const item = this.currentPlaylist.items[itemIndex];
-      console.log('🔄 Loading playlist item:', item);
+                // Calculate beat-aligned points
+                const fromEndTime = fromItem.type === 'loop' ? fromItem.end : fromItem.duration;
+                const toStartTime = toItem.type === 'loop' ? toItem.start : 0;
 
-      try {
-          // Load track into Spotify
-          const startPosition = item.type === 'loop' ? item.start * 1000 : 0;
+                const optimalFromEnd = findBeatAlignedEndPoint(fromAnalysis, fromEndTime);
+                const optimalToStart = findBeatAlignedStartPoint(toAnalysis, toStartTime);
 
-          await loadTrackIntoSpotify({
-              uri: item.type === 'loop' ? item.trackUri : item.uri,
-              name: item.name || 'Unknown Track',
-              artist: item.artist || 'Unknown Artist',
-              duration: item.duration || 180,
-              image: item.image || ''
-          }, startPosition);
+                this.currentTransitionData = {
+                    fromItem,
+                    toItem,
+                    fromEndTime: optimalFromEnd,
+                    toStartTime: optimalToStart,
+                    crossfadeDuration,
+                    transitionQuality,
+                    fromFeatures,
+                    toFeatures
+                };
 
-          // Notify UI of track change - let main player handle the loop logic
-          if (this.onItemChange) {
-              this.onItemChange(item, itemIndex);
-          }
+                console.log(`🎛️ Smart transition prepared: ${crossfadeDuration}s crossfade, ${transitionQuality.quality} quality`);
 
-          console.log('✅ Playlist item loaded - main player will handle loops');
+                if (this.onSmartTransition) {
+                    this.onSmartTransition(this.currentTransitionData);
+                }
+            }
 
-      } catch (error) {
-          console.error('🚨 Failed to load playlist item:', error);
-          // Skip to next item on error
-          await this.skipToNext();
-      }
-  }
+        } catch (error) {
+            console.warn('🎛️ Smart transition preparation failed:', error.message);
+            this.currentTransitionData = null;
+        }
+    }
 
-  // Skip to next playlist item
-  async skipToNext() {
-      if (this.transitionInProgress) return;
+    /**
+     * Handles smart transition timing for full tracks
+     * @param {number} currentTime - Current playback time in seconds
+     */
+    async handleSmartTransitionTiming(currentTime) {
+        if (!this.currentTransitionData || this.crossfadeInProgress) return;
 
-      this.transitionInProgress = true;
-      this.currentItemIndex++;
+        const { fromEndTime, crossfadeDuration } = this.currentTransitionData;
+        const crossfadeStartTime = fromEndTime - crossfadeDuration;
 
-      try {
-          if (this.currentItemIndex >= this.currentPlaylist.items.length) {
-              // Playlist complete
-              console.log('🏁 Playlist finished');
-              if (this.onPlaylistComplete) this.onPlaylistComplete();
-              return;
-          }
+        // Check if it's time to start the crossfade
+        if (currentTime >= crossfadeStartTime - 0.1 && currentTime <= crossfadeStartTime + 0.1) {
+            console.log('🎛️ Starting smart crossfade transition');
+            await this.executeSmartCrossfade();
+        }
+    }
 
-          // Load next item
-          await this.loadPlaylistItem(this.currentItemIndex);
+    /**
+     * Executes smart crossfade transition between tracks
+     */
+    async executeSmartCrossfade() {
+        if (this.crossfadeInProgress || !this.currentTransitionData) return;
 
-      } catch (error) {
-          console.error('🚨 Skip to next error:', error);
-      } finally {
-          this.transitionInProgress = false;
-      }
-  }
+        try {
+            this.crossfadeInProgress = true;
+            const { toItem, toStartTime, crossfadeDuration, transitionQuality } = this.currentTransitionData;
 
-  // Skip to previous playlist item
-  async skipToPrevious() {
-      if (this.transitionInProgress || this.currentItemIndex === 0) return;
+            console.log(`🎛️ Executing ${crossfadeDuration}s crossfade (${transitionQuality.quality} quality)`);
 
-      this.transitionInProgress = true;
-      this.currentItemIndex--;
+            // Start crossfade: fade out current, fade in next
+            await performSmootCrossfade(100, 0, crossfadeDuration * 1000, async () => {
+                // At midpoint: switch to next track
+                await this.loadPlaylistItem(this.currentItemIndex + 1);
+                await seekToPosition(toStartTime * 1000);
+                
+                // Start fading in the new track
+                await performSmootCrossfade(0, 100, (crossfadeDuration / 2) * 1000);
+            });
 
-      try {
-          await this.loadPlaylistItem(this.currentItemIndex);
-      } catch (error) {
-          console.error('🚨 Skip to previous error:', error);
-      } finally {
-          this.transitionInProgress = false;
-      }
-  }
+            this.currentItemIndex++;
+            this.currentTransitionData = null;
 
-  // Get current playlist state
-  getPlaylistState() {
-      if (!this.currentPlaylist) return null;
+            showStatus(`🎛️ Smart transition complete (${transitionQuality.quality})`);
 
-      return {
-          playlist: this.currentPlaylist,
-          currentIndex: this.currentItemIndex,
-          currentItem: this.currentPlaylist.items[this.currentItemIndex]
-      };
-  }
+        } catch (error) {
+            console.error('🎛️ Smart crossfade failed:', error);
+            // Fallback to regular transition
+            await this.skipToNext();
+        } finally {
+            this.crossfadeInProgress = false;
+        }
+    }
 
-  // Notify that current item is complete (called by main player)
-  async notifyItemComplete() {
-      console.log('📢 Main player notified item complete');
-      await this.skipToNext();
-  }
+    /**
+     * Enhanced playback progress handler with smart transitions
+     * @param {number} currentTime - Current playback time in seconds
+     */
+    async handlePlaybackProgress(currentTime) {
+        if (!this.currentPlaylist || this.transitionInProgress || this.crossfadeInProgress) return;
 
-  // Stop playlist and cleanup
-  stopPlaylist() {
-      this.currentPlaylist = null;
-      this.currentItemIndex = 0;
-      this.transitionInProgress = false;
-      console.log('⏹️ Playlist stopped');
-  }
+        const currentItem = this.currentPlaylist.items[this.currentItemIndex];
+
+        // Handle loop items
+        if (currentItem.type === 'loop' && this.currentLoop) {
+            await this.handleLoopProgress(currentTime, currentItem);
+        }
+
+        // Handle smart transition timing for full tracks
+        if (currentItem.type === 'track' && this.currentTransitionData && this.smartTransitionsEnabled) {
+            await this.handleSmartTransitionTiming(currentTime);
+        }
+    }
+
+    /**
+     * Initialize playlist playback
+     * @param {Object} playlist - Playlist to load
+     * @param {number} startIndex - Starting item index
+     */
+    async loadPlaylist(playlist, startIndex = 0) {
+        try {
+            console.log('🎵 Loading playlist:', playlist.name);
+
+            this.currentPlaylist = playlist;
+            this.currentItemIndex = startIndex;
+
+            if (playlist.items.length === 0) {
+                throw new Error('Empty playlist');
+            }
+
+            // Load first track
+            await this.loadPlaylistItem(this.currentItemIndex);
+            
+            // Pre-analyze upcoming tracks for transitions
+            if (this.smartTransitionsEnabled) {
+                this.preAnalyzeUpcomingTracks();
+            }
+
+            console.log('✅ Playlist loaded and ready');
+            return true;
+
+        } catch (error) {
+            console.error('🚨 Playlist load error:', error);
+            throw error;
+        }
+    }
+
+    /**
+     * Enhanced load playlist item with transition planning
+     * @param {number} itemIndex - Index of item to load
+     */
+    async loadPlaylistItem(itemIndex) {
+        if (!this.currentPlaylist || itemIndex >= this.currentPlaylist.items.length) {
+            console.log('📝 Playlist complete');
+            if (this.onPlaylistComplete) this.onPlaylistComplete();
+            return;
+        }
+
+        const item = this.currentPlaylist.items[itemIndex];
+        console.log('🔄 Loading playlist item:', item);
+
+        try {
+            // Reset loop state
+            this.currentLoopCount = 0;
+            this.currentLoopTarget = item.playCount || 1;
+            this.loopStartTime = Date.now();
+
+            // Calculate smart transition if coming from previous item
+            if (itemIndex > 0 && this.smartTransitionsEnabled) {
+                await this.prepareSmartTransition(itemIndex - 1, itemIndex);
+            }
+
+            // Load track into Spotify
+            const startPosition = item.type === 'loop' ? item.start * 1000 : 0;
+
+            await loadTrackIntoSpotify({
+                uri: item.type === 'loop' ? item.trackUri : item.uri,
+                name: item.name || 'Unknown Track',
+                artist: item.artist || 'Unknown Artist',
+                duration: item.duration || 180,
+                image: item.image || ''
+            }, startPosition);
+
+            // Set up loop parameters if this is a loop item
+            if (item.type === 'loop') {
+                this.setupLoopItem(item);
+            }
+
+            // Notify UI of track change
+            if (this.onItemChange) {
+                this.onItemChange(item, itemIndex);
+            }
+
+            console.log('✅ Playlist item loaded');
+
+        } catch (error) {
+            console.error('🚨 Failed to load playlist item:', error);
+            // Skip to next item on error
+            await this.skipToNext();
+        }
+    }
+
+    /**
+     * Sets up loop item parameters
+     * @param {Object} item - Loop item
+     */
+    setupLoopItem(item) {
+        // This function is implemented to maintain compatibility with the existing code
+        // The main player handles the loop logic, so we just need to ensure this method exists
+        console.log(`🔄 Setting up loop item: ${item.name} (${formatTime(item.start)} - ${formatTime(item.end)})`);
+    }
+
+    /**
+     * Handle loop playback progress
+     * @param {number} currentTime - Current playback time
+     * @param {Object} item - Loop item
+     */
+    async handleLoopProgress(currentTime, item) {
+        // This function is implemented to maintain compatibility with the existing code
+        // The main player handles the loop logic, so we just need to ensure this method exists
+        console.log(`🔄 Handling loop progress: ${formatTime(currentTime)}`);
+    }
+
+    /**
+     * Skip to next playlist item
+     */
+    async skipToNext() {
+        if (this.transitionInProgress) return;
+
+        this.transitionInProgress = true;
+        this.currentItemIndex++;
+
+        try {
+            if (this.currentItemIndex >= this.currentPlaylist.items.length) {
+                // Playlist complete
+                console.log('🏁 Playlist finished');
+                if (this.onPlaylistComplete) this.onPlaylistComplete();
+                return;
+            }
+
+            // Load next item
+            await this.loadPlaylistItem(this.currentItemIndex);
+
+        } catch (error) {
+            console.error('🚨 Skip to next error:', error);
+        } finally {
+            this.transitionInProgress = false;
+        }
+    }
+
+    /**
+     * Skip to previous playlist item
+     */
+    async skipToPrevious() {
+        if (this.transitionInProgress || this.currentItemIndex === 0) return;
+
+        this.transitionInProgress = true;
+        this.currentItemIndex--;
+
+        try {
+            await this.loadPlaylistItem(this.currentItemIndex);
+        } catch (error) {
+            console.error('🚨 Skip to previous error:', error);
+        } finally {
+            this.transitionInProgress = false;
+        }
+    }
+
+    /**
+     * Get current playlist state
+     * @returns {Object|null} Playlist state
+     */
+    getPlaylistState() {
+        if (!this.currentPlaylist) return null;
+
+        return {
+            playlist: this.currentPlaylist,
+            currentIndex: this.currentItemIndex,
+            currentItem: this.currentPlaylist.items[this.currentItemIndex]
+        };
+    }
+
+    /**
+     * Notify that current item is complete (called by main player)
+     */
+    async notifyItemComplete() {
+        console.log('📢 Main player notified item complete');
+        await this.skipToNext();
+    }
+
+    /**
+     * Toggle smart transitions on/off
+     * @param {boolean} enabled - Enable or disable smart transitions
+     */
+    setSmartTransitions(enabled) {
+        this.smartTransitionsEnabled = enabled;
+        console.log(`🎛️ Smart transitions ${enabled ? 'enabled' : 'disabled'}`);
+    }
+
+    /**
+     * Extract track ID from Spotify URI
+     * @param {string} uri - Spotify URI
+     * @returns {string|null} Track ID or null
+     */
+    extractTrackId(uri) {
+        if (!uri) return null;
+        const parts = uri.split(':');
+        return parts.length >= 3 ? parts[2] : null;
+    }
+
+    /**
+     * Stop playlist and cleanup
+     */
+    stopPlaylist() {
+        this.currentPlaylist = null;
+        this.currentItemIndex = 0;
+        this.transitionInProgress = false;
+        this.currentTransitionData = null;
+        this.crossfadeInProgress = false;
+        console.log('⏹️ Playlist stopped');
+    }
 }
 
 function initializeSpotifyPlayer() {
@@ -872,6 +1370,26 @@ function setupPlaylistEngineCallbacks() {
       console.log('🏁 Playlist complete!');
       showStatus('Playlist finished!');
       stopPlaylistMode();
+  };
+  
+  // Set up the smart transition callback for UI feedback
+  playlistEngine.onSmartTransition = (transitionData) => {
+      const { transitionQuality, crossfadeDuration, fromItem, toItem } = transitionData;
+      
+      // Show transition quality in the UI
+      const fromName = fromItem.name;
+      const toName = toItem.name;
+      const quality = transitionQuality.quality;
+      const duration = crossfadeDuration.toFixed(1);
+      
+      console.log(`🎛️ Smart transition prepared: ${fromName} → ${toName}`);
+      console.log(`🎛️ Quality: ${quality}, Duration: ${duration}s`);
+      
+      // Update UI with transition info
+      showStatus(`🎛️ Smart transition: ${quality} (${duration}s)`);
+      
+      // You could update additional UI elements here if needed
+      // For example, showing a transition quality indicator
   };
 }
 
