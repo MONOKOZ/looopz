@@ -604,263 +604,384 @@ async function seekToPosition(positionMs) {
   }
 }
 
-// Spotify Audio Analysis Functions
-// Caches to avoid repeated API calls
-const audioAnalysisCache = new Map();
-const audioFeaturesCache = new Map();
+// DJ SMART TRANSITION FUNCTIONS MODULE
+// Enhancing track by track listening experience for playlists
+
+// ===========================================
+// 1. AUDIO ANALYSIS CACHE & DATA FETCHING
+// ===========================================
+
+// Keep existing cache references to maintain compatibility
+// const audioAnalysisCache = new Map(); // Already defined above
+// const trackFeaturesCache = new Map(); // Renamed to maintain compatibility with existing audioFeaturesCache
 
 /**
- * Gets detailed audio analysis for a track from Spotify API
+ * Fetches Spotify's audio analysis for a track (beats, bars, sections)
  * @param {string} trackId - Spotify track ID
- * @returns {Promise<Object>} Audio analysis data
+ * @returns {Object|null} Audio analysis data or null if failed
  */
 async function getAudioAnalysis(trackId) {
-    // Return from cache if available
     if (audioAnalysisCache.has(trackId)) {
         return audioAnalysisCache.get(trackId);
     }
-    
+
     try {
         const response = await fetch(`https://api.spotify.com/v1/audio-analysis/${trackId}`, {
             headers: { 'Authorization': `Bearer ${spotifyAccessToken}` }
         });
-        
+
         if (!response.ok) {
             throw new Error(`Audio analysis failed: ${response.status}`);
         }
-        
-        const data = await response.json();
-        audioAnalysisCache.set(trackId, data);
-        return data;
+
+        const analysis = await response.json();
+        audioAnalysisCache.set(trackId, analysis);
+        return analysis;
     } catch (error) {
-        console.warn('🔍 Audio analysis fetch failed:', error.message);
+        console.warn('🎵 Audio analysis unavailable:', error.message);
         return null;
     }
 }
 
 /**
- * Gets audio features for a track from Spotify API
+ * Fetches Spotify's audio features for a track (tempo, key, energy, etc.)
  * @param {string} trackId - Spotify track ID
- * @returns {Promise<Object>} Audio features data
+ * @returns {Object|null} Audio features data or null if failed
  */
 async function getAudioFeatures(trackId) {
-    // Return from cache if available
     if (audioFeaturesCache.has(trackId)) {
         return audioFeaturesCache.get(trackId);
     }
-    
+
     try {
         const response = await fetch(`https://api.spotify.com/v1/audio-features/${trackId}`, {
             headers: { 'Authorization': `Bearer ${spotifyAccessToken}` }
         });
-        
+
         if (!response.ok) {
             throw new Error(`Audio features failed: ${response.status}`);
         }
-        
-        const data = await response.json();
-        audioFeaturesCache.set(trackId, data);
-        return data;
+
+        const features = await response.json();
+        audioFeaturesCache.set(trackId, features);
+        return features;
     } catch (error) {
-        console.warn('🔍 Audio features fetch failed:', error.message);
+        console.warn('🎵 Audio features unavailable:', error.message);
         return null;
     }
 }
 
-/**
- * Calculates optimal crossfade duration based on track features
- * @param {Object} fromFeatures - Audio features of the current track
- * @param {Object} toFeatures - Audio features of the next track
- * @returns {number} Optimal crossfade duration in seconds
- */
-function calculateOptimalCrossfade(fromFeatures, toFeatures) {
-    if (!fromFeatures || !toFeatures) {
-        return 3; // Default fallback
-    }
-
-    // Calculate compatibility between tracks
-    const tempoDiff = Math.abs(fromFeatures.tempo - toFeatures.tempo);
-    const keyCompatibility = isKeyCompatible(fromFeatures.key, toFeatures.key);
-    const energyDiff = Math.abs(fromFeatures.energy - toFeatures.energy);
-    
-    // Base crossfade timing on track compatibility
-    if (tempoDiff < 5 && keyCompatibility && energyDiff < 0.2) {
-        // Very compatible tracks - shorter, cleaner crossfade
-        return 2 + energyDiff * 5;
-    } else if (tempoDiff < 15 && energyDiff < 0.4) {
-        // Moderately compatible - medium crossfade
-        return 4 + energyDiff * 5;
-    } else {
-        // Less compatible - longer crossfade to blend
-        return 6 + energyDiff * 10;
-    }
-}
+// ===========================================
+// 2. BEAT ALIGNMENT FUNCTIONS
+// ===========================================
 
 /**
- * Check if two musical keys are compatible for transition
- * @param {number} key1 - First key (0-11)
- * @param {number} key2 - Second key (0-11)
- * @returns {boolean} Whether keys are compatible
- */
-function isKeyCompatible(key1, key2) {
-    if (key1 === -1 || key2 === -1) return true; // Unknown key
-    if (key1 === key2) return true; // Same key
-    
-    // Adjacent keys on circle of fifths or relative major/minor
-    const compatible = [
-        [0, 7, 9],     // C: G, A minor
-        [1, 8, 10],    // C#: G#, A# minor
-        [2, 9, 11],    // D: A, B minor
-        [3, 10, 0],    // D#: A#, C minor
-        [4, 11, 1],    // E: B, C# minor
-        [5, 0, 2],     // F: C, D minor
-        [6, 1, 3],     // F#: C#, D# minor
-        [7, 2, 4],     // G: D, E minor
-        [8, 3, 5],     // G#: D#, F minor
-        [9, 4, 6],     // A: E, F# minor
-        [10, 5, 7],    // A#: F, G minor
-        [11, 6, 8]     // B: F#, G# minor
-    ];
-    
-    return compatible[key1].includes(key2);
-}
-
-/**
- * Assesses transition quality between two tracks
- * @param {Object} fromFeatures - Audio features of the current track
- * @param {Object} toFeatures - Audio features of the next track
- * @returns {Object} Transition quality assessment
- */
-function assessTransitionQuality(fromFeatures, toFeatures) {
-    if (!fromFeatures || !toFeatures) {
-        return { quality: 'Unknown', score: 0.5 };
-    }
-
-    // Calculate individual compatibility scores
-    const tempoScore = 1 - (Math.abs(fromFeatures.tempo - toFeatures.tempo) / 100);
-    const keyScore = isKeyCompatible(fromFeatures.key, toFeatures.key) ? 1 : 0.3;
-    const energyScore = 1 - Math.abs(fromFeatures.energy - toFeatures.energy);
-    const danceabilityScore = 1 - Math.abs(fromFeatures.danceability - toFeatures.danceability);
-    
-    // Weighted total score
-    const totalScore = (
-        tempoScore * 0.35 + 
-        keyScore * 0.3 + 
-        energyScore * 0.2 + 
-        danceabilityScore * 0.15
-    );
-    
-    // Classify transition quality
-    let quality;
-    if (totalScore > 0.8) quality = 'Excellent';
-    else if (totalScore > 0.65) quality = 'Good';
-    else if (totalScore > 0.5) quality = 'Fair';
-    else quality = 'Challenging';
-    
-    return { quality, score: totalScore };
-}
-
-/**
- * Finds a beat-aligned end point near the target time
- * @param {Object} analysis - Audio analysis data
- * @param {number} targetTime - Target end time in seconds
- * @returns {number} Beat-aligned end time in seconds
+ * Finds a beat-aligned endpoint for seamless transitions
+ * @param {Object} analysis - Audio analysis object
+ * @param {number} targetTime - Target time in seconds
+ * @returns {number} Beat-aligned time in seconds
  */
 function findBeatAlignedEndPoint(analysis, targetTime) {
-    if (!analysis || !analysis.beats || analysis.beats.length === 0) {
-        return targetTime; // No analysis, return target time
-    }
-    
-    // Find the nearest beat before the target time
-    const beats = analysis.beats.map(beat => beat.start);
-    let closestBeat = targetTime;
-    let minDistance = Number.MAX_VALUE;
-    
-    // Look for beats in a 2-second window before target time
+    if (!analysis?.beats) return targetTime;
+
+    const beats = analysis.beats;
+    let closestBeat = beats[0];
+    let minDistance = Math.abs(beats[0].start - targetTime);
+
     for (const beat of beats) {
-        if (beat <= targetTime && targetTime - beat < 2) {
-            const distance = targetTime - beat;
-            if (distance < minDistance) {
-                minDistance = distance;
-                closestBeat = beat;
-            }
+        const distance = Math.abs(beat.start - targetTime);
+        if (distance < minDistance) {
+            minDistance = distance;
+            closestBeat = beat;
         }
     }
+
+    // Find the end of the current bar (assuming 4/4 time)
+    const currentBeatIndex = beats.indexOf(closestBeat);
+    const beatsPerBar = 4;
+    const barEndIndex = Math.floor(currentBeatIndex / beatsPerBar) * beatsPerBar + (beatsPerBar - 1);
     
-    return closestBeat;
+    if (barEndIndex < beats.length) {
+        return beats[barEndIndex].start + beats[barEndIndex].duration;
+    }
+
+    return closestBeat.start + closestBeat.duration;
 }
 
 /**
- * Finds a beat-aligned start point near the target time
- * @param {Object} analysis - Audio analysis data
- * @param {number} targetTime - Target start time in seconds
- * @returns {number} Beat-aligned start time in seconds
+ * Finds a beat-aligned start point for seamless transitions
+ * @param {Object} analysis - Audio analysis object
+ * @param {number} targetTime - Target time in seconds (default: 0)
+ * @returns {number} Beat-aligned time in seconds
  */
-function findBeatAlignedStartPoint(analysis, targetTime) {
-    if (!analysis || !analysis.beats || analysis.beats.length === 0) {
-        return targetTime; // No analysis, return target time
-    }
+function findBeatAlignedStartPoint(analysis, targetTime = 0) {
+    if (!analysis?.beats) return targetTime;
+
+    const beats = analysis.beats;
     
-    // Find the nearest beat after the target time
-    const beats = analysis.beats.map(beat => beat.start);
-    let closestBeat = targetTime;
-    let minDistance = Number.MAX_VALUE;
-    
-    // Look for beats in a 2-second window after target time
+    // Find the first strong downbeat after targetTime
     for (const beat of beats) {
-        if (beat >= targetTime && beat - targetTime < 2) {
-            const distance = beat - targetTime;
-            if (distance < minDistance) {
-                minDistance = distance;
-                closestBeat = beat;
-            }
+        if (beat.start >= targetTime && beat.confidence > 0.5) {
+            return beat.start;
         }
     }
+
+    return targetTime;
+}
+
+// ===========================================
+// 3. TRANSITION QUALITY ASSESSMENT
+// ===========================================
+
+/**
+ * Calculates optimal crossfade duration based on track compatibility
+ * @param {Object} currentFeatures - Audio features of current track
+ * @param {Object} nextFeatures - Audio features of next track
+ * @returns {number} Optimal crossfade duration in seconds (3-12s)
+ */
+function calculateOptimalCrossfade(currentFeatures, nextFeatures) {
+    if (!currentFeatures || !nextFeatures) {
+        return 6; // Default crossfade duration
+    }
+
+    // Calculate tempo difference
+    const tempoDiff = Math.abs(currentFeatures.tempo - nextFeatures.tempo);
     
-    return closestBeat;
+    // Calculate key compatibility (circle of fifths distance)
+    const keyDistance = Math.abs(currentFeatures.key - nextFeatures.key);
+    const keyCompatibility = keyDistance <= 1 || keyDistance >= 11 ? 1 : 0.5;
+    
+    // Calculate energy difference
+    const energyDiff = Math.abs(currentFeatures.energy - nextFeatures.energy);
+    
+    // Determine optimal crossfade duration
+    let crossfadeDuration = 4; // Base duration
+    
+    if (tempoDiff > 20) crossfadeDuration += 2; // Longer for big tempo changes
+    if (energyDiff > 0.4) crossfadeDuration += 2; // Longer for energy jumps
+    if (keyCompatibility < 1) crossfadeDuration += 1; // Longer for key clashes
+    
+    return Math.min(Math.max(crossfadeDuration, 3), 12); // Between 3-12 seconds
 }
 
 /**
- * Executes a smooth volume crossfade 
- * @param {number} fromVolume - Starting volume (0-100)
- * @param {number} toVolume - Ending volume (0-100)
- * @param {number} durationMs - Crossfade duration in milliseconds
- * @param {Function} midpointCallback - Optional callback to execute at midpoint
- * @returns {Promise<void>}
+ * Assesses the quality of a transition between two tracks
+ * @param {Object} currentFeatures - Audio features of current track
+ * @param {Object} nextFeatures - Audio features of next track
+ * @returns {Object} Quality assessment with score and factors
  */
-async function performSmootCrossfade(fromVolume, toVolume, durationMs, midpointCallback = null) {
-    if (!spotifyPlayer) return;
-    
+function assessTransitionQuality(currentFeatures, nextFeatures) {
+    if (!currentFeatures || !nextFeatures) {
+        return { quality: 'unknown', score: 0.5 };
+    }
+
+    let score = 0;
+    const factors = [];
+
+    // Tempo compatibility (30% weight)
+    const tempoDiff = Math.abs(currentFeatures.tempo - nextFeatures.tempo);
+    const tempoScore = Math.max(0, 1 - (tempoDiff / 50));
+    score += tempoScore * 0.3;
+    factors.push(`Tempo: ${tempoScore.toFixed(2)}`);
+
+    // Key compatibility (25% weight)  
+    const keyDistance = Math.abs(currentFeatures.key - nextFeatures.key);
+    const keyScore = keyDistance <= 1 || keyDistance >= 11 ? 1 : 0.3;
+    score += keyScore * 0.25;
+    factors.push(`Key: ${keyScore.toFixed(2)}`);
+
+    // Energy flow (25% weight)
+    const energyDiff = Math.abs(currentFeatures.energy - nextFeatures.energy);
+    const energyScore = Math.max(0, 1 - energyDiff);
+    score += energyScore * 0.25;
+    factors.push(`Energy: ${energyScore.toFixed(2)}`);
+
+    // Valence/mood compatibility (20% weight)
+    const valenceDiff = Math.abs(currentFeatures.valence - nextFeatures.valence);
+    const valenceScore = Math.max(0, 1 - valenceDiff);
+    score += valenceScore * 0.2;
+    factors.push(`Mood: ${valenceScore.toFixed(2)}`);
+
+    let quality = 'poor';
+    if (score >= 0.8) quality = 'excellent';
+    else if (score >= 0.6) quality = 'good';
+    else if (score >= 0.4) quality = 'fair';
+
+    console.log(`🎵 Transition quality: ${quality} (${score.toFixed(2)}) - ${factors.join(', ')}`);
+
+    return { quality, score, factors };
+}
+
+// ===========================================
+// 4. VOLUME CONTROL & CROSSFADING
+// ===========================================
+
+/**
+ * Sets Spotify volume with SDK and API fallback
+ * @param {number} volumePercent - Volume percentage (0-100)
+ * @returns {boolean} Success status
+ */
+async function setSpotifyVolume(volumePercent) {
     try {
-        const steps = Math.max(5, Math.floor(durationMs / 50));
-        const stepDuration = durationMs / steps;
-        const volumeStep = (toVolume - fromVolume) / steps;
-        const midpoint = Math.floor(steps / 2);
+        if (spotifyPlayer) {
+            await spotifyPlayer.setVolume(volumePercent / 100);
+            return true;
+        }
+    } catch (error) {
+        console.warn('🔊 Volume control via SDK failed:', error.message);
+    }
+
+    try {
+        await fetch(`https://api.spotify.com/v1/me/player/volume?volume_percent=${Math.round(volumePercent)}&device_id=${spotifyDeviceId}`, {
+            method: 'PUT',
+            headers: { 'Authorization': `Bearer ${spotifyAccessToken}` }
+        });
+        return true;
+    } catch (error) {
+        console.warn('🔊 Volume control via API failed:', error.message);
+        return false;
+    }
+}
+
+/**
+ * Performs a smooth crossfade between two volume levels
+ * @param {number} fromVolume - Starting volume (0-100)
+ * @param {number} toVolume - Target volume (0-100)
+ * @param {number} durationMs - Duration in milliseconds
+ * @param {Function} callback - Optional callback at midpoint
+ */
+async function performSmootCrossfade(fromVolume, toVolume, durationMs, callback = null) {
+    const steps = 20; // Number of volume steps
+    const stepDuration = durationMs / steps;
+    const volumeStep = (toVolume - fromVolume) / steps;
+
+    for (let i = 0; i <= steps; i++) {
+        const currentVolume = fromVolume + (volumeStep * i);
+        await setSpotifyVolume(Math.max(0, Math.min(100, currentVolume)));
         
-        // Execute the fade
-        for (let i = 0; i < steps; i++) {
-            const currentVolume = fromVolume + volumeStep * i;
-            await spotifyPlayer.setVolume(currentVolume / 100);
-            
-            // Execute midpoint callback if provided
-            if (midpointCallback && i === midpoint) {
-                await midpointCallback();
-            }
-            
+        if (callback && i === Math.floor(steps / 2)) {
+            callback(); // Execute callback at midpoint (e.g., track switch)
+        }
+        
+        if (i < steps) {
             await new Promise(resolve => setTimeout(resolve, stepDuration));
         }
-        
-        // Ensure final volume is set
-        await spotifyPlayer.setVolume(toVolume / 100);
-        
-    } catch (error) {
-        console.error('🎛️ Crossfade error:', error);
-        // Reset volume to normal in case of error
-        if (spotifyPlayer) {
-            await spotifyPlayer.setVolume(0.8);
+    }
+}
+
+// ===========================================
+// 5. SMART TRANSITION UTILITIES
+// ===========================================
+
+/**
+ * Extracts track ID from Spotify URI
+ * @param {string} uri - Spotify URI (e.g., 'spotify:track:123')
+ * @returns {string|null} Track ID or null
+ */
+function extractTrackId(uri) {
+    if (!uri) return null;
+    const parts = uri.split(':');
+    return parts.length >= 3 ? parts[2] : null;
+}
+
+/**
+ * Pre-analyzes upcoming tracks for optimal performance
+ * @param {Array} tracks - Array of track objects with URIs
+ */
+async function preAnalyzeUpcomingTracks(tracks) {
+    for (const track of tracks) {
+        const trackId = extractTrackId(track.uri);
+        if (trackId) {
+            // Fire and forget - populate cache in background
+            getAudioAnalysis(trackId).catch(() => {});
+            getAudioFeatures(trackId).catch(() => {});
         }
     }
 }
+
+/**
+ * Prepares transition data between two tracks
+ * @param {Object} fromTrack - Current track object
+ * @param {Object} toTrack - Next track object
+ * @returns {Object|null} Transition data or null if failed
+ */
+async function prepareSmartTransition(fromTrack, toTrack) {
+    try {
+        const fromTrackId = extractTrackId(fromTrack.uri);
+        const toTrackId = extractTrackId(toTrack.uri);
+
+        if (!fromTrackId || !toTrackId) return null;
+
+        // Get audio analysis and features for both tracks
+        const [fromFeatures, toFeatures, fromAnalysis, toAnalysis] = await Promise.all([
+            getAudioFeatures(fromTrackId),
+            getAudioFeatures(toTrackId),
+            getAudioAnalysis(fromTrackId),
+            getAudioAnalysis(toTrackId)
+        ]);
+
+        if (fromFeatures && toFeatures) {
+            // Calculate transition parameters
+            const crossfadeDuration = calculateOptimalCrossfade(fromFeatures, toFeatures);
+            const transitionQuality = assessTransitionQuality(fromFeatures, toFeatures);
+
+            // Calculate beat-aligned points
+            const fromEndTime = fromTrack.duration || 180;
+            const toStartTime = 0;
+
+            const optimalFromEnd = findBeatAlignedEndPoint(fromAnalysis, fromEndTime);
+            const optimalToStart = findBeatAlignedStartPoint(toAnalysis, toStartTime);
+
+            return {
+                fromTrack,
+                toTrack,
+                fromEndTime: optimalFromEnd,
+                toStartTime: optimalToStart,
+                crossfadeDuration,
+                transitionQuality,
+                fromFeatures,
+                toFeatures
+            };
+        }
+
+        return null;
+
+    } catch (error) {
+        console.warn('🎛️ Smart transition preparation failed:', error.message);
+        return null;
+    }
+}
+
+// ===========================================
+// 6. EXPORT ALL DJ FUNCTIONS
+// ===========================================
+
+const DJFunctions = {
+    // Audio Analysis
+    getAudioAnalysis,
+    getAudioFeatures,
+    
+    // Beat Alignment
+    findBeatAlignedEndPoint,
+    findBeatAlignedStartPoint,
+    
+    // Transition Quality
+    calculateOptimalCrossfade,
+    assessTransitionQuality,
+    
+    // Volume & Crossfading
+    setSpotifyVolume,
+    performSmootCrossfade,
+    
+    // Utilities
+    extractTrackId,
+    preAnalyzeUpcomingTracks,
+    prepareSmartTransition,
+    
+    // Caches (for external access if needed)
+    audioAnalysisCache,
+    trackFeaturesCache: audioFeaturesCache
+};
 
 // PLAYLIST DJ ENGINE - SMART TRANSITION METHODS
 class PlaylistTransitionEngine {
