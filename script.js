@@ -20,7 +20,8 @@ const transitionSamples = {
         // Add more as needed
     },
     audioContext: null,
-    loadedBuffers: new Map()
+    loadedBuffers: new Map(),
+    activeSamples: new Set() // Track currently playing samples
 };
 
 // State
@@ -1118,7 +1119,7 @@ async function loadAudioBuffer(url) {
 }
 
 /**
- * Play a transition sample
+ * Play a transition sample and return a promise that resolves when the sample completes
  * Note: This plays through Web Audio API, completely independent of Spotify
  * Both audio streams mix naturally in the browser
  */
@@ -1163,6 +1164,10 @@ async function playTransitionSample(sampleKey = 'short', fadeOut = false, fadeIn
     }
     
     try {
+        // Create a unique ID for this sample playback to track it
+        const sampleId = `${sampleKey}_${Date.now()}`;
+        transitionSamples.activeSamples.add(sampleId);
+        
         // Create nodes
         const source = transitionSamples.audioContext.createBufferSource();
         const gainNode = transitionSamples.audioContext.createGain();
@@ -1190,18 +1195,72 @@ async function playTransitionSample(sampleKey = 'short', fadeOut = false, fadeIn
             gainNode.gain.linearRampToValueAtTime(0, fadeStart + 0.1);
         }
         
+        // Create a promise that resolves when the sample completes
+        const completionPromise = new Promise(resolve => {
+            source.onended = () => {
+                console.log(`🔊 Sample ${sampleKey} playback completed`);
+                transitionSamples.activeSamples.delete(sampleId);
+                resolve();
+            };
+            
+            // Safety timeout to ensure promise resolves even if onended doesn't fire
+            setTimeout(() => {
+                if (transitionSamples.activeSamples.has(sampleId)) {
+                    console.log(`⚠️ Sample ${sampleKey} timeout reached, forcing completion`);
+                    transitionSamples.activeSamples.delete(sampleId);
+                    resolve();
+                }
+            }, buffer.duration * 1000 + 500); // Add 500ms buffer
+        });
+        
         // Play the sample
         source.start(0);
         
         console.log(`🔊 Playing transition sample: ${sampleKey} (duration: ${buffer.duration.toFixed(2)}s, volume: ${Math.round(transitionSamples.volume * 100)}%)`);
         
-        // Return duration for timing purposes
-        return buffer.duration * 1000; // Convert to milliseconds
+        // Return a promise that resolves with the duration, and completes when sample finishes
+        return Promise.all([
+            Promise.resolve(buffer.duration * 1000), // Return duration in milliseconds
+            completionPromise
+        ]).then(([duration]) => duration);
         
     } catch (error) {
         console.error('❌ Error playing transition sample:', error);
         return 0;
     }
+}
+
+/**
+ * Waits for all active transition samples to complete playing
+ * @returns {Promise} Resolves when all samples are done
+ */
+async function waitForActiveSamples() {
+    if (transitionSamples.activeSamples.size === 0) {
+        return Promise.resolve();
+    }
+    
+    console.log(`⏳ Waiting for ${transitionSamples.activeSamples.size} active samples to complete`);
+    
+    // Check every 100ms if samples are done
+    return new Promise(resolve => {
+        const checkInterval = setInterval(() => {
+            if (transitionSamples.activeSamples.size === 0) {
+                clearInterval(checkInterval);
+                console.log('✅ All transition samples completed');
+                resolve();
+            }
+        }, 100);
+        
+        // Safety timeout after 5 seconds
+        setTimeout(() => {
+            if (transitionSamples.activeSamples.size > 0) {
+                console.warn(`⚠️ Timeout waiting for samples, ${transitionSamples.activeSamples.size} still active`);
+                clearInterval(checkInterval);
+                transitionSamples.activeSamples.clear();
+                resolve();
+            }
+        }, 5000);
+    });
 }
 
 /**
@@ -1392,8 +1451,9 @@ class PlaylistTransitionEngine {
     }
 
     /**
-     * Execute transition using the simplified gap-masking approach
+     * Execute transition using the improved gap-masking approach
      * Instead of complex volume automation, we use transition samples to mask the gap
+     * with improved timing and sample completion guarantees
      */
     async executeTransitionWithSample() {
         if (!this.currentPlaylist || this.transitionInProgress) return;
@@ -1421,6 +1481,11 @@ class PlaylistTransitionEngine {
                 
                 const sampleKey = selectTransitionSample(currentItem, nextItem);
                 
+                // IMPROVED: First pause to create a small gap before sample starts
+                // This creates a more natural transition feeling where the sample feels
+                // like a deliberate accent rather than blending with Track A's end
+                await new Promise(resolve => setTimeout(resolve, 300));
+                
                 // STEP 1: Start playing the transition sample
                 console.log(`🔊 [PLAYLIST TRANSITION] Starting transition sample to mask the gap`);
                 
@@ -1432,11 +1497,13 @@ class PlaylistTransitionEngine {
                 const sampleDuration = buffer ? buffer.duration * 1000 : 1000; // Default to 1s if unknown
                 
                 // STEP 2: Load the next track during the sample playback
-                // This creates a natural gap that the sample masks
+                // But wait a bit longer to let the sample establish itself first
                 console.log(`🔊 [PLAYLIST TRANSITION] Loading next track while sample plays`);
                 
-                // Small delay to allow sample to establish
-                await new Promise(resolve => setTimeout(resolve, 100));
+                // IMPROVED: Longer delay to ensure sample is clearly heard
+                // This ensures the scratch sample has time to make its presence felt
+                // before the next track begins loading
+                await new Promise(resolve => setTimeout(resolve, 500));
                 
                 // Increment to next track and load it
                 this.currentItemIndex++;
@@ -1449,8 +1516,12 @@ class PlaylistTransitionEngine {
                     }
                 }, 800);
                 
-                // Wait for sample to finish if it hasn't already
+                // IMPROVED: Wait for sample to finish completely
+                // This ensures the sample isn't cut off by the transition
                 await samplePromise;
+                
+                // Make absolutely sure all samples are done
+                await waitForActiveSamples();
                 
                 showStatus(`🎵 Clean transition complete`);
             } 
@@ -1498,8 +1569,9 @@ class PlaylistTransitionEngine {
     }
 
     /**
-     * Simplified smart transition with sample for masking the gap
+     * Improved smart transition with sample for masking the gap
      * Avoids complex volume crossfading that conflicts with Spotify's architecture
+     * Uses better timing to ensure sample is clearly heard
      */
     async executeSmartCrossfadeWithSample() {
         if (this.crossfadeInProgress || !this.currentTransitionData) return;
@@ -1521,12 +1593,15 @@ class PlaylistTransitionEngine {
                     toItem
                 );
                 
+                // IMPROVED: Create a brief pause before the sample
+                await new Promise(resolve => setTimeout(resolve, 300));
+                
                 // Play the transition sample to mask the gap
                 console.log(`🔊 [SMART TRANSITION] Playing transition sample to mask the gap`);
                 const samplePromise = playTransitionSample(sampleKey, true, true);
                 
-                // Small delay to allow sample to establish
-                await new Promise(resolve => setTimeout(resolve, 100));
+                // IMPROVED: Longer delay to allow sample to establish
+                await new Promise(resolve => setTimeout(resolve, 500));
                 
                 // Load the next track while the sample is playing
                 console.log(`🔊 [SMART TRANSITION] Loading next track at position ${formatTime(toStartTime)}`);
@@ -1537,8 +1612,11 @@ class PlaylistTransitionEngine {
                     await seekToPosition(toStartTime * 1000);
                 }
                 
-                // Wait for sample to complete if it hasn't already
+                // IMPROVED: Ensure sample completes before finalizing transition
                 await samplePromise;
+                
+                // Make absolutely sure all samples are done
+                await waitForActiveSamples();
             } else {
                 // Simple transition without sample
                 console.log(`🔊 [SMART TRANSITION] Using simple transition without sample`);
@@ -2005,7 +2083,7 @@ async function checkLoopEnd() {
   }
 }
 
-// Simplified loop end handling
+// Improved loop end handling with guaranteed sample completion
 async function handleLoopEnd() {
   try {
       isLooping = true;
@@ -2032,12 +2110,15 @@ async function handleLoopEnd() {
                   }
               }, 1000);
               
-              // This will use the simplified approach
+              // This will use the improved approach
               await playlistEngine.notifyItemComplete();
               
           } else if (transitionSamples.enabled && currentTrack) {
               // Regular loop mode with transition sample
               console.log('🎵 [TRACK END TRANSITION] Loop completed with transition sample');
+              
+              // IMPROVED: Brief pause before playing the sample
+              await new Promise(resolve => setTimeout(resolve, 300));
               
               // Select the sample to play at loop end
               const sampleKey = 'short'; // Use short sample for loop end
@@ -2061,6 +2142,9 @@ async function handleLoopEnd() {
               // Play a transition sample as we finish the loop
               const sampleDuration = await playTransitionSample(sampleKey, true, true);
               console.log(`🎵 [TRACK END TRANSITION] Sample played (duration: ${sampleDuration}ms)`);
+              
+              // IMPROVED: Ensure sample completes fully
+              await waitForActiveSamples();
               
               // Remove indicator after transition completes
               setTimeout(() => {
