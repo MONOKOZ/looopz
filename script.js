@@ -1392,8 +1392,8 @@ class PlaylistTransitionEngine {
     }
 
     /**
-     * Execute transition with complementary volume levels for a linear total volume
-     * When Track A is at X%, Track B is at (100-X)%, maintaining constant combined volume
+     * Execute transition with improved volume architecture for a more seamless experience
+     * Using overlapping simultaneous playback with continuous volume curves
      */
     async executeTransitionWithSample() {
         if (!this.currentPlaylist || this.transitionInProgress) return;
@@ -1417,8 +1417,8 @@ class PlaylistTransitionEngine {
                 await this.executeSmartCrossfade();
             } 
             else if (transitionSamples.enabled) {
-                // LINEAR VOLUME CROSSFADE IMPLEMENTATION
-                console.log('🎵 [PLAYLIST TRANSITION] Using linear volume crossfade transition');
+                // IMPROVED OVERLAPPING TRANSITION IMPLEMENTATION
+                console.log('🎵 [PLAYLIST TRANSITION] Using simultaneous overlapping transition');
                 
                 const sampleKey = selectTransitionSample(currentItem, nextItem);
                 
@@ -1427,68 +1427,59 @@ class PlaylistTransitionEngine {
                 transitionIndicator.style.cssText = 'position:fixed; top:0; left:0; right:0; height:4px; background:linear-gradient(90deg,#1DB954,#9945DB); z-index:9999; opacity:0.8;';
                 document.body.appendChild(transitionIndicator);
                 
-                // PRE-LOAD next track at 0 volume (completely silent)
-                console.log(`🔊 [PLAYLIST TRANSITION] Pre-loading next track silently`);
-                this.currentItemIndex++;
-                await this.loadPlaylistItem(this.currentItemIndex);
-                await setSpotifyVolume(0);
-                
-                // 1. STEP ONE: Begin fading out Track A first (100→50)
-                console.log(`🔊 [PLAYLIST TRANSITION] Starting fade out of Track A (100→50)`);
-                const midPointVolume = 50; // Track A's midpoint volume
-                await performSmootCrossfade(100, midPointVolume, 300);
-                
-                // 2. STEP TWO: Start sample at 75% of Track A's target volume
-                // Calculate sample volume based on Track A target (75% of midPointVolume)
-                const sampleVolume = Math.min(1.0, (midPointVolume * 0.75) / 100);
-                console.log(`🔊 [PLAYLIST TRANSITION] Starting sample at ${Math.round(sampleVolume * 100)}% volume`);
-                
+                // STEP 1: Start playing the transition sample first
+                console.log(`🔊 [PLAYLIST TRANSITION] Starting transition sample`);
                 // Store original sample volume
                 const originalSampleVolume = transitionSamples.volume;
-                // Set sample volume to calculated value
-                transitionSamples.volume = sampleVolume;
+                // Set initial sample volume (0→70%)
+                transitionSamples.volume = 0.7;
                 
-                // Play the sample
-                const samplePromise = playTransitionSample(sampleKey, true, true);
-                
-                // Get sample duration to calculate midpoint
+                // Get sample buffer to calculate timing
                 const buffer = transitionSamples.loadedBuffers.get(sampleKey);
                 const sampleDuration = buffer ? buffer.duration * 1000 : 1000; // Default to 1s if unknown
                 
-                // 3. STEP THREE: Wait until sample is 50% complete
-                console.log(`🔊 [PLAYLIST TRANSITION] Waiting for sample midpoint (${Math.round(sampleDuration/2)}ms)`);
-                await new Promise(resolve => setTimeout(resolve, sampleDuration / 2));
+                // Play the sample with fade-in and fade-out
+                const samplePromise = playTransitionSample(sampleKey, true, true);
                 
-                // 4. STEP FOUR: Complementary crossfade - Track A at 50%, Track B starts at 50%
-                // This maintains 100% total volume (50% + 50% = 100%)
-                console.log(`🔊 [PLAYLIST TRANSITION] Starting Track B at complementary volume 50%`);
-                await setSpotifyVolume(midPointVolume); // Track B starts at complementary volume
+                // STEP 2: Begin fading out Track A (100→60) while sample plays
+                console.log(`🔊 [PLAYLIST TRANSITION] Beginning fade out of Track A (100→60)`);
+                await performSmootCrossfade(100, 60, 300);
                 
-                // 5. STEP FIVE: Linear crossfade - as Track A goes 50→0, Track B goes 50→100
-                console.log(`🔊 [PLAYLIST TRANSITION] Executing linear crossfade: Track A (50→0), Track B (50→100)`);
+                // STEP 3: PRE-LOAD next track at low volume (30%) DURING the sample
+                console.log(`🔊 [PLAYLIST TRANSITION] Pre-loading next track at 30% volume`);
+                this.currentItemIndex++;
+                await this.loadPlaylistItem(this.currentItemIndex);
+                await setSpotifyVolume(30);
                 
-                // Use multiple small steps for smoother effect
+                // STEP 4: As sample peaks, Track A continues fading (60→30→0)
+                console.log(`🔊 [PLAYLIST TRANSITION] Track A continuing to fade (60→30→0)`);
+                await performSmootCrossfade(60, 30, 200);
+                
+                // STEP 5: Track B fades up (30→60→100) as sample fades out
+                console.log(`🔊 [PLAYLIST TRANSITION] Track B fading up (30→60→100)`);
+                
+                // Simultaneous fade: Track A 30→0 and Track B 30→60
                 const steps = 10;
-                const stepDuration = 40; // 40ms per step = 400ms total
+                const stepDuration = Math.floor(sampleDuration / 20); // Distributed across remainder of sample
                 
                 for (let i = 0; i <= steps; i++) {
-                    // Calculate complementary volumes - always sum to 100%
-                    const trackAVolume = midPointVolume * (1 - (i / steps));
-                    const trackBVolume = midPointVolume + (midPointVolume * (i / steps));
+                    // Calculate volumes for proper overlapping
+                    const trackAVolume = 30 * (1 - (i / steps));
+                    const trackBVolume = 30 + (30 * (i / steps));
                     
-                    // Set Track A volume (first track is controlled via crossfade)
+                    // Set Track A volume
                     await performSmootCrossfade(
-                        i === 0 ? midPointVolume : null, // Only set starting volume on first step
+                        i === 0 ? 30 : null, // Only set starting volume on first step
                         trackAVolume,
                         stepDuration
                     );
                     
-                    // Set Track B volume (next track controlled directly)
+                    // Set Track B volume
                     await setSpotifyVolume(trackBVolume);
                 }
                 
-                // Ensure Track B is at full volume at the end
-                await setSpotifyVolume(100);
+                // Final fade: Track B 60→100
+                await performSmootCrossfade(60, 100, 300);
                 
                 // Restore original sample volume
                 transitionSamples.volume = originalSampleVolume;
@@ -1503,7 +1494,7 @@ class PlaylistTransitionEngine {
                 // Wait for sample to finish if it hasn't already
                 await samplePromise;
                 
-                showStatus(`🎵 Seamless track transition complete`);
+                showStatus(`🎵 Seamless overlapping transition complete`);
             } 
             else {
                 // Simple gap-less transition
@@ -1542,8 +1533,8 @@ class PlaylistTransitionEngine {
     }
 
     /**
-     * Enhanced smart crossfade with complementary volume levels for linear transitions
-     * Maintains constant 100% combined volume throughout the transition
+     * Enhanced smart crossfade with simultaneous overlapping and improved volume architecture
+     * Creates a true "crossfade with sample accent" rather than sequential transitions
      */
     async executeSmartCrossfadeWithSample() {
         if (this.crossfadeInProgress || !this.currentTransitionData) return;
@@ -1565,75 +1556,59 @@ class PlaylistTransitionEngine {
                     toItem
                 );
                 
-                // PRE-LOAD the next track silently first
-                console.log(`🔊 [SMART CROSSFADE] Pre-loading next track silently`);
-                await this.loadPlaylistItem(this.currentItemIndex + 1);
-                await seekToPosition(toStartTime * 1000);
-                await setSpotifyVolume(0); // Start completely silent
-                
-                // 1. STEP ONE: Begin fading out Track A first (100→50)
-                const midPointVolume = 50; // Track A's midpoint volume
-                console.log(`🔊 [SMART CROSSFADE] Starting fade out of Track A (100→${midPointVolume})`);
-                await performSmootCrossfade(100, midPointVolume, crossfadeDuration * 250);
-                
-                // 2. STEP TWO: Start sample at 75% of Track A's midpoint volume
-                // Calculate sample volume based on Track A midpoint
-                const sampleVolume = Math.min(1.0, (midPointVolume * 0.75) / 100);
-                console.log(`🔊 [SMART CROSSFADE] Starting sample at ${Math.round(sampleVolume * 100)}% volume`);
-                
+                // STEP 1: Start playing the transition sample first
+                console.log(`🔊 [SMART CROSSFADE] Starting transition sample`);
                 // Store original sample volume
                 const originalSampleVolume = transitionSamples.volume;
-                // Set sample volume to calculated value
-                transitionSamples.volume = sampleVolume;
+                // Set sample volume to 70% for the accent
+                transitionSamples.volume = 0.7;
                 
-                // Play the sample
+                // Play the sample with fade-in and fade-out
                 const samplePromise = playTransitionSample(sampleKey, true, true);
                 
-                // Get sample duration to calculate midpoint
+                // Get sample duration to calculate timing
                 const buffer = transitionSamples.loadedBuffers.get(sampleKey);
                 const sampleDuration = buffer ? buffer.duration * 1000 : 1000; // Default to 1s if unknown
                 
-                // 3. STEP THREE: Wait until sample is 50% complete
-                console.log(`🔊 [SMART CROSSFADE] Waiting for sample midpoint (${Math.round(sampleDuration/2)}ms)`);
-                await new Promise(resolve => setTimeout(resolve, sampleDuration / 2));
+                // STEP 2: Begin fading out Track A (100→60) while sample plays
+                console.log(`🔊 [SMART CROSSFADE] Starting fade out of Track A (100→60)`);
+                await performSmootCrossfade(100, 60, crossfadeDuration * 200);
                 
-                // 4. STEP FOUR: Complementary crossfade - Track A at 50%, Track B starts at 50%
-                // This maintains 100% total volume (50% + 50% = 100%)
-                console.log(`🔊 [SMART CROSSFADE] Starting Track B at complementary volume ${midPointVolume}%`);
-                await setSpotifyVolume(midPointVolume); // Track B starts at complementary volume
+                // STEP 3: PRE-LOAD next track at low volume (30%) DURING the sample
+                console.log(`🔊 [SMART CROSSFADE] Pre-loading next track at 30% volume`);
+                await this.loadPlaylistItem(this.currentItemIndex + 1);
+                await seekToPosition(toStartTime * 1000);
+                await setSpotifyVolume(30);
                 
-                // 5. STEP FIVE: Linear complementary crossfade
-                // Track A: 50% → 0% while Track B: 50% → 100%
-                // Total volume remains constant at 100% throughout
-                console.log(`🔊 [SMART CROSSFADE] Executing linear complementary crossfade`);
+                // STEP 4: As sample peaks, Track A continues fading (60→30→0)
+                console.log(`🔊 [SMART CROSSFADE] Track A continuing fade (60→30→0)`);
+                await performSmootCrossfade(60, 30, crossfadeDuration * 150);
                 
-                // Use multiple small steps for smoother crossfade
-                const steps = Math.max(5, Math.floor(crossfadeDuration * 2)); // More steps for longer crossfades
-                const stepDuration = Math.floor((crossfadeDuration * 500) / steps); // Distribute time evenly
+                // STEP 5: Track B fades up (30→60→100) as sample fades out
+                console.log(`🔊 [SMART CROSSFADE] Track B fading up (30→60→100)`);
+                
+                // First stage: Track A 30→0 while Track B 30→60
+                const steps = 10;
+                const stepDuration = Math.floor((crossfadeDuration * 300) / steps);
                 
                 for (let i = 0; i <= steps; i++) {
-                    // Calculate complementary volumes - always sum to 100%
-                    const trackAVolume = midPointVolume * (1 - (i / steps));
-                    const trackBVolume = midPointVolume + (midPointVolume * (i / steps));
+                    // Calculate volumes for proper overlapping transition
+                    const trackAVolume = 30 * (1 - (i / steps));
+                    const trackBVolume = 30 + (30 * (i / steps));
                     
-                    // Set Track A volume (first track is controlled via crossfade)
+                    // Set Track A volume
                     await performSmootCrossfade(
-                        i === 0 ? midPointVolume : null, // Only set starting volume on first step
+                        i === 0 ? 30 : null, // Only set starting volume on first step
                         trackAVolume,
                         stepDuration
                     );
                     
-                    // Set Track B volume (next track controlled directly)
+                    // Set Track B volume
                     await setSpotifyVolume(trackBVolume);
-                    
-                    // Log every few steps for debugging
-                    if (i % 3 === 0 || i === steps) {
-                        console.log(`🔊 [STEP ${i}/${steps}] Track A: ${Math.round(trackAVolume)}%, Track B: ${Math.round(trackBVolume)}%`);
-                    }
                 }
                 
-                // Final check to ensure Track B is at full volume
-                await setSpotifyVolume(100);
+                // Final stage: Track B 60→100
+                await performSmootCrossfade(60, 100, crossfadeDuration * 150);
                 
                 // Restore original sample volume
                 transitionSamples.volume = originalSampleVolume;
@@ -1642,38 +1617,55 @@ class PlaylistTransitionEngine {
                 await samplePromise;
                 
             } else {
-                // If no samples, still use the complementary volume approach
-                console.log(`🔊 [SMART CROSSFADE] Using complementary volume crossfade without sample`);
+                // Simultaneous crossfade without sample
+                console.log(`🔊 [SMART CROSSFADE] Using overlapping volume transition without sample`);
                 
                 // Pre-load next track silently
                 await this.loadPlaylistItem(this.currentItemIndex + 1);
                 await seekToPosition(toStartTime * 1000);
                 await setSpotifyVolume(0);
                 
-                // 1. First half of crossfade: Track A 100% → 50%
-                await performSmootCrossfade(100, 50, crossfadeDuration * 250);
+                // First stage: Track A 100→60 while starting Track B
+                await performSmootCrossfade(100, 60, crossfadeDuration * 200);
                 
-                // 2. Bring Track B up to complementary volume (50%)
-                await setSpotifyVolume(50);
+                // Bring Track B up to initial volume (30%)
+                await setSpotifyVolume(30);
                 
-                // 3. Complete crossfade with complementary volumes
-                // Track A: 50% → 0%, Track B: 50% → 100%
-                const steps = Math.max(5, Math.floor(crossfadeDuration * 2));
-                const stepDuration = Math.floor((crossfadeDuration * 500) / steps);
+                // Second stage: Track A 60→30 while Track B 30→60
+                const stepsFirst = 10;
+                const stepDurationFirst = Math.floor((crossfadeDuration * 300) / stepsFirst);
                 
-                for (let i = 0; i <= steps; i++) {
-                    const trackAVolume = 50 * (1 - (i / steps));
-                    const trackBVolume = 50 + (50 * (i / steps));
+                for (let i = 0; i <= stepsFirst; i++) {
+                    const trackAVolume = 60 - (30 * (i / stepsFirst));
+                    const trackBVolume = 30 + (30 * (i / stepsFirst));
                     
                     await performSmootCrossfade(
-                        i === 0 ? 50 : null,
+                        i === 0 ? 60 : null,
                         trackAVolume,
-                        stepDuration
+                        stepDurationFirst
                     );
                     
                     await setSpotifyVolume(trackBVolume);
                 }
                 
+                // Final stage: Track A 30→0 while Track B 60→100
+                const stepsSecond = 10;
+                const stepDurationSecond = Math.floor((crossfadeDuration * 300) / stepsSecond);
+                
+                for (let i = 0; i <= stepsSecond; i++) {
+                    const trackAVolume = 30 * (1 - (i / stepsSecond));
+                    const trackBVolume = 60 + (40 * (i / stepsSecond));
+                    
+                    await performSmootCrossfade(
+                        i === 0 ? 30 : null,
+                        trackAVolume,
+                        stepDurationSecond
+                    );
+                    
+                    await setSpotifyVolume(trackBVolume);
+                }
+                
+                // Ensure Track B is at full volume
                 await setSpotifyVolume(100);
             }
             
@@ -1687,7 +1679,7 @@ class PlaylistTransitionEngine {
             this.currentItemIndex++;
             this.currentTransitionData = null;
 
-            showStatus(`🎛️ Smart transition complete with linear volume crossfade`);
+            showStatus(`🎛️ Smart transition complete with true overlapping crossfade`);
 
         } catch (error) {
             console.error('🎛️ Smart crossfade failed:', error);
