@@ -14,9 +14,9 @@ const transitionSamples = {
     enabled: false,
     volume: 0.7, // 0-1 range
     samples: {
-        short: '/assets/sounds/scratch_short.MP3', // 0.5s for short loops
-        medium: '/assets/sounds/scratch_med.MP3', // 1s for medium
-        long: '/assets/sounds/scratch_long.MP3', // 2s for long tracks
+        short: 'assets/sounds/scratch_short.MP3', // 0.5s for short loops
+        medium: 'assets/sounds/scratch_med.MP3', // 1s for medium
+        long: 'assets/sounds/scratch_long.MP3', // 2s for long tracks
         // Add more as needed
     },
     audioContext: null,
@@ -1014,71 +1014,59 @@ async function initializeTransitionSamples() {
         let loadedCount = 0;
         const totalSamples = Object.keys(transitionSamples.samples).length;
         
-        // Define all possible base paths to try
-        const basePaths = [
-            '', // Current path as defined
-            window.location.origin + '/', // Absolute from origin
-            '/', // Root relative
-            '/assets/', // From assets directory
-            'assets/', // Relative assets
-        ];
-        
-        for (const [key, originalUrl] of Object.entries(transitionSamples.samples)) {
-            let loaded = false;
-            
-            // Try each base path
-            for (const basePath of basePaths) {
-                // Skip empty base when URL already starts with /
-                if (basePath === '' && originalUrl.startsWith('/')) continue;
+        for (const [key, url] of Object.entries(transitionSamples.samples)) {
+            try {
+                console.log(`🔄 Attempting to load sample: ${key} from ${url}`);
+                const buffer = await loadAudioBuffer(url);
+                transitionSamples.loadedBuffers.set(key, buffer);
+                loadedCount++;
+                console.log(`✅ Loaded transition sample (${loadedCount}/${totalSamples}): ${key} from ${url}`);
+            } catch (error) {
+                console.warn(`⚠️ Failed to load transition sample ${key} from ${url}:`, error);
                 
-                // Remove any leading slash if base path ends with slash
-                const url = (basePath.endsWith('/') && originalUrl.startsWith('/')) 
-                    ? basePath + originalUrl.substring(1) 
-                    : basePath + originalUrl;
+                // Try multiple path variations for maximum compatibility
+                const altPaths = [
+                    // Case sensitivity variations
+                    url.replace('.MP3', '.mp3'),
+                    url.replace('.mp3', '.MP3'),
+                    // Path format variations
+                    url.startsWith('/') ? url.substring(1) : `/${url}`,
+                    // Different directory structure variations
+                    url.includes('/sounds/') ? url : url.replace('assets/', 'assets/sounds/'),
+                    `assets/sounds/${key}.MP3`,
+                    `assets/sounds/${key}.mp3`,
+                    `/assets/sounds/${key}.MP3`,
+                    `/assets/sounds/${key}.mp3`
+                ];
                 
-                try {
-                    console.log(`🔄 Attempting to load sample: ${key} using path: ${url}`);
-                    const buffer = await loadAudioBuffer(url);
-                    transitionSamples.loadedBuffers.set(key, buffer);
-                    loadedCount++;
-                    console.log(`✅ Loaded transition sample (${loadedCount}/${totalSamples}): ${key} from ${url}`);
-                    
-                    // Store the working path
-                    transitionSamples.samples[key] = url;
-                    loaded = true;
-                    break;
-                } catch (error) {
-                    console.warn(`⚠️ Failed to load using path: ${url}`, error.message);
-                    
-                    // Try alternative extensions if this is a path issue
-                    const altExtUrl = url.endsWith('.MP3') 
-                        ? url.replace('.MP3', '.mp3') 
-                        : url.replace('.mp3', '.MP3');
+                let loaded = false;
+                for (const altPath of altPaths) {
+                    if (altPath === url) continue;
                     
                     try {
-                        console.log(`🔄 Trying alternate extension: ${altExtUrl}`);
-                        const buffer = await loadAudioBuffer(altExtUrl);
+                        console.log(`🔄 Trying alternate path: ${altPath}`);
+                        const buffer = await loadAudioBuffer(altPath);
                         transitionSamples.loadedBuffers.set(key, buffer);
                         loadedCount++;
-                        console.log(`✅ Loaded with alternate extension: ${key} from ${altExtUrl}`);
-                        
-                        // Store the working path
-                        transitionSamples.samples[key] = altExtUrl;
+                        console.log(`✅ Loaded transition sample with alternate path: ${key} from ${altPath}`);
                         loaded = true;
+                        
+                        // Update the original path to the working one for future references
+                        transitionSamples.samples[key] = altPath;
                         break;
                     } catch (altError) {
-                        // Continue to next base path
+                        console.warn(`⚠️ Alternate path ${altPath} also failed`);
                     }
                 }
-            }
-            
-            if (!loaded) {
-                console.error(`❌ All paths failed for sample: ${key}. Please check if the file exists at any of these locations.`);
+                
+                if (!loaded) {
+                    console.error(`❌ All paths failed for sample: ${key}`);
+                }
             }
         }
         
         if (loadedCount === 0) {
-            console.error('❌ Failed to load ANY transition samples. The system will be disabled.');
+            console.error('❌ Failed to load ANY transition samples');
             return false;
         }
         
@@ -1087,7 +1075,7 @@ async function initializeTransitionSamples() {
         console.log('📊 Loaded samples:', 
           Array.from(transitionSamples.loadedBuffers.keys())
             .map(key => `${key}: ${transitionSamples.samples[key]}`).join(', '));
-        
+            
         // Test play a sample to verify audio system works
         if (transitionSamples.loadedBuffers.has('short')) {
             console.log('🔈 Testing sample playback...');
