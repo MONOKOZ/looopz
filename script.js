@@ -649,12 +649,10 @@ async function getAudioAnalysis(trackId) {
 
 /**
  * Fetches Spotify's audio features for a track (tempo, key, energy, etc.)
- * @param {string} trackId - Spotify track ID
- * @returns {Object|null} Audio features data or null if failed
  */
 async function getAudioFeatures(trackId) {
-    if (audioFeaturesCache.has(trackId)) {
-        return audioFeaturesCache.get(trackId);
+    if (trackFeaturesCache.has(trackId)) {
+        return trackFeaturesCache.get(trackId);
     }
 
     try {
@@ -667,7 +665,7 @@ async function getAudioFeatures(trackId) {
         }
 
         const features = await response.json();
-        audioFeaturesCache.set(trackId, features);
+        trackFeaturesCache.set(trackId, features);
         return features;
     } catch (error) {
         console.warn('🎵 Audio features unavailable:', error.message);
@@ -984,7 +982,7 @@ const DJFunctions = {
     
     // Caches (for external access if needed)
     audioAnalysisCache,
-    trackFeaturesCache: audioFeaturesCache
+    trackFeaturesCache
 };
 
 // PLAYLIST DJ ENGINE - SMART TRANSITION METHODS
@@ -1497,24 +1495,10 @@ function setupPlaylistEngineCallbacks() {
       stopPlaylistMode();
   };
   
-  // Set up the smart transition callback for UI feedback
   playlistEngine.onSmartTransition = (transitionData) => {
-      const { transitionQuality, crossfadeDuration, fromItem, toItem } = transitionData;
-      
-      // Show transition quality in the UI
-      const fromName = fromItem.name;
-      const toName = toItem.name;
-      const quality = transitionQuality.quality;
-      const duration = crossfadeDuration.toFixed(1);
-      
-      console.log(`🎛️ Smart transition prepared: ${fromName} → ${toName}`);
-      console.log(`🎛️ Quality: ${quality}, Duration: ${duration}s`);
-      
-      // Update UI with transition info
-      showStatus(`🎛️ Smart transition: ${quality} (${duration}s)`);
-      
-      // You could update additional UI elements here if needed
-      // For example, showing a transition quality indicator
+      console.log('🎛️ Smart transition data:', transitionData);
+      const { transitionQuality, crossfadeDuration } = transitionData;
+      showStatus(`🎛️ Smart transition: ${crossfadeDuration}s (${transitionQuality.quality})`);
   };
 }
 
