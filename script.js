@@ -192,17 +192,24 @@ function updatePlayPauseButton() {
   els.playPauseBtn.innerHTML = isPlaying 
     ? '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-pause"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>' 
     : '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-play"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>';
+  updateMiniPlayButton();
 }
 
-function updateNowPlayingIndicator(track = null) {
-  const indicator = els.nowPlayingIndicator;
-  if (track && isPlaying && currentView !== 'player') {
-      els.miniTrackTitle.textContent = track.name;
-      els.miniTrackArtist.textContent = track.artist;
-      indicator.classList.add('show');
+function updateMiniPlayer(track = null) {
+  if (track && currentView !== 'player') {
+      els.miniTrackTitle.textContent = track.name || 'Unknown Track';
+      els.miniTrackArtist.textContent = track.artist || 'Unknown Artist';
+      els.miniPlayer.classList.remove('hidden');
+      updateMiniPlayButton();
   } else {
-      indicator.classList.remove('show');
+      els.miniPlayer.classList.add('hidden');
   }
+}
+
+function updateMiniPlayButton() {
+  els.miniPlayBtn.innerHTML = isPlaying 
+    ? '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-pause"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>' 
+    : '<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-play"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>';
 }
 
 function updateConnectionStatus() {
@@ -459,7 +466,7 @@ function disconnectSpotify() {
   isConnected = false;
   if (spotifyPlayer) spotifyPlayer.disconnect();
   updateConnectionStatus();
-  updateNowPlayingIndicator();
+  updateMiniPlayer();
   showView('login');
   showStatus('Disconnected from Spotify');
 }
@@ -526,7 +533,7 @@ async function loadTrackIntoSpotify(track, startPositionMs = 0) {
                   els.currentArtist.textContent = track.artist;
                   updateProgress();
                   updatePlayPauseButton();
-                  updateNowPlayingIndicator(currentTrack);
+                  updateMiniPlayer(currentTrack);
 
                   // Start progress updates if playing
                   if (isPlaying) {
@@ -575,7 +582,7 @@ async function togglePlayPause() {
 
           isPlaying = !isPlaying;
           updatePlayPauseButton();
-          updateNowPlayingIndicator(isPlaying ? currentTrack : null);
+          updateMiniPlayer(isPlaying ? currentTrack : null);
 
           if (isPlaying) {
               startProgressUpdates();
@@ -605,7 +612,7 @@ async function togglePlayPause() {
 
       isPlaying = !isPlaying;
       updatePlayPauseButton();
-      updateNowPlayingIndicator(isPlaying ? currentTrack : null);
+      updateMiniPlayer(isPlaying ? currentTrack : null);
 
       if (isPlaying) {
           startProgressUpdates();
@@ -638,7 +645,7 @@ async function playFromPosition(positionMs = 0) {
           isPlaying = true;
           currentTime = positionMs / 1000;
           updatePlayPauseButton();
-          updateNowPlayingIndicator(currentTrack);
+          updateMiniPlayer(currentTrack);
           updateProgress();
           startProgressUpdates();
           showStatus('Playing!');
@@ -665,7 +672,7 @@ async function playFromPosition(positionMs = 0) {
       isPlaying = true;
       currentTime = positionMs / 1000;
       updatePlayPauseButton();
-      updateNowPlayingIndicator(currentTrack);
+      updateMiniPlayer(currentTrack);
       updateProgress();
       startProgressUpdates();
       showStatus('Playing!');
@@ -2068,7 +2075,7 @@ function initializeSpotifyPlayer() {
 
           updateProgress();
           updatePlayPauseButton();
-          updateNowPlayingIndicator(currentTrack);
+          updateMiniPlayer(currentTrack);
 
           if (state.track_window.current_track) {
               const track = state.track_window.current_track;
@@ -2584,7 +2591,7 @@ async function playTrackInBackground(track) {
       }
 
       updateSearchTrackHighlighting(track.uri);
-      updateNowPlayingIndicator(currentTrack);
+      updateMiniPlayer(currentTrack);
       showStatus(`🎵 Playing: ${track.name}`);
 
   } catch (error) {
@@ -2633,7 +2640,7 @@ async function selectTrack(uri, name, artist, durationMs, imageUrl) {
       
       // Update UI components
       updatePlayPauseButton();
-      updateNowPlayingIndicator(currentTrack);
+      updateMiniPlayer(currentTrack);
       startProgressUpdates();
       
       showStatus(`✅ Selected: ${name}`);
@@ -2955,7 +2962,7 @@ async function loadSavedLoop(loopId) {
 
       updateProgress();
       updatePlayPauseButton();
-      updateNowPlayingIndicator(currentTrack);
+      updateMiniPlayer(currentTrack);
       startProgressUpdates();
 
       showView('player');
@@ -3799,7 +3806,7 @@ async function loadSharedLoop() {
 
           updateProgress();
           updatePlayPauseButton();
-          updateNowPlayingIndicator(currentTrack);
+          updateMiniPlayer(currentTrack);
           startProgressUpdates();
 
           showView('player');
@@ -4439,6 +4446,84 @@ function setupEventListeners() {
           updateLoopVisuals();
       }
   });
+
+  // Mini Player Event Handlers
+  // Play/pause button in mini player
+  els.miniPlayBtn.addEventListener('click', async (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      if (!currentTrack) {
+          showStatus('No track selected');
+          return;
+      }
+      try {
+          await togglePlayPause();
+      } catch (error) {
+          console.error('Mini player play/pause error:', error);
+          showStatus('Playback failed');
+      }
+  });
+
+  // Tap mini player content to show player view
+  els.miniPlayer.addEventListener('click', (e) => {
+      // Don't trigger on play button click
+      if (e.target.closest('.mini-play-btn')) return;
+      
+      e.preventDefault();
+      if (currentTrack) {
+          showView('player');
+      }
+  });
+
+  // Touch events for swipe gestures (playlist navigation)
+  let touchStartX = 0;
+  let touchStartY = 0;
+  let touchStartTime = 0;
+  
+  els.miniPlayer.addEventListener('touchstart', (e) => {
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+      touchStartTime = Date.now();
+  }, { passive: true });
+
+  els.miniPlayer.addEventListener('touchend', async (e) => {
+      if (!e.changedTouches[0]) return;
+      
+      const touchEndX = e.changedTouches[0].clientX;
+      const touchEndY = e.changedTouches[0].clientY;
+      const touchEndTime = Date.now();
+      
+      const deltaX = touchEndX - touchStartX;
+      const deltaY = touchEndY - touchStartY;
+      const deltaTime = touchEndTime - touchStartTime;
+      
+      // Only process quick swipes (< 300ms) with significant horizontal movement
+      if (deltaTime < 300 && Math.abs(deltaX) > 50 && Math.abs(deltaY) < 30) {
+          e.preventDefault();
+          
+          // Only allow swipe navigation when in playlist mode
+          if (isPlaylistMode && playlistEngine) {
+              try {
+                  if (deltaX > 0) {
+                      // Swipe right - previous track
+                      await playlistEngine.skipToPrevious();
+                      showStatus('⏮️ Previous track');
+                  } else {
+                      // Swipe left - next track  
+                      await playlistEngine.skipToNext();
+                      showStatus('⏭️ Next track');
+                  }
+              } catch (error) {
+                  console.error('Swipe navigation error:', error);
+                  showStatus('Navigation failed');
+              }
+          } else {
+              // Show helpful message when not in playlist mode
+              const direction = deltaX > 0 ? 'previous' : 'next';
+              showStatus(`Swipe to ${direction} available in playlist mode`);
+          }
+      }
+  }, { passive: false });
 }
 
 // Global edit functions
@@ -4470,9 +4555,10 @@ function init() {
       connectionStatus: document.getElementById('connection-status'),
       statusBar: document.getElementById('status-bar'),
       statusText: document.getElementById('status-text'),
-      nowPlayingIndicator: document.getElementById('now-playing-indicator'),
+      miniPlayer: document.getElementById('mini-player'),
       miniTrackTitle: document.getElementById('mini-track-title'),
       miniTrackArtist: document.getElementById('mini-track-artist'),
+      miniPlayBtn: document.getElementById('mini-play-btn'),
       searchInput: document.getElementById('search-input'),
       searchResults: document.getElementById('search-results'),
       searchBackBtn: document.getElementById('search-back-btn'),
