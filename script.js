@@ -38,6 +38,7 @@ let isPlaylistMode = false;
 let currentEditingPlaylistId = null;
 let pendingPlaylistItem = null; // For adding items to playlists
 let playlistEngine = null; // Will hold the playlist engine instance
+let playlistViewMode = 'overview'; // 'overview' or 'tracklist'
 
 // Search state
 let searchState = {
@@ -2133,9 +2134,9 @@ function setupPlaylistEngineCallbacks() {
       console.log('🎵 Playlist item changed:', item);
       updatePlaylistNowPlaying(item, index);
       
-      // Update playlist track display to show new current track
+      // Update playlist display to show new current track
       if (currentView === 'playlists' && isPlaylistMode) {
-          updatePlaylistTrackDisplay();
+          updatePlaylistDisplay();
       }
 
       // Update main player UI and let it handle the loops
@@ -2706,11 +2707,7 @@ function showView(view) {
   if (view === 'library') els.librarySection.classList.remove('hidden');
   if (view === 'playlists') {
       els.playlistsSection.classList.remove('hidden');
-      if (isPlaylistMode && currentPlaylist) {
-          updatePlaylistTrackDisplay();
-      } else {
-          renderPlaylistsList();
-      }
+      updatePlaylistDisplay();
   }
 
   document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
@@ -3306,9 +3303,10 @@ async function playPlaylist(playlistId, startIndex = 0) {
       // Load playlist into engine
       await playlistEngine.loadPlaylist(playlist, startIndex);
 
-      // Stay in playlist view - don't jump to player
+      // Stay in playlist view - switch to track list mode
       // User can tap mini player or nav to enter loop mode
-      updatePlaylistTrackDisplay();
+      playlistViewMode = 'tracklist';
+      updatePlaylistDisplay();
       
       showStatus(`🎵 Playing playlist: ${playlist.name}`);
 
@@ -3455,19 +3453,36 @@ function renderPlaylistItems(playlist) {
   `).join('');
 }
 
+// Universal playlist display function - handles both modes
+function updatePlaylistDisplay() {
+  if (playlistViewMode === 'tracklist' && currentPlaylist && isPlaylistMode) {
+    updatePlaylistTrackDisplay();
+  } else {
+    renderPlaylistsOverview();
+  }
+}
+
 // Render playlist as track list when playing (like search results)
 function updatePlaylistTrackDisplay() {
   if (!currentPlaylist || !isPlaylistMode) {
-    renderPlaylistsList();
+    renderPlaylistsOverview();
     return;
   }
 
   const currentIndex = playlistEngine ? playlistEngine.currentItemIndex : 0;
   
   const html = `
-    <div class="playlist-now-playing-header">
-      <h3>🎵 ${currentPlaylist.name}</h3>
-      <p>${currentPlaylist.items.length} tracks</p>
+    <div class="playlist-tracklist-header">
+      <button class="back-btn" id="playlist-back-btn">
+        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-left">
+          <line x1="19" y1="12" x2="5" y2="12"></line>
+          <polyline points="12 19 5 12 12 5"></polyline>
+        </svg>
+      </button>
+      <div class="playlist-tracklist-info">
+        <h3>🎵 ${currentPlaylist.name}</h3>
+        <p>${currentPlaylist.items.length} tracks</p>
+      </div>
     </div>
     
     ${currentPlaylist.items.map((item, index) => {
@@ -3512,6 +3527,97 @@ function updatePlaylistTrackDisplay() {
   `;
 
   els.playlistsList.innerHTML = html;
+}
+
+// Render all playlists overview with currently playing one highlighted
+function renderPlaylistsOverview() {
+  if (savedPlaylists.length === 0) {
+      els.playlistsList.innerHTML = `
+          <div style="text-align: center; padding: 60px 20px;">
+              <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.4;">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-music"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+              </div>
+              <div style="color: var(--light-gray); font-size: 16px; margin-bottom: 8px;">No playlists yet</div>
+              <div style="color: var(--light-gray); font-size: 13px;">Create playlists to mix loops and full tracks</div>
+          </div>
+      `;
+      return;
+  }
+
+  els.playlistsList.innerHTML = savedPlaylists.map((playlist) => {
+    const isCurrentlyPlaying = isPlaylistMode && currentPlaylist && playlist.id === currentPlaylist.id;
+    
+    return `
+      <div class="playlist-card ${isCurrentlyPlaying ? 'currently-playing' : ''}" data-playlist-id="${playlist.id}">
+          ${isCurrentlyPlaying ? '<div class="playlist-playing-indicator">🎵 Now Playing</div>' : ''}
+          
+          <div class="playlist-header">
+              <div class="playlist-icon">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-music"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+              </div>
+              <div class="playlist-details">
+                  <div class="playlist-name">${playlist.name}</div>
+                  <div class="playlist-description">${playlist.description || `${playlist.items.length} items`}</div>
+              </div>
+          </div>
+
+          <div class="playlist-stats">
+              <div class="playlist-stat">
+                  <span class="playlist-stat-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-list"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
+                  </span>
+                  <span>${playlist.items.length} items</span>
+              </div>
+              <div class="playlist-stat">
+                  <span class="playlist-stat-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-clock"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                  </span>
+                  <span>${formatTime(playlist.totalDuration, false)}</span>
+              </div>
+              <div class="playlist-stat">
+                  <span class="playlist-stat-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-play"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                  </span>
+                  <span>${playlist.playCount || 0} plays</span>
+              </div>
+          </div>
+
+          <div class="playlist-actions">
+              ${isCurrentlyPlaying ? `
+                <button class="playlist-action-btn view-tracklist-btn" data-playlist-id="${playlist.id}">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-list">
+                    <line x1="8" y1="6" x2="21" y2="6"></line>
+                    <line x1="8" y1="12" x2="21" y2="12"></line>
+                    <line x1="8" y1="18" x2="21" y2="18"></line>
+                    <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                    <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                    <line x1="3" y1="18" x2="3.01" y2="18"></line>
+                  </svg>
+                  View Tracks
+                </button>
+              ` : `
+                <button class="playlist-action-btn play-playlist-btn" data-playlist-id="${playlist.id}">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-play"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+                  Play
+                </button>
+              `}
+              <button class="playlist-action-btn edit-playlist-btn" data-playlist-id="${playlist.id}">Edit</button>
+              <button class="playlist-action-btn share-playlist-btn" data-playlist-id="${playlist.id}">Share</button>
+              <button class="playlist-action-btn danger delete-playlist-btn" data-playlist-id="${playlist.id}">Delete</button>
+          </div>
+
+          <div class="playlist-editor" id="playlist-editor-${playlist.id}">
+              <div class="playlist-items" id="playlist-items-${playlist.id}">
+                  ${renderPlaylistItems(playlist)}
+              </div>
+              <div class="edit-actions">
+                  <button class="btn secondary" onclick="savePlaylistEdits('${playlist.id}')">💾 Save Changes</button>
+                  <button class="btn" onclick="cancelPlaylistEdit('${playlist.id}')">❌ Cancel</button>
+              </div>
+          </div>
+      </div>
+    `;
+  }).join('');
 }
 
 function editPlaylist(playlistId) {
@@ -4166,6 +4272,10 @@ function setupEventListeners() {
 
   els.navPlaylists.addEventListener('click', (e) => {
       e.preventDefault();
+      // Default to overview mode when navigating to playlists
+      if (currentView !== 'playlists') {
+          playlistViewMode = 'overview';
+      }
       showView('playlists');
   });
 
@@ -4415,6 +4525,16 @@ function setupEventListeners() {
               if (playlistEngine && isPlaylistMode) {
                   await playlistEngine.skipToItem(trackIndex);
               }
+          }
+          else if (target.matches('.view-tracklist-btn')) {
+              e.preventDefault();
+              playlistViewMode = 'tracklist';
+              updatePlaylistDisplay();
+          }
+          else if (target.matches('#playlist-back-btn')) {
+              e.preventDefault();
+              playlistViewMode = 'overview';
+              updatePlaylistDisplay();
           }
           else if (target.matches('.edit-playlist-btn')) {
               e.preventDefault();
