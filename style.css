@@ -654,7 +654,7 @@ body {
 
 .now-playing-indicator {
    position: fixed;
-   bottom: 100px;
+   bottom: 88px;
    right: 12px;
    background: rgba(29, 185, 84, 0.55);
    backdrop-filter: blur(10px);
@@ -667,7 +667,7 @@ body {
    opacity: 0;
    transform: translateX(100%);
    transition: all 0.3s ease;
-   max-width: 100 vw;
+   max-width: 100%;
 }
 
 .now-playing-indicator.show { opacity: 1; transform: translateX(0); }
