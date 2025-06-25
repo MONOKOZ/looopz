@@ -1426,6 +1426,57 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
    font-size: 12px;
 }
 
+/* Playlist Now Playing Header */
+.playlist-now-playing-header {
+   text-align: center;
+   padding: var(--space-4) var(--space-4) var(--space-3);
+   border-bottom: 1px solid var(--border-subtle);
+   margin-bottom: var(--space-3);
+}
+
+.playlist-now-playing-header h3 {
+   margin: 0 0 var(--space-1) 0;
+   color: var(--text-primary);
+   font-size: 18px;
+   font-weight: 700;
+}
+
+.playlist-now-playing-header p {
+   margin: 0;
+   color: var(--text-secondary);
+   font-size: 13px;
+}
+
+/* Playlist Track States */
+.playlist-track.now-playing {
+   background: rgba(123, 104, 238, 0.1);
+   border-color: var(--primary);
+}
+
+.playlist-track.now-playing .track-name {
+   color: var(--primary);
+   font-weight: 600;
+}
+
+.playlist-track.played {
+   opacity: 0.6;
+}
+
+.playlist-track.played .track-name {
+   color: var(--text-muted);
+}
+
+.now-playing-indicator {
+   font-size: 12px;
+   color: var(--primary);
+   animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+   0%, 100% { opacity: 1; }
+   50% { opacity: 0.5; }
+}
+
 /* Playlist Styles */
 .playlist-card {
    background: linear-gradient(145deg, rgba(153, 69, 219, 0.1), rgba(26, 26, 26, 0.5));
