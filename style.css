@@ -1466,6 +1466,17 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
    border: 2px solid var(--primary);
 }
 
+/* Touch dragging state */
+.saved-loop.playlist-item.touch-dragging {
+   opacity: 0.8;
+   z-index: 1000;
+   transform: scale(1.02);
+   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+   transition: transform 0.1s ease;
+   background: rgba(255, 255, 255, 0.03);
+   border: 1px solid var(--primary);
+}
+
 /* Drag placeholder */
 .drag-placeholder {
    transition: all 0.2s ease;
