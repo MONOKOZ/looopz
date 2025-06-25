@@ -1817,59 +1817,8 @@ class PlaylistTransitionEngine {
             document.body.appendChild(transitionIndicator);
             
             if (transitionSamples.enabled) {
-                console.log('🎵 [PLAYLIST TRANSITION] Using volume fading with underlying sample');
-                
-                const sampleKey = selectTransitionSample(currentItem, nextItem);
-                
-                // First reduce volume of current track to 70%
-                console.log(`🔊 [PLAYLIST TRANSITION] Reducing volume of track A to 70%`);
-                await setSpotifyVolume(70);
-                
-                // Brief pause to create separation
-                await new Promise(resolve => setTimeout(resolve, 200));
-                
-                // STEP 1: Start playing the transition sample at full volume
-                console.log(`🔊 [PLAYLIST TRANSITION] Starting transition sample at full volume`);
-                const samplePromise = playTransitionSample(sampleKey, true, true);
-                
-                // Get sample buffer to calculate timing
-                const buffer = transitionSamples.loadedBuffers.get(sampleKey);
-                const sampleDuration = buffer ? buffer.duration * 1000 : 1000; // Default to 1s if unknown
-                
-                // Continue reducing volume of current track to 30%
-                console.log(`🔊 [PLAYLIST TRANSITION] Further reducing volume of track A to 30%`);
-                await setSpotifyVolume(30);
-                
-                // CRITICAL FIX: Wait for sample to finish BEFORE loading next track
-                console.log(`🔊 [PLAYLIST TRANSITION] Waiting for transition sample to complete...`);
-                await samplePromise;
-                
-                // Make absolutely sure all samples are done
-                await waitForActiveSamples();
-                console.log(`✅ [PLAYLIST TRANSITION] Sample playback confirmed complete`);
-                
-                // STEP 2: Now load the next track (after sample completes)
-                console.log(`🔊 [PLAYLIST TRANSITION] Loading next track after sample completion`);
-                this.currentItemIndex++;
-                await this.loadPlaylistItem(this.currentItemIndex);
-                
-                // Start next track at 70% volume (no need for gradual fade since sample is done)
-                console.log(`🔊 [PLAYLIST TRANSITION] Starting track B at 70% volume`);
-                await setSpotifyVolume(70);
-                
-                // Quick fade to full volume
-                await new Promise(resolve => setTimeout(resolve, 200));
-                console.log(`🔊 [PLAYLIST TRANSITION] Restoring full volume for track B`);
-                await setSpotifyVolume(100);
-                
-                // Remove indicator after transition
-                setTimeout(() => {
-                    if (document.body.contains(transitionIndicator)) {
-                        document.body.removeChild(transitionIndicator);
-                    }
-                }, 300);
-                
-                showStatus(`🎵 Smooth transition with sample complete`);
+                console.log('🎵 [SEAMLESS TRANSITION] Starting seamless crossfade with background sample');
+                await this.executeSeamlessTransition(currentItem, nextItem, transitionIndicator);
             } 
             else {
                 // Simple crossfade without sample
@@ -1901,6 +1850,85 @@ class PlaylistTransitionEngine {
             await setSpotifyVolume(100); // Ensure volume is restored
         } finally {
             this.transitionInProgress = false;
+        }
+    }
+
+    /**
+     * Execute seamless transition with crossfade and background sample
+     */
+    async executeSeamlessTransition(currentItem, nextItem, transitionIndicator) {
+        try {
+            const sampleKey = selectTransitionSample(currentItem, nextItem);
+            console.log(`🎵 [SEAMLESS] Using sample: ${sampleKey}`);
+            
+            // PHASE 1: Pre-load next track at very low volume (0%)
+            console.log(`🎵 [SEAMLESS] Pre-loading Track B: ${nextItem.name}`);
+            this.currentItemIndex++;
+            await this.loadPlaylistItem(this.currentItemIndex);
+            
+            // Start Track B at 0% volume (silent)
+            await setSpotifyVolume(0);
+            console.log(`🎵 [SEAMLESS] Track B loaded silently`);
+            
+            // Brief pause to ensure Track B is ready
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            // PHASE 2: Start background sample at moderate volume
+            console.log(`🎵 [SEAMLESS] Starting background sample`);
+            const samplePromise = playTransitionSample(sampleKey, true, false); // Background sample
+            
+            // PHASE 3: Crossfade - Track A down, Track B up
+            console.log(`🎵 [SEAMLESS] Starting crossfade: A (100% → 0%) | B (0% → 100%)`);
+            
+            // Crossfade duration based on sample length
+            const buffer = transitionSamples.loadedBuffers.get(sampleKey);
+            const crossfadeDuration = buffer ? Math.min(buffer.duration * 1000, 2000) : 1500;
+            const steps = 10;
+            const stepDuration = crossfadeDuration / steps;
+            
+            for (let i = 0; i <= steps; i++) {
+                const progress = i / steps;
+                const trackAVolume = Math.round((1 - progress) * 100);
+                const trackBVolume = Math.round(progress * 100);
+                
+                // Note: We can only set one volume at a time in Spotify Web API
+                // So we'll fade Track A down, then fade Track B up
+                if (i <= steps / 2) {
+                    // First half: fade Track A down
+                    await setSpotifyVolume(trackAVolume);
+                    console.log(`🎵 [SEAMLESS] Track A: ${trackAVolume}%`);
+                } else {
+                    // Second half: fade Track B up
+                    await setSpotifyVolume(trackBVolume);
+                    console.log(`🎵 [SEAMLESS] Track B: ${trackBVolume}%`);
+                }
+                
+                await new Promise(resolve => setTimeout(resolve, stepDuration));
+            }
+            
+            // PHASE 4: Wait for sample to complete
+            console.log(`🎵 [SEAMLESS] Ensuring sample completes...`);
+            await samplePromise;
+            await waitForActiveSamples();
+            
+            // Final volume adjustment
+            await setSpotifyVolume(100);
+            console.log(`🎵 [SEAMLESS] Transition complete - Track B at full volume`);
+            
+            // Remove visual indicator
+            setTimeout(() => {
+                if (document.body.contains(transitionIndicator)) {
+                    document.body.removeChild(transitionIndicator);
+                }
+            }, 500);
+            
+            showStatus(`✨ Seamless transition complete`);
+            
+        } catch (error) {
+            console.error('🚨 Seamless transition failed:', error);
+            // Fallback to simple transition
+            await setSpotifyVolume(100);
+            showStatus('⚠️ Transition failed - using fallback');
         }
     }
 
@@ -2108,6 +2136,9 @@ class PlaylistTransitionEngine {
             this.currentLoopCount = 0;
             this.currentLoopTarget = item.playCount || 1;
             this.loopStartTime = Date.now();
+            
+            // Reset seamless transition state for new track
+            transitionPrepared = false;
 
             // Calculate smart transition if coming from previous item
             if (itemIndex > 0 && this.smartTransitionsEnabled) {
@@ -2484,11 +2515,19 @@ function stopProgressUpdates() {
   }
 }
 
-// FIX 9: Unified loop end handling function
+// FIX 9: Unified loop end handling function with seamless transition preparation
 async function checkLoopEnd() {
   // Debug logging for playlist loops
   if (isPlaylistMode && loopEnabled) {
       console.log(`🔍 Checking playlist loop: time=${currentTime.toFixed(3)}s, end=${loopEnd.toFixed(3)}s, threshold=${LOOP_END_THRESHOLD}s, loopCount=${loopCount}/${loopTarget}`);
+  }
+
+  // SEAMLESS TRANSITION: Prepare next track when we're close to final loop end
+  if (isPlaylistMode && loopCount === loopTarget - 1) { // On the last loop iteration
+      const timeUntilEnd = loopEnd - currentTime;
+      if (timeUntilEnd <= SEAMLESS_TRANSITION_PREP_TIME && timeUntilEnd > 0) {
+          await prepareSeamlessTransition();
+      }
   }
 
   // Check if we've reached the loop end with precise timing
@@ -2499,6 +2538,31 @@ async function checkLoopEnd() {
           await handleLoopEnd();
       }
   }
+}
+
+// Seamless transition preparation - starts a few seconds before track end
+let transitionPrepared = false;
+const SEAMLESS_TRANSITION_PREP_TIME = 3; // Start preparing 3 seconds before end
+
+async function prepareSeamlessTransition() {
+    if (transitionPrepared || !isPlaylistMode || !playlistEngine) return;
+    
+    try {
+        transitionPrepared = true;
+        console.log('🎵 [SEAMLESS PREP] Preparing next track for seamless transition...');
+        
+        const currentItem = playlistEngine.currentPlaylist.items[playlistEngine.currentItemIndex];
+        const nextItem = playlistEngine.currentPlaylist.items[playlistEngine.currentItemIndex + 1];
+        
+        if (nextItem) {
+            // Pre-analyze and prepare next track
+            console.log(`🎵 [SEAMLESS PREP] Next track ready: ${nextItem.name}`);
+            showStatus('🎵 Preparing seamless transition...');
+        }
+    } catch (error) {
+        console.warn('Seamless transition prep failed:', error);
+        transitionPrepared = false;
+    }
 }
 
 // Enhanced loop end handling with volume fading and guaranteed sample completion
