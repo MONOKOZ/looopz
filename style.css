@@ -1403,22 +1403,46 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
 .drag-handle {
    position: absolute;
    left: 8px;
-   top: 50%;
-   transform: translateY(-50%);
+   top: 18px;
    cursor: grab;
    color: var(--text-secondary);
    opacity: 0.5;
    transition: opacity 0.2s ease;
    padding: 4px;
+   z-index: 1;
+   background: rgba(0, 0, 0, 0.3);
+   border-radius: 4px;
 }
 
 .drag-handle:hover {
    opacity: 1;
 }
 
+/* Ensure the main container maintains proper flex layout */
 .saved-loop.playlist-item {
+   display: flex;
+   flex-direction: column;
    padding-left: 40px;
    cursor: grab;
+   box-sizing: border-box;
+}
+
+.saved-loop.playlist-item .loop-stats {
+   display: flex;
+   gap: 16px;
+   margin-bottom: 14px;
+   font-size: 12px;
+   flex-wrap: wrap;
+   width: 100%;
+   box-sizing: border-box;
+}
+
+.saved-loop.playlist-item .loop-actions {
+   display: flex;
+   gap: 6px;
+   flex-wrap: wrap;
+   width: 100%;
+   box-sizing: border-box;
 }
 
 .saved-loop.playlist-item.dragging {
