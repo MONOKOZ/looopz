@@ -199,10 +199,11 @@ function updateMiniPlayer(track = null) {
   if (track) {
       els.miniTrackTitle.textContent = track.name || 'Unknown Track';
       els.miniTrackArtist.textContent = track.artist || 'Unknown Artist';
-      els.miniPlayer.classList.remove('hidden');
       updateMiniPlayButton();
   } else {
-      els.miniPlayer.classList.add('hidden');
+      els.miniTrackTitle.textContent = 'No track playing';
+      els.miniTrackArtist.textContent = 'Select a track to start';
+      updateMiniPlayButton();
   }
 }
 
