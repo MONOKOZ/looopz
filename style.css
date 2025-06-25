@@ -275,6 +275,65 @@ body {
 .track-action-btn.secondary { background: var(--secondary); }
 .track-action-btn.menu { background: var(--gray); }
 
+/* Popularity Legend */
+.popularity-legend {
+   font-size: 11px;
+   color: rgba(255, 255, 255, 0.5);
+   margin-top: 8px;
+   padding: 0 4px;
+   text-align: center;
+}
+
+/* Track Header with Popularity Badge */
+.track-header {
+   display: flex;
+   align-items: center;
+   gap: 8px;
+   margin-bottom: 2px;
+}
+
+.track-header .track-name {
+   flex: 1;
+   margin-bottom: 0;
+}
+
+/* Trend/Popularity Badges */
+.trend-badge {
+   font-size: 12px;
+   font-weight: 600;
+   padding: 3px 8px;
+   border-radius: 12px;
+   display: inline-flex;
+   align-items: center;
+   gap: 3px;
+   flex-shrink: 0;
+   background: rgba(255, 255, 255, 0.1);
+   color: rgba(255, 255, 255, 0.9);
+}
+
+/* Popularity Badge Colors */
+.trend-hot {
+   background: rgba(255, 61, 0, 0.15);
+   color: #ff6b35;
+}
+
+.trend-popular {
+   background: rgba(255, 215, 0, 0.15);
+   color: #ffd700;
+}
+
+.trend-gem {
+   background: rgba(79, 195, 247, 0.15);
+   color: #4fc3f7;
+}
+
+/* Bigger Action Buttons */
+.track-action-btn.big-btn {
+   width: 40px;
+   height: 40px;
+   padding: 10px;
+}
+
 /* Three-Dot Context Menu - IMPROVED UX */
 .track-context-menu {
    position: fixed;
