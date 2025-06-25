@@ -1435,6 +1435,40 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
    border: 1px solid var(--primary);
 }
 
+/* Custom loop names */
+.loop-custom-name {
+   font-size: 13px;
+   font-weight: 600;
+   color: var(--primary);
+   margin-bottom: 2px;
+}
+
+/* Playlist edit view */
+.playlist-edit-view {
+   width: 100%;
+}
+
+.playlist-edit-header {
+   display: flex;
+   align-items: center;
+   gap: 16px;
+   margin-bottom: 24px;
+   padding: 16px 0;
+   border-bottom: 1px solid var(--border-subtle);
+}
+
+.playlist-edit-info h2 {
+   margin: 0;
+   font-size: 24px;
+   color: var(--text-primary);
+}
+
+.playlist-edit-info p {
+   margin: 0;
+   color: var(--text-secondary);
+   font-size: 14px;
+}
+
 .loop-edit-form {
    display: none;
    background: rgba(0, 0, 0, 0.3);
