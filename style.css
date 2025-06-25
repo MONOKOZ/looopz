@@ -106,6 +106,11 @@ body {
    backdrop-filter: blur(10px);
 }
 
+/* Reduce padding for search section to give more space to track items */
+#search-section .card {
+   padding: 21px 12px;
+}
+
 .card-title {
    color: var(--light);
    font-size: 20px;
@@ -280,6 +285,7 @@ body {
    font-size: 10px;
    color: rgba(255, 255, 255, 0.4);
    margin-top: 6px;
+   margin-bottom: 16px;
    padding: 0 2px;
    text-align: center;
    line-height: 1.2;
@@ -300,13 +306,13 @@ body {
 
 /* Trend/Popularity Badges */
 .trend-badge {
-   font-size: 10px;
+   font-size: 9px;
    font-weight: 600;
-   padding: 2px 6px;
-   border-radius: 10px;
+   padding: 1px 4px;
+   border-radius: 8px;
    display: inline-flex;
    align-items: center;
-   gap: 2px;
+   gap: 1px;
    flex-shrink: 0;
    background: rgba(255, 255, 255, 0.1);
    color: rgba(255, 255, 255, 0.9);
@@ -359,7 +365,7 @@ body {
    border: 1px solid rgba(255, 255, 255, 0.15);
    border-radius: 20px;
    padding: 12px 0;
-   min-width: 280px;
+   min-width: 320px;
    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
    backdrop-filter: blur(25px);
    z-index: 1000;
@@ -397,10 +403,26 @@ body {
    -webkit-tap-highlight-color: transparent;
 }
 
-.context-menu-item:hover {
-   background: rgba(29, 185, 84, 0.25);
-   color: var(--primary);
-   transform: translateX(4px);
+/* Desktop hover only - not on touch devices */
+@media (hover: hover) and (pointer: fine) {
+   .context-menu-item:hover {
+      background: rgba(29, 185, 84, 0.25);
+      color: var(--primary);
+      transform: translateX(4px);
+   }
+}
+
+/* Mobile touch - immediate response, no hover state */
+@media (hover: none) and (pointer: coarse) {
+   .context-menu-item {
+      transition: background 0.1s ease;
+   }
+   
+   .context-menu-item:active {
+      background: rgba(29, 185, 84, 0.25);
+      color: var(--primary);
+      transform: translateX(2px);
+   }
 }
 
 .context-menu-item:active {
