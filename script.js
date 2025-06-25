@@ -2136,7 +2136,12 @@ function setupPlaylistEngineCallbacks() {
       
       // Update playlist display to show new current track
       if (currentView === 'playlists' && isPlaylistMode) {
-          updatePlaylistDisplay();
+          // Maintain current view mode - don't reset to overview
+          if (playlistViewMode === 'editing' && currentPlaylist) {
+              renderPlaylistEditView(currentPlaylist);
+          } else {
+              updatePlaylistDisplay();
+          }
       }
 
       // Update main player UI and let it handle the loops
@@ -2707,7 +2712,17 @@ function showView(view) {
   if (view === 'library') els.librarySection.classList.remove('hidden');
   if (view === 'playlists') {
       els.playlistsSection.classList.remove('hidden');
-      updatePlaylistDisplay();
+      // Maintain current view mode when switching to playlists
+      if (playlistViewMode === 'editing' && currentEditingPlaylistId) {
+          const playlist = savedPlaylists.find(p => p.id === currentEditingPlaylistId);
+          if (playlist) {
+              renderPlaylistEditView(playlist);
+          } else {
+              updatePlaylistDisplay();
+          }
+      } else {
+          updatePlaylistDisplay();
+      }
   }
 
   document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
@@ -3315,10 +3330,10 @@ async function playPlaylist(playlistId, startIndex = 0) {
       // Load playlist into engine
       await playlistEngine.loadPlaylist(playlist, startIndex);
 
-      // Stay in playlist view - switch to track list mode
+      // Stay in playlist view - switch to editing mode to show full cards
       // User can tap mini player or nav to enter loop mode
-      playlistViewMode = 'tracklist';
-      updatePlaylistDisplay();
+      playlistViewMode = 'editing';
+      renderPlaylistEditView(playlist);
       
       showStatus(`🎵 Playing playlist: ${playlist.name}`);
 
@@ -3965,43 +3980,109 @@ function setupPlaylistDragAndDrop(playlistId) {
 
   let draggedElement = null;
   let draggedIndex = null;
+  let placeholder = null;
 
+  // Create placeholder element
+  function createPlaceholder() {
+    if (placeholder) return placeholder;
+    placeholder = document.createElement('div');
+    placeholder.className = 'playlist-item-placeholder';
+    placeholder.style.cssText = `
+      height: 80px;
+      background: rgba(255, 255, 255, 0.1);
+      border: 2px dashed rgba(255, 255, 255, 0.3);
+      border-radius: 12px;
+      margin: 8px 0;
+      opacity: 0.5;
+    `;
+    return placeholder;
+  }
+
+  // Handle drag start
   container.addEventListener('dragstart', (e) => {
-      // Find the playlist-item element (could be the element itself or a parent)
       const playlistItem = e.target.closest('.playlist-item');
       if (!playlistItem) return;
+      
+      // Only allow drag from drag handle or if the entire item is draggable
+      const dragHandle = e.target.closest('.drag-handle');
+      if (!dragHandle && !playlistItem.draggable) {
+          e.preventDefault();
+          return;
+      }
 
       draggedElement = playlistItem;
       draggedIndex = parseInt(playlistItem.dataset.itemIndex);
       playlistItem.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
+      e.dataTransfer.setData('text/html', playlistItem.outerHTML);
   });
 
+  // Handle drag end
   container.addEventListener('dragend', (e) => {
       const playlistItem = e.target.closest('.playlist-item');
-      if (!playlistItem) return;
-      playlistItem.classList.remove('dragging');
+      if (playlistItem) {
+          playlistItem.classList.remove('dragging');
+      }
+      if (placeholder && placeholder.parentNode) {
+          placeholder.parentNode.removeChild(placeholder);
+      }
+      placeholder = null;
   });
 
+  // Handle drag over with better scrolling support
   container.addEventListener('dragover', (e) => {
       e.preventDefault();
+      e.stopPropagation();
+
+      if (!draggedElement) return;
+
+      // Auto-scroll when near edges
+      const containerRect = container.getBoundingClientRect();
+      const scrollThreshold = 50;
+      const scrollSpeed = 5;
+      
+      if (e.clientY < containerRect.top + scrollThreshold) {
+          container.scrollTop -= scrollSpeed;
+      } else if (e.clientY > containerRect.bottom - scrollThreshold) {
+          container.scrollTop += scrollSpeed;
+      }
 
       const afterElement = getDragAfterElement(container, e.clientY);
+      const ph = createPlaceholder();
+      
       if (afterElement == null) {
-          container.appendChild(draggedElement);
+          container.appendChild(ph);
       } else {
-          container.insertBefore(draggedElement, afterElement);
+          container.insertBefore(ph, afterElement);
       }
   });
 
+  // Handle drop
   container.addEventListener('drop', (e) => {
       e.preventDefault();
+      e.stopPropagation();
 
-      const items = [...container.querySelectorAll('.playlist-item:not(.dragging)')];
-      const newIndex = items.indexOf(draggedElement);
+      if (!draggedElement || !placeholder) return;
 
-      if (newIndex !== draggedIndex) {
-          reorderPlaylistItems(playlistId, draggedIndex, newIndex);
+      const allItems = [...container.querySelectorAll('.playlist-item')];
+      const placeholderIndex = [...container.children].indexOf(placeholder);
+      
+      // Calculate new index based on placeholder position
+      let newIndex = 0;
+      let itemCount = 0;
+      for (let i = 0; i < container.children.length; i++) {
+          const child = container.children[i];
+          if (child === placeholder) {
+              newIndex = itemCount;
+              break;
+          }
+          if (child.classList.contains('playlist-item') && child !== draggedElement) {
+              itemCount++;
+          }
+      }
+
+      if (newIndex !== draggedIndex && newIndex !== draggedIndex + 1) {
+          reorderPlaylistItems(playlistId, draggedIndex, newIndex > draggedIndex ? newIndex - 1 : newIndex);
 
           // Re-render items
           const playlist = savedPlaylists.find(p => p.id === playlistId);
@@ -4010,6 +4091,12 @@ function setupPlaylistDragAndDrop(playlistId) {
               setupPlaylistDragAndDrop(playlistId);
           }
       }
+
+      // Clean up
+      if (placeholder && placeholder.parentNode) {
+          placeholder.parentNode.removeChild(placeholder);
+      }
+      placeholder = null;
   });
 }
 
@@ -4852,6 +4939,12 @@ function setupEventListeners() {
               const playlistId = target.dataset.playlistId;
               const itemIndex = parseInt(target.dataset.itemIndex);
               loadPlaylistItem(playlistId, itemIndex);
+          }
+          else if (target.matches('.edit-playlist-item-btn')) {
+              e.preventDefault();
+              const playlistId = target.dataset.playlistId;
+              const itemIndex = parseInt(target.dataset.itemIndex);
+              editPlaylistItem(playlistId, itemIndex);
           }
           else if (target.matches('.edit-playlist-btn')) {
               e.preventDefault();
