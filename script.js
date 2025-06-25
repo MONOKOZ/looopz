@@ -10,20 +10,7 @@ const CACHE_SIZE_LIMIT = 100; // Maximum items per cache
 const audioAnalysisCache = new Map();
 const trackFeaturesCache = new Map();
 
-// Transition sample configuration
-const transitionSamples = {
-    enabled: false,
-    volume: 0.7, // 0-1 range
-    samples: {
-        short: '/assets/sounds/scratch_short.MP3', // 0.5s for short loops
-        medium: '/assets/sounds/scratch_med.MP3', // 1s for medium
-        long: '/assets/sounds/scratch_long.MP3', // 2s for long tracks
-        // Add more as needed
-    },
-    audioContext: null,
-    loadedBuffers: new Map(),
-    activeSamples: new Set() // Track currently playing samples
-};
+// Transition sample configuration - REMOVED (no longer needed)
 
 // State
 let spotifyPlayer = null, spotifyDeviceId = null, spotifyAccessToken = null;
@@ -1437,332 +1424,14 @@ function toggleAI() {
     }
 }
 
-/**
- * Initialize the Web Audio API context and load samples
- */
-async function initializeTransitionSamples() {
-    try {
-        console.log('🎵 Initializing transition samples system...');
-        
-        // Create audio context
-        transitionSamples.audioContext = new (window.AudioContext || window.webkitAudioContext)();
-        console.log('✅ Created audio context');
-        
-        // Load all transition samples
-        let loadedCount = 0;
-        const totalSamples = Object.keys(transitionSamples.samples).length;
-        
-        for (const [key, url] of Object.entries(transitionSamples.samples)) {
-            try {
-                console.log(`🔄 Attempting to load sample: ${key} from ${url}`);
-                const buffer = await loadAudioBuffer(url);
-                transitionSamples.loadedBuffers.set(key, buffer);
-                loadedCount++;
-                console.log(`✅ Loaded transition sample (${loadedCount}/${totalSamples}): ${key} from ${url}`);
-            } catch (error) {
-                console.warn(`⚠️ Failed to load transition sample ${key} from ${url}:`, error);
-                
-                // Try multiple path variations for maximum compatibility
-                const altPaths = [
-                    // Case sensitivity variations
-                    url.replace('.MP3', '.mp3'),
-                    url.replace('.mp3', '.MP3'),
-                    // Path format variations
-                    url.startsWith('/') ? url.substring(1) : `/${url}`,
-                    // Different directory structure variations
-                    url.includes('/sounds/') ? url : url.replace('assets/', 'assets/sounds/'),
-                    `assets/sounds/${key}.MP3`,
-                    `assets/sounds/${key}.mp3`,
-                    `/assets/sounds/${key}.MP3`,
-                    `/assets/sounds/${key}.mp3`
-                ];
-                
-                let loaded = false;
-                for (const altPath of altPaths) {
-                    if (altPath === url) continue;
-                    
-                    try {
-                        console.log(`🔄 Trying alternate path: ${altPath}`);
-                        const buffer = await loadAudioBuffer(altPath);
-                        transitionSamples.loadedBuffers.set(key, buffer);
-                        loadedCount++;
-                        console.log(`✅ Loaded transition sample with alternate path: ${key} from ${altPath}`);
-                        loaded = true;
-                        
-                        // Update the original path to the working one for future references
-                        transitionSamples.samples[key] = altPath;
-                        break;
-                    } catch (altError) {
-                        console.warn(`⚠️ Alternate path ${altPath} also failed`);
-                    }
-                }
-                
-                if (!loaded) {
-                    console.error(`❌ All paths failed for sample: ${key}`);
-                }
-            }
-        }
-        
-        if (loadedCount === 0) {
-            console.error('❌ Failed to load ANY transition samples');
-            return false;
-        }
-        
-        // Display loaded samples for diagnostic purposes
-        console.log(`🎵 Transition samples initialized (${loadedCount}/${totalSamples} samples loaded)`);
-        console.log('📊 Loaded samples:', 
-          Array.from(transitionSamples.loadedBuffers.keys())
-            .map(key => `${key}: ${transitionSamples.samples[key]}`).join(', '));
-            
-        // Test play a sample to verify audio system works
-        if (transitionSamples.loadedBuffers.has('short')) {
-            console.log('🔈 Testing sample playback...');
-            setTimeout(() => {
-                playTransitionSample('short', true, true)
-                    .then(duration => console.log(`✅ Test sample played (${duration}ms)`))
-                    .catch(err => console.error('❌ Test sample failed:', err));
-            }, 1000);
-        }
-        
-        return loadedCount > 0;
-    } catch (error) {
-        console.error('🚨 Failed to initialize transition samples:', error);
-        return false;
-    }
-}
+// All sample functionality removed
 
-/**
- * Load an audio file into a buffer
- */
-async function loadAudioBuffer(url) {
-    console.log(`🔄 Loading audio buffer from: ${url}`);
-    try {
-        // Handle both absolute and relative URLs
-        const fullUrl = url.startsWith('http') ? url : new URL(url, window.location.href).href;
-        console.log(`🔄 Full URL: ${fullUrl}`);
-        
-        const response = await fetch(fullUrl);
-        if (!response.ok) {
-            throw new Error(`Failed to fetch audio file: ${response.status} ${response.statusText}`);
-        }
-        const arrayBuffer = await response.arrayBuffer();
-        const audioBuffer = await transitionSamples.audioContext.decodeAudioData(arrayBuffer);
-        console.log(`✅ Successfully loaded and decoded audio from: ${url}`);
-        return audioBuffer;
-    } catch (error) {
-        console.error(`❌ Error loading audio buffer from ${url}:`, error);
-        throw error;
-    }
-}
 
-/**
- * Play a transition sample and return a promise that resolves when the sample completes
- * Note: This plays through Web Audio API, completely independent of Spotify
- * Both audio streams mix naturally in the browser
- */
-async function playTransitionSample(sampleKey = 'short', fadeOut = false, fadeIn = false) {
-    if (!transitionSamples.enabled) {
-        console.log('🔇 Transition samples disabled, skipping sample playback');
-        return 0;
-    }
-    
-    if (!transitionSamples.audioContext) {
-        console.warn('⚠️ Audio context not initialized, attempting to initialize now');
-        const initialized = await initializeTransitionSamples();
-        if (!initialized) {
-            console.error('❌ Failed to initialize audio context, cannot play sample');
-            return 0;
-        }
-    }
-    
-    // Resume suspended audio context if needed (browser autoplay policies)
-    if (transitionSamples.audioContext.state === 'suspended') {
-        console.log('🔄 Resuming suspended audio context');
-        try {
-            await transitionSamples.audioContext.resume();
-            console.log('✅ Audio context resumed successfully');
-        } catch (error) {
-            console.warn('⚠️ Could not resume audio context:', error.message);
-        }
-    }
-    
-    const buffer = transitionSamples.loadedBuffers.get(sampleKey);
-    if (!buffer) {
-        console.warn(`⚠️ Transition sample '${sampleKey}' not loaded, available samples: ${Array.from(transitionSamples.loadedBuffers.keys()).join(', ')}`);
-        
-        // Try to fall back to any available sample
-        const availableSamples = Array.from(transitionSamples.loadedBuffers.keys());
-        if (availableSamples.length > 0) {
-            const fallbackKey = availableSamples[0];
-            console.log(`🔄 Falling back to available sample: ${fallbackKey}`);
-            return playTransitionSample(fallbackKey, fadeOut, fadeIn);
-        }
-        return 0;
-    }
-    
-    try {
-        // Create a unique ID for this sample playback to track it
-        const sampleId = `${sampleKey}_${Date.now()}`;
-        transitionSamples.activeSamples.add(sampleId);
-        
-        // Create nodes
-        const source = transitionSamples.audioContext.createBufferSource();
-        const gainNode = transitionSamples.audioContext.createGain();
-        
-        // Connect nodes
-        source.buffer = buffer;
-        source.connect(gainNode);
-        gainNode.connect(transitionSamples.audioContext.destination);
-        
-        // Set initial volume
-        const now = transitionSamples.audioContext.currentTime;
-        gainNode.gain.setValueAtTime(transitionSamples.volume, now);
-        
-        // Apply fades if requested
-        if (fadeIn) {
-            console.log(`🔊 Applying fade-in effect to sample ${sampleKey}`);
-            gainNode.gain.setValueAtTime(0, now);
-            gainNode.gain.linearRampToValueAtTime(transitionSamples.volume, now + 0.1);
-        }
-        
-        if (fadeOut) {
-            console.log(`🔊 Applying fade-out effect to sample ${sampleKey}`);
-            const fadeStart = now + buffer.duration - 0.1;
-            gainNode.gain.setValueAtTime(transitionSamples.volume, fadeStart);
-            gainNode.gain.linearRampToValueAtTime(0, fadeStart + 0.1);
-        }
-        
-        // Create a promise that resolves when the sample completes
-        const completionPromise = new Promise(resolve => {
-            source.onended = () => {
-                console.log(`🔊 Sample ${sampleKey} playback completed`);
-                transitionSamples.activeSamples.delete(sampleId);
-                resolve();
-            };
-            
-            // Safety timeout to ensure promise resolves even if onended doesn't fire
-            setTimeout(() => {
-                if (transitionSamples.activeSamples.has(sampleId)) {
-                    console.log(`⚠️ Sample ${sampleKey} timeout reached, forcing completion`);
-                    transitionSamples.activeSamples.delete(sampleId);
-                    resolve();
-                }
-            }, buffer.duration * 1000 + 500); // Add 500ms buffer
-        });
-        
-        // Play the sample
-        source.start(0);
-        
-        console.log(`🔊 Playing transition sample: ${sampleKey} (duration: ${buffer.duration.toFixed(2)}s, volume: ${Math.round(transitionSamples.volume * 100)}%)`);
-        
-        // Return a promise that resolves with the duration, and completes when sample finishes
-        return Promise.all([
-            Promise.resolve(buffer.duration * 1000), // Return duration in milliseconds
-            completionPromise
-        ]).then(([duration]) => duration);
-        
-    } catch (error) {
-        console.error('❌ Error playing transition sample:', error);
-        return 0;
-    }
-}
 
-/**
- * Waits for all active transition samples to complete playing
- * @returns {Promise} Resolves when all samples are done
- */
-async function waitForActiveSamples() {
-    if (transitionSamples.activeSamples.size === 0) {
-        return Promise.resolve();
-    }
-    
-    console.log(`⏳ Waiting for ${transitionSamples.activeSamples.size} active samples to complete`);
-    
-    // Check every 100ms if samples are done
-    return new Promise(resolve => {
-        const checkInterval = setInterval(() => {
-            if (transitionSamples.activeSamples.size === 0) {
-                clearInterval(checkInterval);
-                console.log('✅ All transition samples completed');
-                resolve();
-            }
-        }, 100);
-        
-        // Safety timeout after 5 seconds
-        setTimeout(() => {
-            if (transitionSamples.activeSamples.size > 0) {
-                console.warn(`⚠️ Timeout waiting for samples, ${transitionSamples.activeSamples.size} still active`);
-                clearInterval(checkInterval);
-                transitionSamples.activeSamples.clear();
-                resolve();
-            }
-        }, 5000);
-    });
-}
 
-/**
- * Choose appropriate sample based on context
- */
-function selectTransitionSample(fromItem, toItem) {
-    // Logic to choose sample based on track characteristics
-    if (!fromItem || !toItem) return 'short';
-    
-    const fromDuration = fromItem.type === 'loop' 
-        ? (fromItem.end - fromItem.start) 
-        : fromItem.duration;
-    
-    const toDuration = toItem.type === 'loop' 
-        ? (toItem.end - toItem.start) 
-        : toItem.duration;
-    
-    // Choose sample based on track lengths
-    if (fromDuration < 20 || toDuration < 20) {
-        return 'short'; // Quick transition for short loops
-    } else if (fromDuration < 60 || toDuration < 60) {
-        return 'medium'; // Medium transition
-    } else {
-        return 'long'; // Longer transition for full tracks
-    }
-}
 
-/**
- * Toggle transition samples on/off
- */
-function toggleTransitionSamples(enabled) {
-    transitionSamples.enabled = enabled;
-    
-    // Initialize on first enable
-    if (enabled && !transitionSamples.audioContext) {
-        initializeTransitionSamples();
-    }
-    
-    console.log(`🎵 Transition samples ${enabled ? 'enabled' : 'disabled'}`);
-    showStatus(`Transition samples ${enabled ? 'enabled' : 'disabled'}`);
-}
 
-/**
- * Set transition sample volume
- */
-function setTransitionSampleVolume(volume) {
-    transitionSamples.volume = Math.max(0, Math.min(1, volume));
-    console.log(`🔊 Transition sample volume: ${Math.round(volume * 100)}%`);
-}
 
-/**
- * Add custom transition sample
- */
-async function addTransitionSample(key, url) {
-    try {
-        transitionSamples.samples[key] = url;
-        const buffer = await loadAudioBuffer(url);
-        transitionSamples.loadedBuffers.set(key, buffer);
-        console.log(`✅ Added transition sample: ${key}`);
-        return true;
-    } catch (error) {
-        console.error(`Failed to add transition sample ${key}:`, error);
-        return false;
-    }
-}
 
 // PLAYLIST DJ ENGINE - SIMPLIFIED TRANSITION METHODS
 class PlaylistTransitionEngine {
@@ -1887,69 +1556,6 @@ class PlaylistTransitionEngine {
         }
     }
 
-    /**
-     * Execute transition with volume fading and underlying sample at full volume
-     * This combines the best of both approaches:
-     * 1. Volume fading between tracks for smooth transitions
-     * 2. Full volume sample playing underneath to add character
-     * 3. Sample completion guarantee for professional quality
-     */
-    async executeTransitionWithSample() {
-        if (!this.currentPlaylist || this.transitionInProgress) return;
-        
-        this.transitionInProgress = true;
-        
-        try {
-            const currentItem = this.currentPlaylist.items[this.currentItemIndex];
-            const nextItem = this.currentPlaylist.items[this.currentItemIndex + 1];
-            
-            if (!nextItem) {
-                // Playlist complete
-                if (this.onPlaylistComplete) this.onPlaylistComplete();
-                return;
-            }
-            
-            // NEW: Get AI recommendation
-            let aiPlan = null;
-            if (aiEnabled && essentiaReady) {
-                aiPlan = await determineOptimalTransitionWithAI(currentItem, nextItem, {
-                    isPlaylistMode: true,
-                    playlistName: this.currentPlaylist.name
-                });
-                
-                if (aiPlan.useAI) {
-                    console.log('🤖 Using AI transition plan:', aiPlan);
-                }
-            }
-            
-            // If AI suggests no sample for high compatibility
-            if (aiPlan?.strategy === 'beat_aligned_cut' && aiPlan.confidence > 0.8) {
-                console.log('🎵 AI: Seamless transition without sample');
-                this.currentItemIndex++;
-                await this.loadPlaylistItem(this.currentItemIndex);
-                showStatus('✨ Seamless AI transition');
-                return;
-            }
-            
-            // Add visual feedback
-            const transitionIndicator = document.createElement('div');
-            transitionIndicator.style.cssText = 'position:fixed; top:0; left:0; right:0; height:4px; background:linear-gradient(90deg,#1DB954,#9945DB); z-index:9999; opacity:0.8;';
-            document.body.appendChild(transitionIndicator);
-            
-            // Professional crossfade transition - no samples, just pure audio mixing
-            console.log('🎵 [PROFESSIONAL TRANSITION] Starting beat-synced crossfade');
-            await this.executeProfessionalCrossfade(currentItem, nextItem, transitionIndicator);
-            
-        } catch (error) {
-            console.error('🚨 Transition error:', error);
-            // Fallback: just skip to next
-            this.currentItemIndex++;
-            await this.loadPlaylistItem(this.currentItemIndex);
-            await setSpotifyVolume(100); // Ensure volume is restored
-        } finally {
-            this.transitionInProgress = false;
-        }
-    }
 
     /**
      * Execute professional crossfade transition - industry-standard beat-matching
@@ -2072,27 +1678,23 @@ class PlaylistTransitionEngine {
     }
 
     /**
-     * Handle loop completion with optional sample
+     * Handle loop completion
      */
     async handleLoopEndWithSample() {
         const currentItem = this.currentPlaylist.items[this.currentItemIndex];
         
         if (this.currentLoopCount >= this.currentLoopTarget) {
             // Loop complete, transition to next item
-            if (transitionSamples.enabled) {
-                await this.executeTransitionWithSample();
-            } else {
-                await this.skipToNext();
-            }
+            await this.skipToNext();
         } else {
-            // Continue looping - no sample needed
+            // Continue looping
             await this.performLoopSeek();
         }
     }
 
     /**
-     * Enhanced smart transition with volume fading and underlying sample at full volume
-     * This creates a DJ-quality transition with proper crossfading and sample accents
+     * Enhanced smart transition with volume fading
+     * This creates a DJ-quality transition with proper crossfading
      */
     async executeSmartCrossfadeWithSample() {
         if (this.crossfadeInProgress || !this.currentTransitionData) return;
@@ -2108,70 +1710,22 @@ class PlaylistTransitionEngine {
             transitionIndicator.style.cssText = 'position:fixed; top:0; left:0; right:0; height:4px; background:linear-gradient(90deg,#1DB954,#9945DB); z-index:9999; opacity:0.8;';
             document.body.appendChild(transitionIndicator);
             
-            if (transitionSamples.enabled) {
-                const sampleKey = selectTransitionSample(
-                    this.currentPlaylist.items[this.currentItemIndex],
-                    toItem
-                );
-                
-                // First reduce volume of current track to prepare for crossfade
-                console.log(`🔊 [SMART TRANSITION] Starting volume fade for track A (${transitionQuality.quality} quality)`);
-                await setSpotifyVolume(70);
-                
-                // Brief pause for separation
-                await new Promise(resolve => setTimeout(resolve, 200));
-                
-                // Play the transition sample at full volume underneath both tracks
-                console.log(`🔊 [SMART TRANSITION] Playing transition sample at full volume`);
-                const samplePromise = playTransitionSample(sampleKey, true, true);
-                
-                // Continue reducing volume
-                console.log(`🔊 [SMART TRANSITION] Continuing volume fade for track A`);
-                await setSpotifyVolume(40);
-                
-                // Load the next track while the sample is playing
-                console.log(`🔊 [SMART TRANSITION] Loading next track at position ${formatTime(toStartTime)}`);
-                await this.loadPlaylistItem(this.currentItemIndex + 1);
-                
-                // If we have a specific start position from analysis, use it
-                if (toStartTime > 0) {
-                    await seekToPosition(toStartTime * 1000);
-                }
-                
-                // Start next track at lower volume
-                console.log(`🔊 [SMART TRANSITION] Starting volume fade for track B`);
-                await setSpotifyVolume(40);
-                
-                // Wait for sample to finish playing
-                await samplePromise;
-                
-                // Make absolutely sure all samples are done
-                await waitForActiveSamples();
-                
-                // Increase volume of next track
-                console.log(`🔊 [SMART TRANSITION] Completing volume fade for track B`);
-                await setSpotifyVolume(70);
-                await new Promise(resolve => setTimeout(resolve, 300));
-                await setSpotifyVolume(100);
-                
-            } else {
-                // Simple crossfade without sample
-                console.log(`🔊 [SMART TRANSITION] Using simple crossfade (no sample)`);
-                
-                // Reduce volume of current track
-                await setSpotifyVolume(50);
-                
-                // Load next track directly
-                await this.loadPlaylistItem(this.currentItemIndex + 1);
-                
-                // If we have a specific start position from analysis, use it
-                if (toStartTime > 0) {
-                    await seekToPosition(toStartTime * 1000);
-                }
-                
-                // Restore volume
-                await setSpotifyVolume(100);
+            // Simple crossfade without sample
+            console.log(`🔊 [SMART TRANSITION] Using simple crossfade`);
+            
+            // Reduce volume of current track
+            await setSpotifyVolume(50);
+            
+            // Load next track directly
+            await this.loadPlaylistItem(this.currentItemIndex + 1);
+            
+            // If we have a specific start position from analysis, use it
+            if (toStartTime > 0) {
+                await seekToPosition(toStartTime * 1000);
             }
+            
+            // Restore volume
+            await setSpotifyVolume(100);
             
             // Remove indicator after transition
             setTimeout(() => {
@@ -2405,13 +1959,8 @@ class PlaylistTransitionEngine {
     async notifyItemComplete() {
         console.log('📢 Main player notified item complete');
         
-        // Use sample-enabled transition if samples are enabled
-        if (transitionSamples.enabled) {
-            console.log('🎵 Using sample-enabled transition');
-            await this.executeTransitionWithSample();
-        } else {
-            await this.skipToNext();
-        }
+        // Always skip to next without samples
+        await this.skipToNext();
     }
 
     /**
@@ -2478,18 +2027,6 @@ function initializeSpotifyPlayer() {
           // Initialize playlist engine
           playlistEngine = new PlaylistTransitionEngine(spotifyPlayer, spotifyAccessToken, spotifyDeviceId);
           setupPlaylistEngineCallbacks();
-
-          // Initialize transition samples
-          console.log('🎵 Starting transition samples initialization...');
-          initializeTransitionSamples().then(success => {
-            if (success) {
-              console.log('✅ Transition samples system ready');
-              // Enable transition samples by default
-              toggleTransitionSamples(true);
-            } else {
-              console.error('❌ Failed to initialize transition samples system');
-            }
-          });
 
           // Initialize AI audio analysis after a short delay
           setTimeout(() => {
@@ -2772,7 +2309,7 @@ async function handleLoopEnd() {
       isLooping = true;
       loopCount++;
       
-      console.log(`🔄 Loop end reached: count=${loopCount}/${loopTarget}, playlistMode=${isPlaylistMode}, samplesEnabled=${transitionSamples.enabled}`);
+      console.log(`🔄 Loop end reached: count=${loopCount}/${loopTarget}, playlistMode=${isPlaylistMode}`);
 
       if (loopCount >= loopTarget) {
           console.log(`✅ [TRACK END TRANSITION] Loop target reached (${loopCount}/${loopTarget}), determining next action...`);
