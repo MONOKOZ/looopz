@@ -4013,19 +4013,33 @@ function setupPlaylistDragAndDrop(playlistId) {
     console.log('Drag started for item at index:', originalIndex);
   }
 
-  // Drag over handler
+  // Drag over handler with throttling
+  let lastDragOver = 0;
   function handleDragOver(e) {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     
     if (!draggedElement) return;
+    
+    // Throttle drag over events to reduce jumpiness
+    const now = Date.now();
+    if (now - lastDragOver < 50) return; // 50ms throttle
+    lastDragOver = now;
 
     const afterElement = getDragAfterElement(container, e.clientY);
     
-    if (afterElement == null) {
-      container.appendChild(draggedElement);
-    } else {
-      container.insertBefore(draggedElement, afterElement);
+    // Only move if there's actually a change
+    const currentNext = draggedElement.nextElementSibling;
+    const shouldMove = (afterElement !== currentNext) && 
+                      (afterElement !== draggedElement) &&
+                      (afterElement !== null || draggedElement !== container.lastElementChild);
+    
+    if (shouldMove) {
+      if (afterElement == null) {
+        container.appendChild(draggedElement);
+      } else {
+        container.insertBefore(draggedElement, afterElement);
+      }
     }
   }
 
@@ -4063,7 +4077,7 @@ function setupPlaylistDragAndDrop(playlistId) {
     originalIndex = null;
   }
 
-  // Helper function to find insertion point
+  // Helper function to find insertion point with better sensitivity
   function getDragAfterElement(container, y) {
     const draggableElements = [...container.querySelectorAll('.playlist-item:not(.dragging)')];
     
@@ -4091,9 +4105,11 @@ function setupPlaylistDragAndDrop(playlistId) {
   container.addEventListener('drop', handleDrop);
   container.addEventListener('dragend', handleDragEnd);
   
-  // Add touch support for mobile
+  // Add touch support for mobile with better sensitivity
   let touchStartY = 0;
   let touchItem = null;
+  let touchMoved = false;
+  let lastTouchMove = 0;
   
   container.addEventListener('touchstart', (e) => {
     const item = e.target.closest('.playlist-item');
@@ -4104,7 +4120,9 @@ function setupPlaylistDragAndDrop(playlistId) {
     
     touchStartY = e.touches[0].clientY;
     touchItem = item;
+    touchMoved = false;
     item.style.transform = 'scale(1.02)';
+    item.classList.add('touch-dragging');
   }, { passive: true });
   
   container.addEventListener('touchmove', (e) => {
@@ -4113,22 +4131,36 @@ function setupPlaylistDragAndDrop(playlistId) {
     const touchY = e.touches[0].clientY;
     const deltaY = touchY - touchStartY;
     
-    if (Math.abs(deltaY) > 10) {
+    // Require more movement before considering it a drag
+    if (Math.abs(deltaY) > 30) {
       e.preventDefault();
+      touchMoved = true;
+      
+      // Throttle touch moves
+      const now = Date.now();
+      if (now - lastTouchMove < 100) return;
+      lastTouchMove = now;
       
       // Find the item to swap with
       const items = [...container.querySelectorAll('.playlist-item')];
       const currentIndex = items.indexOf(touchItem);
-      const targetIndex = deltaY > 0 ? currentIndex + 1 : currentIndex - 1;
       
-      if (targetIndex >= 0 && targetIndex < items.length) {
+      // Calculate how many items to move based on distance
+      const itemHeight = touchItem.offsetHeight + 12; // item + margin
+      const moveSteps = Math.floor(Math.abs(deltaY) / itemHeight);
+      const direction = deltaY > 0 ? 1 : -1;
+      const targetIndex = currentIndex + (direction * moveSteps);
+      
+      if (targetIndex >= 0 && targetIndex < items.length && targetIndex !== currentIndex) {
         const targetItem = items[targetIndex];
-        if (deltaY > 0) {
+        if (direction > 0) {
           container.insertBefore(touchItem, targetItem.nextSibling);
         } else {
           container.insertBefore(touchItem, targetItem);
         }
-        touchStartY = touchY;
+        
+        // Update touch start position to prevent excessive jumping
+        touchStartY = touchY - (deltaY % itemHeight);
       }
     }
   }, { passive: false });
@@ -4137,21 +4169,26 @@ function setupPlaylistDragAndDrop(playlistId) {
     if (!touchItem) return;
     
     touchItem.style.transform = '';
+    touchItem.classList.remove('touch-dragging');
     
-    // Update indices and save
-    const items = [...container.querySelectorAll('.playlist-item')];
-    const newIndex = items.indexOf(touchItem);
-    const oldIndex = parseInt(touchItem.dataset.itemIndex);
-    
-    if (newIndex !== oldIndex) {
-      reorderPlaylistItems(playlistId, oldIndex, newIndex);
-      items.forEach((item, index) => {
-        item.dataset.itemIndex = index;
-      });
+    // Only save if actually moved
+    if (touchMoved) {
+      const items = [...container.querySelectorAll('.playlist-item')];
+      const newIndex = items.indexOf(touchItem);
+      const oldIndex = parseInt(touchItem.dataset.itemIndex);
+      
+      if (newIndex !== oldIndex) {
+        reorderPlaylistItems(playlistId, oldIndex, newIndex);
+        items.forEach((item, index) => {
+          item.dataset.itemIndex = index;
+        });
+      }
     }
     
     touchItem = null;
     touchStartY = 0;
+    touchMoved = false;
+    lastTouchMove = 0;
   }, { passive: true });
   
   console.log('Drag and drop setup complete for playlist:', playlistId);
