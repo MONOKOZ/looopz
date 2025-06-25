@@ -163,15 +163,32 @@ body {
    box-shadow: var(--shadow-md);
 }
 
-/* Reduce padding for search section to give more space to track items */
-#search-section .card {
-   padding: var(--space-5) var(--space-3);
-}
-
-/* Apply same tight spacing to library and playlist sections */
+/* Remove cards from list sections - only player needs card background */
+#search-section .card,
 #library-section .card,
 #playlists-section .card {
-   padding: var(--space-5) var(--space-3);
+   background: transparent;
+   border: none;
+   box-shadow: none;
+   padding: 0;
+   margin-bottom: 0;
+}
+
+#search-section .card:hover,
+#library-section .card:hover,
+#playlists-section .card:hover {
+   border: none;
+   box-shadow: none;
+}
+
+/* Keep card styling only for player section */
+#player-section .card {
+   background: var(--bg-secondary);
+   border: 1px solid var(--border-subtle);
+   border-radius: var(--radius-lg);
+   padding: var(--space-5);
+   margin-bottom: var(--space-4);
+   box-shadow: var(--shadow-sm);
 }
 
 .card-title {
@@ -955,61 +972,63 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
    left: 0;
    right: 0;
    bottom: 0;
-   background: rgba(10, 10, 10, 0.65);
-   backdrop-filter: blur(1px);
+   background: rgba(0, 0, 0, 0.7);
+   backdrop-filter: blur(20px);
    z-index: 1000;
    display: flex;
    align-items: center;
    justify-content: center;
-   padding: 20px;
+   padding: var(--space-5);
 }
 
 .precision-popup-content {
-   background: linear-gradient(15deg, var(--dark), rgba(42, 42, 42, 0.85));
-   border: 1px solid rgba(255, 255, 255, 0.08);
-   border-radius: 20px;
-   padding: 24px;
+   background: var(--bg-secondary);
+   border: 1px solid var(--border-subtle);
+   border-radius: var(--radius-xl);
+   padding: var(--space-6);
    max-width: 500px;
    width: 100%;
    max-height: 80vh;
    overflow-y: auto;
-   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+   box-shadow: var(--shadow-lg);
 }
 
 .precision-popup-header {
    display: flex;
    justify-content: space-between;
    align-items: center;
-   margin-bottom: 20px;
+   margin-bottom: var(--space-5);
 }
 
 .precision-popup-header h3 {
-   color: var(--light);
-   font-size: 18px;
-   font-weight: 600;
+   color: var(--text-primary);
+   font-size: 20px;
+   font-weight: 700;
    margin: 0;
 }
 
 .popup-close {
    background: none;
    border: none;
-   color: var(--light-gray);
-   font-size: 20px;
+   color: var(--text-muted);
+   font-size: 24px;
    cursor: pointer;
-   padding: 4px;
+   padding: var(--space-2);
    border-radius: 50%;
-   width: 32px;
-   height: 32px;
+   width: 40px;
+   height: 40px;
    display: flex;
    align-items: center;
    justify-content: center;
-   transition: all 0.3s ease;
+   transition: all 0.2s ease;
 }
 
 .popup-close:hover {
-   background: rgba(255, 255, 255, 0.1);
-   color: var(--light);
+   background: var(--bg-tertiary);
+   color: var(--text-primary);
 }
+
+/* Duplicate hover rule removed */
 
 .fine-tune-section {
    padding: 0 20px 20px;
@@ -1801,8 +1820,8 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
    }
 
    .precision-popup-content {
-       background: linear-gradient(15deg, var(--dark), rgba(42, 42, 42, 0.85));
-       padding: 20px;
+       background: var(--bg-secondary);
+       padding: var(--space-5);
        margin-top: 165px;
    }
 }
