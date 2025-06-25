@@ -1426,22 +1426,42 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
    font-size: 12px;
 }
 
-/* Playlist Now Playing Header */
-.playlist-now-playing-header {
-   text-align: center;
+/* Playlist Track List Header */
+.playlist-tracklist-header {
+   display: flex;
+   align-items: center;
+   gap: var(--space-3);
    padding: var(--space-4) var(--space-4) var(--space-3);
    border-bottom: 1px solid var(--border-subtle);
    margin-bottom: var(--space-3);
 }
 
-.playlist-now-playing-header h3 {
+.playlist-tracklist-header .back-btn {
+   background: none;
+   border: none;
+   color: var(--text-secondary);
+   padding: var(--space-2);
+   border-radius: var(--radius-sm);
+   cursor: pointer;
+   transition: all 0.2s ease;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+}
+
+.playlist-tracklist-header .back-btn:hover {
+   background: var(--bg-tertiary);
+   color: var(--text-primary);
+}
+
+.playlist-tracklist-info h3 {
    margin: 0 0 var(--space-1) 0;
    color: var(--text-primary);
    font-size: 18px;
    font-weight: 700;
 }
 
-.playlist-now-playing-header p {
+.playlist-tracklist-info p {
    margin: 0;
    color: var(--text-secondary);
    font-size: 13px;
@@ -1475,6 +1495,30 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
 @keyframes pulse {
    0%, 100% { opacity: 1; }
    50% { opacity: 0.5; }
+}
+
+/* Currently Playing Playlist Indicator */
+.playlist-playing-indicator {
+   background: var(--primary);
+   color: white;
+   font-size: 11px;
+   font-weight: 600;
+   padding: var(--space-1) var(--space-2);
+   border-radius: var(--radius-sm);
+   margin-bottom: var(--space-2);
+   display: inline-block;
+   animation: pulse 2s infinite;
+}
+
+.playlist-card.currently-playing {
+   border-color: var(--primary);
+   background: linear-gradient(145deg, rgba(123, 104, 238, 0.15), rgba(26, 26, 26, 0.7));
+   box-shadow: 0 0 0 1px rgba(123, 104, 238, 0.3);
+}
+
+.playlist-card.currently-playing .playlist-name {
+   color: var(--primary);
+   font-weight: 600;
 }
 
 /* Playlist Styles */
