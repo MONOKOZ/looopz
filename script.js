@@ -196,7 +196,7 @@ function updatePlayPauseButton() {
 }
 
 function updateMiniPlayer(track = null) {
-  if (track && currentView !== 'player') {
+  if (track) {
       els.miniTrackTitle.textContent = track.name || 'Unknown Track';
       els.miniTrackArtist.textContent = track.artist || 'Unknown Artist';
       els.miniPlayer.classList.remove('hidden');
@@ -466,7 +466,7 @@ function disconnectSpotify() {
   isConnected = false;
   if (spotifyPlayer) spotifyPlayer.disconnect();
   updateConnectionStatus();
-  updateMiniPlayer();
+  updateMiniPlayer(null);
   showView('login');
   showStatus('Disconnected from Spotify');
 }
@@ -582,7 +582,7 @@ async function togglePlayPause() {
 
           isPlaying = !isPlaying;
           updatePlayPauseButton();
-          updateMiniPlayer(isPlaying ? currentTrack : null);
+          updateMiniPlayer(currentTrack);
 
           if (isPlaying) {
               startProgressUpdates();
@@ -4484,6 +4484,7 @@ function setupEventListeners() {
       touchStartX = e.touches[0].clientX;
       touchStartY = e.touches[0].clientY;
       touchStartTime = Date.now();
+      console.log('🎵 Touch start on mini player:', { x: touchStartX, y: touchStartY });
   }, { passive: true });
 
   els.miniPlayer.addEventListener('touchend', async (e) => {
@@ -4497,19 +4498,28 @@ function setupEventListeners() {
       const deltaY = touchEndY - touchStartY;
       const deltaTime = touchEndTime - touchStartTime;
       
-      // Only process quick swipes (< 300ms) with significant horizontal movement
-      if (deltaTime < 300 && Math.abs(deltaX) > 50 && Math.abs(deltaY) < 30) {
+      console.log('🎵 Touch end on mini player:', { 
+          deltaX, deltaY, deltaTime, 
+          isPlaylistMode, 
+          hasPlaylistEngine: !!playlistEngine 
+      });
+      
+      // Only process quick swipes (< 500ms) with significant horizontal movement
+      if (deltaTime < 500 && Math.abs(deltaX) > 30 && Math.abs(deltaY) < 50) {
           e.preventDefault();
+          console.log('🎵 Swipe detected!', deltaX > 0 ? 'RIGHT' : 'LEFT');
           
           // Only allow swipe navigation when in playlist mode
           if (isPlaylistMode && playlistEngine) {
               try {
                   if (deltaX > 0) {
                       // Swipe right - previous track
+                      console.log('🎵 Attempting previous track...');
                       await playlistEngine.skipToPrevious();
                       showStatus('⏮️ Previous track');
                   } else {
                       // Swipe left - next track  
+                      console.log('🎵 Attempting next track...');
                       await playlistEngine.skipToNext();
                       showStatus('⏭️ Next track');
                   }
@@ -4521,7 +4531,10 @@ function setupEventListeners() {
               // Show helpful message when not in playlist mode
               const direction = deltaX > 0 ? 'previous' : 'next';
               showStatus(`Swipe to ${direction} available in playlist mode`);
+              console.log('🎵 Not in playlist mode or no engine');
           }
+      } else {
+          console.log('🎵 Swipe not recognized - insufficient movement or too slow');
       }
   }, { passive: false });
 }
