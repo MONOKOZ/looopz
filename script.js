@@ -38,7 +38,7 @@ let isPlaylistMode = false;
 let currentEditingPlaylistId = null;
 let pendingPlaylistItem = null; // For adding items to playlists
 let playlistEngine = null; // Will hold the playlist engine instance
-let playlistViewMode = 'overview'; // 'overview', 'tracklist', or 'editing'
+let playlistViewMode = 'overview'; // 'overview' or 'tracklist'
 
 // Search state
 let searchState = {
@@ -2820,7 +2820,7 @@ function saveLooopsToStorage() {
   }
 }
 
-function showSaveLoopDialog() {
+async function saveCurrentLoop() {
   if (!currentTrack) {
       showStatus('No track selected to save');
       return;
@@ -2838,26 +2838,12 @@ function showSaveLoopDialog() {
       return;
   }
 
-  // Populate the preview
-  els.loopPreviewTrack.textContent = `${currentTrack.name} - ${currentTrack.artist}`;
-  els.loopPreviewDetails.textContent = `Loop: ${formatTime(loopStart, false)} - ${formatTime(loopEnd, false)} (${loopTarget}×)`;
+  // Prompt for loop name
+  const loopName = prompt('Enter a name for this loop (optional):', currentTrack.name);
   
-  // Clear the input
-  els.loopNameInput.value = '';
-  
-  // Show popup
-  els.saveLoopPopup.classList.remove('hidden');
-}
-
-async function saveCurrentLoop(customName = '') {
-  if (!currentTrack) {
-      showStatus('No track selected to save');
-      return;
-  }
-
   const loop = {
       id: `loop_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-      name: customName.trim() || null, // Store custom name if provided
+      name: loopName || null, // Store custom name if provided
       track: {
           uri: currentTrack.uri,
           name: currentTrack.name,
@@ -2883,8 +2869,7 @@ async function saveCurrentLoop(customName = '') {
       saveBtn.style.background = '';
   }, 2000);
 
-  const displayName = customName.trim() || currentTrack.name;
-  showStatus(`Loop "${displayName}" saved! Total: ${savedLoops.length}`);
+  showStatus(`Loop saved! Total: ${savedLoops.length}`);
 }
 
 function renderLoopsList() {
@@ -2902,81 +2887,68 @@ function renderLoopsList() {
   }
 
   els.loopsList.innerHTML = savedLoops.map((loop, index) => `
-      <div class="track-item loop-item" data-loop-id="${loop.id}">
-          <div class="track-info">
-              <div class="track-header">
-                  <div class="track-name">${loop.name || loop.track.name}</div>
-                  <div class="loop-badge">🔁</div>
-              </div>
-              <div class="track-artist">${loop.track.artist}</div>
-              <div class="track-type">
-                  Loop: ${formatTime(loop.loop.start, false)} - ${formatTime(loop.loop.end, false)} (${loop.loop.repeat}×)
-              </div>
-              <div class="track-meta">
-                  Saved ${new Date(loop.savedAt).toLocaleDateString()}
+      <div class="saved-loop" data-loop-id="${loop.id}">
+          <button class="delete-x-btn" data-loop-id="${loop.id}" title="Delete loop">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-x"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+          <div class="loop-header">
+              <img src="${loop.track.image || ''}" alt="${loop.track.name}" class="loop-thumbnail" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 60 60\"%3E%3Crect width=\"60\" height=\"60\" fill=\"%23333\"/%3E%3C/svg%3E'">
+              <div class="loop-details">
+                  <div class="loop-track-name">${loop.name || loop.track.name}</div>
+                  <div class="loop-artist">${loop.track.artist}</div>
               </div>
           </div>
-          <div class="track-actions">
-              <button class="track-action-btn big-btn load-btn" data-loop-id="${loop.id}">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-play">
-                      <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                  </svg>
-              </button>
-              <button class="track-action-btn big-btn edit-btn" data-loop-id="${loop.id}">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-edit-3">
-                      <path d="M12 20h9"></path>
-                      <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-                  </svg>
-              </button>
-              <button class="track-action-btn big-btn add-to-playlist-btn" data-loop-id="${loop.id}">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-plus">
-                      <line x1="12" y1="5" x2="12" y2="19"></line>
-                      <line x1="5" y1="12" x2="19" y2="12"></line>
-                  </svg>
-              </button>
-              <button class="track-action-btn big-btn menu">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-more-horizontal">
-                      <circle cx="12" cy="12" r="1"></circle>
-                      <circle cx="19" cy="12" r="1"></circle>
-                      <circle cx="5" cy="12" r="1"></circle>
-                  </svg>
-              </button>
+
+          <div class="loop-stats">
+              <div class="loop-stat">
+                  <span class="loop-stat-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-clock"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                  </span>
+                  <span>${formatTime(loop.loop.start, false)} - ${formatTime(loop.loop.end, false)}</span>
+              </div>
+              <div class="loop-stat">
+                  <span class="loop-stat-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-repeat"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+                  </span>
+                  <span>${loop.loop.repeat}×</span>
+              </div>
+              <div class="loop-stat">
+                  <span class="loop-stat-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-calendar"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg>
+                  </span>
+                  <span>${new Date(loop.savedAt).toLocaleDateString()}</span>
+              </div>
           </div>
-          <!-- Edit Form -->
+
+          <div class="loop-actions">
+              <button class="loop-action-btn load-btn" data-loop-id="${loop.id}">Load</button>
+              <button class="loop-action-btn add-to-playlist-btn" data-loop-id="${loop.id}">+ Playlist</button>
+              <button class="loop-action-btn edit-btn" data-loop-id="${loop.id}">Edit</button>
+              <button class="loop-action-btn share-btn" data-loop-id="${loop.id}">Share</button>
+          </div>
+
           <div class="loop-edit-form" id="edit-form-${loop.id}">
-              <div class="edit-form-content">
-                  <div class="edit-form-field">
-                      <label class="edit-form-label">Loop Name</label>
-                      <input type="text" class="edit-form-input" id="edit-name-${loop.id}" 
-                             value="${loop.name || ''}" placeholder="Enter custom name">
+              <div class="edit-grid">
+                  <div class="edit-field">
+                      <label class="edit-label">Loop Name</label>
+                      <input type="text" class="edit-input" id="edit-name-${loop.id}" value="${loop.name || ''}" placeholder="Enter custom name">
                   </div>
-                  <div class="edit-form-row">
-                      <div class="edit-form-field">
-                          <label class="edit-form-label">Start Time</label>
-                          <input type="text" class="edit-form-input" id="edit-start-${loop.id}" 
-                                 value="${formatTime(loop.loop.start, false)}" placeholder="0:00">
-                      </div>
-                      <div class="edit-form-field">
-                          <label class="edit-form-label">End Time</label>
-                          <input type="text" class="edit-form-input" id="edit-end-${loop.id}" 
-                                 value="${formatTime(loop.loop.end, false)}" placeholder="0:30">
-                      </div>
-                      <div class="edit-form-field">
-                          <label class="edit-form-label">Repeat</label>
-                          <input type="number" class="edit-form-input" id="edit-repeat-${loop.id}" 
-                                 value="${loop.loop.repeat}" min="1" max="99">
-                      </div>
+                  <div class="edit-field">
+                      <label class="edit-label">Start Time</label>
+                      <input type="text" class="edit-input" id="edit-start-${loop.id}" value="${formatTime(loop.loop.start)}">
                   </div>
-                  <div class="edit-form-actions">
-                      <button class="btn secondary edit-save-btn" onclick="saveLoopEdits('${loop.id}')">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-save" style="margin-right: 4px; vertical-align: text-bottom;"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path><polyline points="17 21 17 13 7 13 7 21"></polyline><polyline points="7 3 7 8 15 8"></polyline></svg>
-                          Save
-                      </button>
-                      <button class="btn danger edit-cancel-btn" onclick="cancelEdit('${loop.id}')">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-x" style="margin-right: 4px; vertical-align: text-bottom;"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-                          Cancel
-                      </button>
+                  <div class="edit-field">
+                      <label class="edit-label">End Time</label>
+                      <input type="text" class="edit-input" id="edit-end-${loop.id}" value="${formatTime(loop.loop.end)}">
                   </div>
+                  <div class="edit-field">
+                      <label class="edit-label">Repeat Count</label>
+                      <input type="number" class="edit-input" id="edit-repeat-${loop.id}" value="${loop.loop.repeat}" min="1" max="99">
+                  </div>
+              </div>
+              <div class="edit-actions">
+                  <button class="btn secondary" onclick="saveLoopEdits('${loop.id}')">💾 Save</button>
+                  <button class="btn" onclick="cancelEdit('${loop.id}')">❌ Cancel</button>
               </div>
           </div>
       </div>
@@ -3475,29 +3447,87 @@ function renderPlaylistItems(playlist) {
       return '<div style="text-align: center; padding: 20px; color: var(--light-gray);">No items in playlist</div>';
   }
 
-  return playlist.items.map((item, index) => `
-      <div class="playlist-item" data-item-index="${index}" draggable="true">
-          <div class="playlist-item-handle">☰</div>
-          <div class="playlist-item-info">
-              <div class="playlist-item-name">${item.name} - ${item.artist}</div>
-              <div class="playlist-item-type">
-                  ${item.type === 'loop'
-                      ? `Loop: ${formatTime(item.start, false)} - ${formatTime(item.end, false)}`
-                      : 'Full Track'}
+  return playlist.items.map((item, index) => {
+      const isLoop = item.type === 'loop';
+      const savedLoop = isLoop ? savedLoops.find(l => l.id === item.id) : null;
+      const customName = savedLoop?.name || item.name;
+      
+      return `
+      <div class="saved-loop playlist-item" data-item-index="${index}" draggable="true">
+          <button class="delete-x-btn" onclick="removeFromPlaylist('${playlist.id}', ${index})" title="Remove from playlist">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-x"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
+          <div class="drag-handle" title="Drag to reorder">
+              <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-menu">
+                  <line x1="3" y1="12" x2="21" y2="12"></line>
+                  <line x1="3" y1="6" x2="21" y2="6"></line>
+                  <line x1="3" y1="18" x2="21" y2="18"></line>
+              </svg>
+          </div>
+          <div class="loop-header">
+              <img src="${item.image || ''}" alt="${customName}" class="loop-thumbnail" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 60 60\"%3E%3Crect width=\"60\" height=\"60\" fill=\"%23333\"/%3E%3C/svg%3E'">
+              <div class="loop-details">
+                  <div class="loop-track-name">${customName}</div>
+                  <div class="loop-artist">${item.artist}</div>
               </div>
           </div>
-          <div class="playlist-item-repeat">${item.playCount}×</div>
-          <button class="playlist-item-remove" onclick="removeFromPlaylist('${playlist.id}', ${index})">×</button>
+
+          <div class="loop-stats">
+              <div class="loop-stat">
+                  <span class="loop-stat-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-clock"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
+                  </span>
+                  <span>${isLoop ? `${formatTime(item.start, false)} - ${formatTime(item.end, false)}` : `Full: ${formatTime(item.duration, false)}`}</span>
+              </div>
+              ${isLoop ? `
+              <div class="loop-stat">
+                  <span class="loop-stat-icon">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-repeat"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
+                  </span>
+                  <span>${item.playCount}×</span>
+              </div>
+              ` : ''}
+              <div class="loop-stat">
+                  <span class="loop-stat-icon">${isLoop ? '🔁' : '🎵'}</span>
+                  <span>${isLoop ? 'Loop' : 'Track'}</span>
+              </div>
+          </div>
+
+          <div class="loop-actions">
+              <button class="loop-action-btn edit-playlist-item-btn" data-playlist-id="${playlist.id}" data-item-index="${index}">Edit</button>
+          </div>
+
+          <div class="loop-edit-form" id="edit-playlist-item-${playlist.id}-${index}">
+              <div class="edit-grid">
+                  ${isLoop ? `
+                  <div class="edit-field">
+                      <label class="edit-label">Start Time</label>
+                      <input type="text" class="edit-input" id="edit-start-${playlist.id}-${index}" value="${formatTime(item.start)}">
+                  </div>
+                  <div class="edit-field">
+                      <label class="edit-label">End Time</label>
+                      <input type="text" class="edit-input" id="edit-end-${playlist.id}-${index}" value="${formatTime(item.end)}">
+                  </div>
+                  ` : ''}
+                  <div class="edit-field">
+                      <label class="edit-label">Play Count</label>
+                      <input type="number" class="edit-input" id="edit-playcount-${playlist.id}-${index}" value="${item.playCount}" min="1" max="99">
+                  </div>
+              </div>
+              <div class="edit-actions">
+                  <button class="btn secondary" onclick="updatePlaylistItem('${playlist.id}', ${index})">💾 Update</button>
+                  <button class="btn" onclick="cancelPlaylistItemEdit('${playlist.id}', ${index})">❌ Cancel</button>
+              </div>
+          </div>
       </div>
-  `).join('');
+    `;
+  }).join('');
 }
 
-// Universal playlist display function - handles all modes
+// Universal playlist display function - handles both modes
 function updatePlaylistDisplay() {
   if (playlistViewMode === 'tracklist' && currentPlaylist && isPlaylistMode) {
     updatePlaylistTrackDisplay();
-  } else if (playlistViewMode === 'editing' && currentEditingPlaylistId) {
-    renderPlaylistEditMode();
   } else {
     renderPlaylistsOverview();
   }
@@ -3590,6 +3620,9 @@ function renderPlaylistsOverview() {
     
     return `
       <div class="playlist-card ${isCurrentlyPlaying ? 'currently-playing' : ''}" data-playlist-id="${playlist.id}">
+          <button class="delete-x-btn" data-playlist-id="${playlist.id}" title="Delete playlist">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-x"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+          </button>
           ${isCurrentlyPlaying ? '<div class="playlist-playing-indicator">🎵 Now Playing</div>' : ''}
           
           <div class="playlist-header">
@@ -3597,7 +3630,7 @@ function renderPlaylistsOverview() {
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-music"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
               </div>
               <div class="playlist-details">
-                  <div class="playlist-name">${playlist.name}</div>
+                  <div class="playlist-name" contenteditable="false" onblur="updatePlaylistName('${playlist.id}', this)" onclick="enablePlaylistNameEdit(this)">${playlist.name}</div>
                   <div class="playlist-description">${playlist.description || `${playlist.items.length} items`}</div>
               </div>
           </div>
@@ -3644,197 +3677,134 @@ function renderPlaylistsOverview() {
               `}
               <button class="playlist-action-btn edit-playlist-btn" data-playlist-id="${playlist.id}">Edit</button>
               <button class="playlist-action-btn share-playlist-btn" data-playlist-id="${playlist.id}">Share</button>
-              <button class="playlist-action-btn danger delete-playlist-btn" data-playlist-id="${playlist.id}">Delete</button>
+          </div>
+
+          <div class="playlist-editor" id="playlist-editor-${playlist.id}">
+              <div class="playlist-items" id="playlist-items-${playlist.id}">
+                  ${renderPlaylistItems(playlist)}
+              </div>
+              <div class="edit-actions">
+                  <button class="btn secondary" onclick="savePlaylistEdits('${playlist.id}')">💾 Save Changes</button>
+                  <button class="btn" onclick="cancelPlaylistEdit('${playlist.id}')">❌ Cancel</button>
+              </div>
           </div>
       </div>
     `;
   }).join('');
 }
 
-// Render playlist in edit mode using spacious card layout
-function renderPlaylistEditMode() {
-  const playlist = savedPlaylists.find(p => p.id === currentEditingPlaylistId);
-  if (!playlist) {
-    renderPlaylistsOverview();
-    return;
+function enablePlaylistNameEdit(element) {
+  element.contentEditable = true;
+  element.focus();
+  // Select all text
+  const range = document.createRange();
+  range.selectNodeContents(element);
+  const selection = window.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+function updatePlaylistName(playlistId, element) {
+  const playlist = savedPlaylists.find(p => p.id === playlistId);
+  if (playlist) {
+      const newName = element.textContent.trim();
+      if (newName && newName !== playlist.name) {
+          playlist.name = newName;
+          savePlaylistsToStorage();
+          showStatus('✅ Playlist renamed!');
+      } else {
+          element.textContent = playlist.name; // Restore original name if empty
+      }
   }
-
-  const html = `
-    <div class="playlist-edit-header">
-      <button class="back-btn" id="playlist-edit-back-btn">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-left">
-          <line x1="19" y1="12" x2="5" y2="12"></line>
-          <polyline points="12 19 5 12 12 5"></polyline>
-        </svg>
-      </button>
-      <div class="playlist-edit-info">
-        <input type="text" class="playlist-name-edit" id="playlist-name-edit" value="${playlist.name}" placeholder="Playlist name">
-        <p>${playlist.items.length} tracks</p>
-      </div>
-      <button class="save-playlist-btn" id="save-playlist-changes">
-        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-check">
-          <polyline points="20 6 9 17 4 12"></polyline>
-        </svg>
-      </button>
-    </div>
-    
-    ${playlist.items.length === 0 ? `
-      <div style="text-align: center; padding: 60px 20px;">
-        <div style="color: var(--text-secondary); font-size: 16px;">No tracks in playlist</div>
-        <div style="color: var(--text-muted); font-size: 13px; margin-top: 8px;">Add tracks from your loops or search</div>
-      </div>
-    ` : playlist.items.map((item, index) => `
-      <div class="track-item playlist-edit-item" data-item-index="${index}" draggable="true">
-        <div class="track-drag-handle">
-          <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-menu">
-            <line x1="3" y1="6" x2="21" y2="6"></line>
-            <line x1="3" y1="12" x2="21" y2="12"></line>
-            <line x1="3" y1="18" x2="21" y2="18"></line>
-          </svg>
-        </div>
-        <div class="track-info">
-          <div class="track-header">
-            <div class="track-name">${item.name}</div>
-          </div>
-          <div class="track-artist">${item.artist}</div>
-          <div class="track-type">
-            ${item.type === 'loop' 
-              ? `Loop: ${formatTime(item.start, false)} - ${formatTime(item.end, false)} (${item.playCount || 1}×)` 
-              : 'Full Track'}
-          </div>
-        </div>
-        <div class="track-actions">
-          <button class="track-action-btn big-btn play-playlist-item-btn" data-item-index="${index}">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-play">
-              <polygon points="5 3 19 12 5 21 5 3"></polygon>
-            </svg>
-          </button>
-          ${item.type === 'loop' ? `
-            <button class="track-action-btn big-btn edit-loop-btn" data-item-index="${index}">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-edit-3">
-                <path d="M12 20h9"></path>
-                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"></path>
-              </svg>
-            </button>
-          ` : ''}
-          <button class="track-action-btn big-btn danger remove-from-playlist-btn" data-item-index="${index}">
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-trash-2">
-              <polyline points="3 6 5 6 21 6"></polyline>
-              <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-            </svg>
-          </button>
-        </div>
-      </div>
-    `).join('')}
-  `;
-
-  els.playlistsList.innerHTML = html;
-  
-  // Setup drag and drop for reordering
-  setupPlaylistEditDragAndDrop();
+  element.contentEditable = false;
 }
 
 function editPlaylist(playlistId) {
-  currentEditingPlaylistId = playlistId;
-  playlistViewMode = 'editing';
-  updatePlaylistDisplay();
-}
-
-function cancelPlaylistEdit() {
-  currentEditingPlaylistId = null;
-  playlistViewMode = 'overview';
-  updatePlaylistDisplay();
-}
-
-function savePlaylistEdits() {
-  // Save playlist name if changed
-  const nameInput = document.getElementById('playlist-name-edit');
-  if (nameInput && currentEditingPlaylistId) {
-    const playlist = savedPlaylists.find(p => p.id === currentEditingPlaylistId);
-    if (playlist && nameInput.value.trim() !== playlist.name) {
-      playlist.name = nameInput.value.trim() || 'Untitled Playlist';
-      savePlaylistsToStorage();
-    }
+  document.querySelectorAll('.playlist-editor').forEach(editor => editor.classList.remove('active'));
+  const editor = document.getElementById(`playlist-editor-${playlistId}`);
+  if (editor) {
+      editor.classList.add('active');
+      currentEditingPlaylistId = playlistId;
+      setupPlaylistDragAndDrop(playlistId);
   }
-  
-  cancelPlaylistEdit();
+}
+
+function cancelPlaylistEdit(playlistId) {
+  const editor = document.getElementById(`playlist-editor-${playlistId}`);
+  if (editor) editor.classList.remove('active');
+  currentEditingPlaylistId = null;
+}
+
+function savePlaylistEdits(playlistId) {
+  // Just close the editor - changes are saved automatically
+  cancelPlaylistEdit(playlistId);
   showStatus('✅ Playlist updated!');
 }
 
-// Drag and drop for playlist editing
-function setupPlaylistEditDragAndDrop() {
-  const container = els.playlistsList;
-  if (!container) return;
-
-  let draggedElement = null;
-  let draggedIndex = null;
-
-  container.addEventListener('dragstart', (e) => {
-      if (!e.target.closest('.playlist-edit-item')) return;
-      
-      draggedElement = e.target.closest('.playlist-edit-item');
-      draggedIndex = parseInt(draggedElement.dataset.itemIndex);
-      draggedElement.classList.add('dragging');
-      e.dataTransfer.effectAllowed = 'move';
-  });
-
-  container.addEventListener('dragend', (e) => {
-      if (draggedElement) {
-          draggedElement.classList.remove('dragging');
-          draggedElement = null;
-          draggedIndex = null;
-      }
-  });
-
-  container.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      const afterElement = getDragAfterElement(container, e.clientY);
-      if (draggedElement) {
-          if (afterElement == null) {
-              container.appendChild(draggedElement);
-          } else {
-              container.insertBefore(draggedElement, afterElement);
-          }
-      }
-  });
-
-  container.addEventListener('drop', (e) => {
-      e.preventDefault();
-      if (draggedIndex !== null && currentEditingPlaylistId) {
-          const playlist = savedPlaylists.find(p => p.id === currentEditingPlaylistId);
-          if (playlist) {
-              // Get new position
-              const items = Array.from(container.querySelectorAll('.playlist-edit-item'));
-              const newIndex = items.indexOf(draggedElement);
-              
-              if (newIndex !== draggedIndex) {
-                  // Reorder the playlist items
-                  const [movedItem] = playlist.items.splice(draggedIndex, 1);
-                  playlist.items.splice(newIndex, 0, movedItem);
-                  savePlaylistsToStorage();
-                  
-                  // Refresh the display
-                  renderPlaylistEditMode();
-                  showStatus('✅ Playlist reordered!');
-              }
-          }
-      }
-  });
+function editPlaylistItem(playlistId, itemIndex) {
+  const editForm = document.getElementById(`edit-playlist-item-${playlistId}-${itemIndex}`);
+  if (editForm) {
+      editForm.classList.add('active');
+  }
 }
 
-function getDragAfterElement(container, y) {
-  const draggableElements = [...container.querySelectorAll('.playlist-edit-item:not(.dragging)')];
+function cancelPlaylistItemEdit(playlistId, itemIndex) {
+  const editForm = document.getElementById(`edit-playlist-item-${playlistId}-${itemIndex}`);
+  if (editForm) editForm.classList.remove('active');
+}
+
+function updatePlaylistItem(playlistId, itemIndex) {
+  const playlist = savedPlaylists.find(p => p.id === playlistId);
+  if (!playlist || !playlist.items[itemIndex]) return;
+
+  const item = playlist.items[itemIndex];
+  const isLoop = item.type === 'loop';
+
+  // Update play count
+  const newPlayCount = parseInt(document.getElementById(`edit-playcount-${playlistId}-${itemIndex}`).value);
   
-  return draggableElements.reduce((closest, child) => {
-      const box = child.getBoundingClientRect();
-      const offset = y - box.top - box.height / 2;
+  if (isLoop) {
+      // Update loop times
+      const newStart = parseTimeInput(document.getElementById(`edit-start-${playlistId}-${itemIndex}`).value);
+      const newEnd = parseTimeInput(document.getElementById(`edit-end-${playlistId}-${itemIndex}`).value);
       
-      if (offset < 0 && offset > closest.offset) {
-          return { offset: offset, element: child };
+      if (newStart >= 0 && newEnd > newStart && newPlayCount >= 1 && newPlayCount <= 99) {
+          item.start = newStart;
+          item.end = newEnd;
+          item.playCount = newPlayCount;
+          
+          // If it's updating the original loop, save it
+          const savedLoop = savedLoops.find(l => l.id === item.id);
+          if (savedLoop) {
+              savedLoop.loop.start = newStart;
+              savedLoop.loop.end = newEnd;
+              savedLoop.loop.repeat = newPlayCount;
+              saveLooopsToStorage();
+          }
       } else {
-          return closest;
+          showStatus('❌ Invalid values');
+          return;
       }
-  }, { offset: Number.NEGATIVE_INFINITY }).element;
+  } else {
+      // For full tracks, just update play count
+      if (newPlayCount >= 1 && newPlayCount <= 99) {
+          item.playCount = newPlayCount;
+      } else {
+          showStatus('❌ Invalid play count');
+          return;
+      }
+  }
+
+  savePlaylistsToStorage();
+  
+  // Re-render the playlist items
+  const itemsContainer = document.getElementById(`playlist-items-${playlistId}`);
+  if (itemsContainer) {
+      itemsContainer.innerHTML = renderPlaylistItems(playlist);
+      setupPlaylistDragAndDrop(playlistId); // Re-setup drag and drop
+  }
+  
+  showStatus('✅ Item updated!');
 }
 
 function removeFromPlaylist(playlistId, itemIndex) {
@@ -4585,22 +4555,6 @@ function setupEventListeners() {
               els.precisionPopup.classList.add('hidden');
           }
 
-          // Save Loop popup
-          else if (target.matches('#save-loop-close, #save-loop-cancel')) {
-              e.preventDefault();
-              els.saveLoopPopup.classList.add('hidden');
-          }
-          else if (target.matches('#save-loop-confirm')) {
-              e.preventDefault();
-              const customName = els.loopNameInput.value.trim();
-              els.saveLoopPopup.classList.add('hidden');
-              await saveCurrentLoop(customName);
-          }
-          else if (target.matches('#save-loop-popup') && !target.closest('.precision-popup-content')) {
-              e.preventDefault();
-              els.saveLoopPopup.classList.add('hidden');
-          }
-
           // Search navigation
           else if (target.matches('#search-back-btn')) {
               e.preventDefault();
@@ -4702,14 +4656,14 @@ function setupEventListeners() {
               const loopId = target.dataset.loopId;
               await shareSavedLoop(loopId, target);
           }
-          else if (target.matches('.delete-btn')) {
+          else if (target.matches('.delete-btn, .delete-x-btn')) {
               e.preventDefault();
               const loopId = target.dataset.loopId;
               deleteLoop(loopId);
           }
           else if (target.matches('#save-loop-btn')) {
               e.preventDefault();
-              showSaveLoopDialog();
+              await saveCurrentLoop();
           }
           else if (target.matches('#add-to-playlist-btn')) {
               e.preventDefault();
@@ -4746,31 +4700,6 @@ function setupEventListeners() {
               e.preventDefault();
               playlistViewMode = 'overview';
               updatePlaylistDisplay();
-          }
-          else if (target.matches('#playlist-edit-back-btn')) {
-              e.preventDefault();
-              cancelPlaylistEdit();
-          }
-          else if (target.matches('#save-playlist-changes')) {
-              e.preventDefault();
-              savePlaylistEdits();
-          }
-          else if (target.matches('.remove-from-playlist-btn')) {
-              e.preventDefault();
-              const itemIndex = parseInt(target.dataset.itemIndex);
-              if (currentEditingPlaylistId) {
-                  removeItemFromPlaylist(currentEditingPlaylistId, itemIndex);
-                  renderPlaylistEditMode();
-                  showStatus('✅ Track removed from playlist');
-              }
-          }
-          else if (target.matches('.play-playlist-item-btn')) {
-              e.preventDefault();
-              const itemIndex = parseInt(target.dataset.itemIndex);
-              if (currentEditingPlaylistId) {
-                  // Play the playlist starting from this item
-                  playPlaylist(currentEditingPlaylistId, itemIndex);
-              }
           }
           else if (target.matches('.edit-playlist-btn')) {
               e.preventDefault();
@@ -5001,6 +4930,10 @@ window.saveLoopEdits = saveLoopEdits;
 window.cancelPlaylistEdit = cancelPlaylistEdit;
 window.savePlaylistEdits = savePlaylistEdits;
 window.removeFromPlaylist = removeFromPlaylist;
+window.enablePlaylistNameEdit = enablePlaylistNameEdit;
+window.updatePlaylistName = updatePlaylistName;
+window.updatePlaylistItem = updatePlaylistItem;
+window.cancelPlaylistItemEdit = cancelPlaylistItemEdit;
 
 // Init
 function init() {
@@ -5055,14 +4988,6 @@ function init() {
       precisionClose: document.getElementById('precision-close'),
       precisionStart: document.getElementById('precision-start'),
       precisionEnd: document.getElementById('precision-end'),
-      // Save Loop popup elements
-      saveLoopPopup: document.getElementById('save-loop-popup'),
-      saveLoopClose: document.getElementById('save-loop-close'),
-      saveLoopConfirm: document.getElementById('save-loop-confirm'),
-      saveLoopCancel: document.getElementById('save-loop-cancel'),
-      loopNameInput: document.getElementById('loop-name-input'),
-      loopPreviewTrack: document.getElementById('loop-preview-track'),
-      loopPreviewDetails: document.getElementById('loop-preview-details'),
       loopsList: document.getElementById('loops-list'),
       loopCountBadge: document.getElementById('loop-count-badge'),
       playlistsList: document.getElementById('playlists-list'),
