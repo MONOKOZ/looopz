@@ -12,10 +12,10 @@
    --danger: #EF5350;
 
    /* Backgrounds */
-   --bg-primary: #36393F;
-   --bg-secondary: #2F3136;
-   --bg-tertiary: #40444B;
-   --bg-elevated: #4F545C;
+   --bg-primary: #1a1a1a;
+   --bg-secondary: #252525;
+   --bg-tertiary: #2f2f2f;
+   --bg-elevated: #3a3a3a;
 
    /* Text */
    --text-primary: #DCDDDE;
@@ -229,7 +229,7 @@ body {
 .btn:active { transform: scale(0.98); }
 
 .btn.secondary { 
-   background: linear-gradient(135deg, var(--secondary), #FF6B9D); 
+   background: linear-gradient(135deg, var(--success), #4CAF50); 
 }
 
 .btn.tertiary { 
@@ -268,7 +268,7 @@ body {
    position: sticky;
    top: 41px;
    z-index: 90;
-   padding: var(--space-5) var(--space-4);
+   padding: var(--space-5) 0;
    margin: 0 0 var(--space-4) 0;
 }
 
@@ -311,7 +311,7 @@ body {
    outline: none;
    transition: all 0.2s ease;
    min-height: 52px;
-   margin: 0;
+   margin: 0 var(--space-4);
    box-sizing: border-box;
 }
 
