@@ -569,6 +569,11 @@ body {
 
 .control-btn:hover { background: linear-gradient(145deg, #444, #333); transform: scale(1.05); }
 
+/* Fix button click/touch issues - prevent SVG icons from capturing clicks */
+.control-btn svg {
+   pointer-events: none;
+}
+
 .play-pause-btn {
    width: 72px;
    height: 72px;
