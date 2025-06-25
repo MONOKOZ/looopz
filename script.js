@@ -2894,7 +2894,8 @@ function renderLoopsList() {
           <div class="loop-header">
               <img src="${loop.track.image || ''}" alt="${loop.track.name}" class="loop-thumbnail" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 60 60\"%3E%3Crect width=\"60\" height=\"60\" fill=\"%23333\"/%3E%3C/svg%3E'">
               <div class="loop-details">
-                  <div class="loop-track-name">${loop.name || loop.track.name}</div>
+                  ${loop.name ? `<div class="loop-custom-name">${loop.name}</div>` : ''}
+                  <div class="loop-track-name">${loop.track.name}</div>
                   <div class="loop-artist">${loop.track.artist}</div>
               </div>
           </div>
@@ -3442,18 +3443,44 @@ function renderPlaylistsList() {
   `).join('');
 }
 
-function renderPlaylistItems(playlist) {
+function renderPlaylistEditView(playlist) {
+  const html = `
+    <div class="playlist-edit-view">
+      <div class="playlist-edit-header">
+        <button class="back-btn" id="playlist-edit-back-btn">
+          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-left">
+            <line x1="19" y1="12" x2="5" y2="12"></line>
+            <polyline points="12 19 5 12 12 5"></polyline>
+          </svg>
+        </button>
+        <div class="playlist-edit-info">
+          <h2>${playlist.name}</h2>
+          <p>${playlist.items.length} items • ${formatTime(playlist.totalDuration, false)}</p>
+        </div>
+      </div>
+      
+      <div id="playlist-items-container">
+        ${renderPlaylistItemsAsCards(playlist)}
+      </div>
+    </div>
+  `;
+  
+  els.playlistsList.innerHTML = html;
+  setupPlaylistDragAndDrop(playlist.id);
+}
+
+function renderPlaylistItemsAsCards(playlist) {
   if (playlist.items.length === 0) {
-      return '<div style="text-align: center; padding: 20px; color: var(--light-gray);">No items in playlist</div>';
+      return '<div style="text-align: center; padding: 60px 20px; color: var(--light-gray);">No items in playlist yet</div>';
   }
 
   return playlist.items.map((item, index) => {
       const isLoop = item.type === 'loop';
       const savedLoop = isLoop ? savedLoops.find(l => l.id === item.id) : null;
-      const customName = savedLoop?.name || item.name;
+      const customName = savedLoop?.name;
       
       return `
-      <div class="saved-loop playlist-item" data-item-index="${index}" draggable="true">
+      <div class="saved-loop playlist-item" data-playlist-id="${playlist.id}" data-item-index="${index}" draggable="true">
           <button class="delete-x-btn" onclick="removeFromPlaylist('${playlist.id}', ${index})" title="Remove from playlist">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-x"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
@@ -3465,9 +3492,10 @@ function renderPlaylistItems(playlist) {
               </svg>
           </div>
           <div class="loop-header">
-              <img src="${item.image || ''}" alt="${customName}" class="loop-thumbnail" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 60 60\"%3E%3Crect width=\"60\" height=\"60\" fill=\"%23333\"/%3E%3C/svg%3E'">
+              <img src="${item.image || ''}" alt="${item.name}" class="loop-thumbnail" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 60 60\"%3E%3Crect width=\"60\" height=\"60\" fill=\"%23333\"/%3E%3C/svg%3E'">
               <div class="loop-details">
-                  <div class="loop-track-name">${customName}</div>
+                  ${customName ? `<div class="loop-custom-name">${customName}</div>` : ''}
+                  <div class="loop-track-name">${item.name}</div>
                   <div class="loop-artist">${item.artist}</div>
               </div>
           </div>
@@ -3494,7 +3522,9 @@ function renderPlaylistItems(playlist) {
           </div>
 
           <div class="loop-actions">
+              <button class="loop-action-btn load-playlist-item-btn" data-playlist-id="${playlist.id}" data-item-index="${index}">Load</button>
               <button class="loop-action-btn edit-playlist-item-btn" data-playlist-id="${playlist.id}" data-item-index="${index}">Edit</button>
+              <button class="loop-action-btn share-btn" data-item='${JSON.stringify(item)}'>Share</button>
           </div>
 
           <div class="loop-edit-form" id="edit-playlist-item-${playlist.id}-${index}">
@@ -3515,13 +3545,19 @@ function renderPlaylistItems(playlist) {
                   </div>
               </div>
               <div class="edit-actions">
-                  <button class="btn secondary" onclick="updatePlaylistItem('${playlist.id}', ${index})">💾 Update</button>
+                  <button class="btn secondary" onclick="saveOrUpdatePlaylistItem('${playlist.id}', ${index})">💾 Save</button>
                   <button class="btn" onclick="cancelPlaylistItemEdit('${playlist.id}', ${index})">❌ Cancel</button>
               </div>
           </div>
       </div>
     `;
   }).join('');
+}
+
+// Keep the old function for the compact view in playlist overview
+function renderPlaylistItems(playlist) {
+  // This stays as the compact view for the playlist card editor
+  return ''; // We'll use the full card view now
 }
 
 // Universal playlist display function - handles both modes
@@ -3720,13 +3756,13 @@ function updatePlaylistName(playlistId, element) {
 }
 
 function editPlaylist(playlistId) {
-  document.querySelectorAll('.playlist-editor').forEach(editor => editor.classList.remove('active'));
-  const editor = document.getElementById(`playlist-editor-${playlistId}`);
-  if (editor) {
-      editor.classList.add('active');
-      currentEditingPlaylistId = playlistId;
-      setupPlaylistDragAndDrop(playlistId);
-  }
+  // Switch to tracklist view mode and show the playlist items
+  const playlist = savedPlaylists.find(p => p.id === playlistId);
+  if (!playlist) return;
+  
+  currentEditingPlaylistId = playlistId;
+  playlistViewMode = 'editing';
+  renderPlaylistEditView(playlist);
 }
 
 function cancelPlaylistEdit(playlistId) {
@@ -3810,19 +3846,117 @@ function updatePlaylistItem(playlistId, itemIndex) {
 function removeFromPlaylist(playlistId, itemIndex) {
   removeItemFromPlaylist(playlistId, itemIndex);
 
-  // Re-render the playlist items
+  // Re-render the playlist items if in edit view
   const playlist = savedPlaylists.find(p => p.id === playlistId);
-  if (playlist) {
-      const itemsContainer = document.getElementById(`playlist-items-${playlistId}`);
+  if (playlist && playlistViewMode === 'editing') {
+      const itemsContainer = document.getElementById('playlist-items-container');
       if (itemsContainer) {
-          itemsContainer.innerHTML = renderPlaylistItems(playlist);
+          itemsContainer.innerHTML = renderPlaylistItemsAsCards(playlist);
+          setupPlaylistDragAndDrop(playlistId);
       }
+  }
+}
+
+function loadPlaylistItem(playlistId, itemIndex) {
+  const playlist = savedPlaylists.find(p => p.id === playlistId);
+  if (!playlist || !playlist.items[itemIndex]) return;
+
+  const item = playlist.items[itemIndex];
+  
+  if (item.type === 'loop') {
+      // Load as a saved loop
+      const trackData = {
+          uri: item.uri,
+          name: item.name,
+          artist: item.artist,
+          duration: item.duration,
+          image: item.image || ''
+      };
+
+      currentTrack = trackData;
+      duration = trackData.duration;
+      els.currentTrack.textContent = item.name;
+      els.currentArtist.textContent = item.artist;
+
+      loopStart = item.start;
+      loopEnd = item.end;
+      loopTarget = item.playCount;
+      loopEnabled = true;
+
+      if (els.loopToggle) els.loopToggle.checked = true;
+      updateRepeatDisplay();
+      updateLoopVisuals();
+
+      loadTrackSafely(trackData, loopStart * 1000, true);
+      
+      showView('player');
+      showStatus(`🔄 Loading: ${item.name}`);
+  } else {
+      // Load full track
+      showStatus('❌ Full track loading not implemented yet');
+  }
+}
+
+// Add save or update function
+function saveOrUpdatePlaylistItem(playlistId, itemIndex) {
+  const choice = confirm("Do you want to:\n\nOK = Save as new loop\nCancel = Update existing");
+  
+  if (choice) {
+      // Save as new
+      savePlaylistItemAsNew(playlistId, itemIndex);
+  } else {
+      // Update existing
+      updatePlaylistItem(playlistId, itemIndex);
+  }
+}
+
+function savePlaylistItemAsNew(playlistId, itemIndex) {
+  const playlist = savedPlaylists.find(p => p.id === playlistId);
+  if (!playlist || !playlist.items[itemIndex]) return;
+
+  const item = playlist.items[itemIndex];
+  const isLoop = item.type === 'loop';
+
+  if (!isLoop) {
+      showStatus('❌ Can only save loops as new');
+      return;
+  }
+
+  // Get new values
+  const newStart = parseTimeInput(document.getElementById(`edit-start-${playlistId}-${itemIndex}`).value);
+  const newEnd = parseTimeInput(document.getElementById(`edit-end-${playlistId}-${itemIndex}`).value);
+  const newPlayCount = parseInt(document.getElementById(`edit-playcount-${playlistId}-${itemIndex}`).value);
+
+  if (newStart >= 0 && newEnd > newStart && newPlayCount >= 1 && newPlayCount <= 99) {
+      // Create new loop
+      const newLoop = {
+          id: `loop_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          name: prompt('Enter a name for the new loop:', item.name) || null,
+          track: {
+              uri: item.uri,
+              name: item.name,
+              artist: item.artist,
+              duration: item.duration,
+              image: item.image
+          },
+          loop: { start: newStart, end: newEnd, repeat: newPlayCount },
+          savedAt: new Date().toISOString(),
+          playCount: 0
+      };
+
+      savedLoops.unshift(newLoop);
+      saveLooopsToStorage();
+      
+      cancelPlaylistItemEdit(playlistId, itemIndex);
+      showStatus('✅ New loop saved!');
+  } else {
+      showStatus('❌ Invalid values');
   }
 }
 
 // Drag and Drop for playlist reordering
 function setupPlaylistDragAndDrop(playlistId) {
-  const container = document.getElementById(`playlist-items-${playlistId}`);
+  const container = document.getElementById('playlist-items-container');
   if (!container) return;
 
   let draggedElement = null;
@@ -4693,13 +4827,24 @@ function setupEventListeners() {
           }
           else if (target.matches('.view-tracklist-btn')) {
               e.preventDefault();
-              playlistViewMode = 'tracklist';
-              updatePlaylistDisplay();
+              const playlistId = target.dataset.playlistId;
+              const playlist = savedPlaylists.find(p => p.id === playlistId);
+              if (playlist) {
+                  playlistViewMode = 'editing';
+                  renderPlaylistEditView(playlist);
+              }
           }
-          else if (target.matches('#playlist-back-btn')) {
+          else if (target.matches('#playlist-back-btn, #playlist-edit-back-btn')) {
               e.preventDefault();
               playlistViewMode = 'overview';
+              currentEditingPlaylistId = null;
               updatePlaylistDisplay();
+          }
+          else if (target.matches('.load-playlist-item-btn')) {
+              e.preventDefault();
+              const playlistId = target.dataset.playlistId;
+              const itemIndex = parseInt(target.dataset.itemIndex);
+              loadPlaylistItem(playlistId, itemIndex);
           }
           else if (target.matches('.edit-playlist-btn')) {
               e.preventDefault();
@@ -4934,6 +5079,7 @@ window.enablePlaylistNameEdit = enablePlaylistNameEdit;
 window.updatePlaylistName = updatePlaylistName;
 window.updatePlaylistItem = updatePlaylistItem;
 window.cancelPlaylistItemEdit = cancelPlaylistItemEdit;
+window.saveOrUpdatePlaylistItem = saveOrUpdatePlaylistItem;
 
 // Init
 function init() {
