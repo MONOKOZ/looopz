@@ -1415,6 +1415,62 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
    box-shadow: 0 0 0 3px rgba(29, 185, 84, 0.1);
 }
 
+/* Enhanced Edit Form */
+.edit-form-content {
+   display: flex;
+   flex-direction: column;
+   gap: 16px;
+}
+
+.edit-form-field {
+   display: flex;
+   flex-direction: column;
+   gap: 6px;
+}
+
+.edit-form-row {
+   display: grid;
+   grid-template-columns: 1fr 1fr 80px;
+   gap: 12px;
+}
+
+.edit-form-label {
+   font-size: 11px;
+   color: var(--text-secondary);
+   text-transform: uppercase;
+   font-weight: 600;
+   letter-spacing: 0.5px;
+}
+
+.edit-form-input {
+   background: var(--bg-tertiary);
+   border: 1px solid var(--border-subtle);
+   color: var(--text-primary);
+   padding: 8px 12px;
+   border-radius: 6px;
+   font-size: 13px;
+   font-family: inherit;
+}
+
+.edit-form-input:focus {
+   outline: none;
+   border-color: var(--primary);
+   box-shadow: 0 0 0 2px rgba(29, 185, 84, 0.1);
+}
+
+.edit-form-actions {
+   display: flex;
+   gap: 8px;
+   justify-content: flex-end;
+   margin-top: 8px;
+}
+
+.edit-save-btn,
+.edit-cancel-btn {
+   padding: 8px 12px;
+   font-size: 12px;
+}
+
 .edit-actions {
    display: flex;
    gap: 8px;
@@ -1465,6 +1521,108 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
    margin: 0;
    color: var(--text-secondary);
    font-size: 13px;
+}
+
+/* Playlist Edit Header */
+.playlist-edit-header {
+   display: flex;
+   align-items: center;
+   gap: var(--space-3);
+   padding: var(--space-4) var(--space-4) var(--space-3);
+   border-bottom: 1px solid var(--border-subtle);
+   margin-bottom: var(--space-3);
+}
+
+.playlist-edit-header .back-btn {
+   background: none;
+   border: none;
+   color: var(--text-secondary);
+   padding: var(--space-2);
+   border-radius: var(--radius-sm);
+   cursor: pointer;
+   transition: all 0.2s ease;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+}
+
+.playlist-edit-header .back-btn:hover {
+   background: var(--bg-tertiary);
+   color: var(--text-primary);
+}
+
+.playlist-edit-info {
+   flex: 1;
+}
+
+.playlist-name-edit {
+   background: none;
+   border: none;
+   color: var(--text-primary);
+   font-size: 18px;
+   font-weight: 700;
+   padding: var(--space-1);
+   border-radius: var(--radius-sm);
+   outline: none;
+   width: 100%;
+   margin-bottom: var(--space-1);
+}
+
+.playlist-name-edit:focus {
+   background: var(--bg-tertiary);
+}
+
+.playlist-edit-info p {
+   margin: 0;
+   color: var(--text-secondary);
+   font-size: 13px;
+}
+
+.save-playlist-btn {
+   background: var(--success);
+   color: white;
+   border: none;
+   padding: var(--space-2);
+   border-radius: var(--radius-sm);
+   cursor: pointer;
+   transition: all 0.2s ease;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+}
+
+.save-playlist-btn:hover {
+   background: #4CAF50;
+   transform: scale(1.05);
+}
+
+/* Playlist Edit Items */
+.playlist-edit-item {
+   cursor: grab;
+}
+
+.playlist-edit-item.dragging {
+   opacity: 0.5;
+   cursor: grabbing;
+}
+
+.track-drag-handle {
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   color: var(--text-muted);
+   padding: var(--space-2);
+   margin-right: var(--space-2);
+   cursor: grab;
+   transition: all 0.2s ease;
+}
+
+.track-drag-handle:hover {
+   color: var(--text-secondary);
+}
+
+.playlist-edit-item:active .track-drag-handle {
+   cursor: grabbing;
 }
 
 /* Playlist Track States */
@@ -1757,6 +1915,33 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
    outline: none;
    border-color: var(--primary);
    box-shadow: 0 0 0 3px rgba(29, 185, 84, 0.1);
+}
+
+/* Save Loop Form */
+.save-loop-form {
+   display: flex;
+   flex-direction: column;
+   gap: 16px;
+}
+
+.loop-preview {
+   background: var(--bg-secondary);
+   border: 1px solid var(--border-subtle);
+   border-radius: 8px;
+   padding: 16px;
+   margin: 8px 0;
+}
+
+.loop-preview-track {
+   font-size: 16px;
+   font-weight: 600;
+   color: var(--text-primary);
+   margin-bottom: 4px;
+}
+
+.loop-preview-details {
+   font-size: 14px;
+   color: var(--text-secondary);
 }
 
 /* Add to Playlist Popup */
