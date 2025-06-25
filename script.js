@@ -3975,88 +3975,186 @@ function savePlaylistItemAsNew(playlistId, itemIndex) {
   }
 }
 
-// Simple, working drag and drop for playlist reordering
+// Working drag and drop implementation based on research
 function setupPlaylistDragAndDrop(playlistId) {
   const container = document.getElementById('playlist-items-container');
   if (!container) return;
 
-  let draggedItem = null;
-  let draggedFromIndex = null;
+  // Remove existing listeners to avoid duplicates
+  container.removeEventListener('dragstart', container._dragStart);
+  container.removeEventListener('dragover', container._dragOver);
+  container.removeEventListener('drop', container._drop);
+  container.removeEventListener('dragend', container._dragEnd);
 
-  // Make the container ready for drag and drop
-  container.addEventListener('dragstart', handleDragStart);
-  container.addEventListener('dragover', handleDragOver);
-  container.addEventListener('drop', handleDrop);
-  container.addEventListener('dragend', handleDragEnd);
+  let draggedElement = null;
+  let originalIndex = null;
 
+  // Drag start handler
   function handleDragStart(e) {
     const item = e.target.closest('.playlist-item');
     if (!item) return;
+
+    // Only allow dragging from drag handle or if no buttons are clicked
+    const isButton = e.target.closest('button');
+    const isDragHandle = e.target.closest('.drag-handle');
     
-    // Don't allow drag from buttons (except drag handle)
-    if (e.target.closest('button') && !e.target.closest('.drag-handle')) {
+    if (isButton && !isDragHandle) {
       e.preventDefault();
       return;
     }
 
-    draggedItem = item;
-    draggedFromIndex = parseInt(item.dataset.itemIndex);
-    item.classList.add('dragging');
+    draggedElement = item;
+    originalIndex = parseInt(item.dataset.itemIndex);
     
+    item.classList.add('dragging');
     e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/html', item.outerHTML);
+    e.dataTransfer.setData('text/html', '');
+    
+    console.log('Drag started for item at index:', originalIndex);
   }
 
+  // Drag over handler
   function handleDragOver(e) {
     e.preventDefault();
     e.dataTransfer.dropEffect = 'move';
     
-    if (!draggedItem) return;
+    if (!draggedElement) return;
 
-    const items = [...container.querySelectorAll('.playlist-item:not(.dragging)')];
-    const nextItem = items.find(item => {
-      const rect = item.getBoundingClientRect();
-      return e.clientY < rect.top + rect.height / 2;
-    });
-
-    if (nextItem) {
-      container.insertBefore(draggedItem, nextItem);
+    const afterElement = getDragAfterElement(container, e.clientY);
+    
+    if (afterElement == null) {
+      container.appendChild(draggedElement);
     } else {
-      container.appendChild(draggedItem);
+      container.insertBefore(draggedElement, afterElement);
     }
   }
 
+  // Drop handler
   function handleDrop(e) {
     e.preventDefault();
     
-    if (!draggedItem) return;
+    if (!draggedElement) return;
 
-    // Find the new position
-    const items = [...container.querySelectorAll('.playlist-item')];
-    const newIndex = items.indexOf(draggedItem);
+    // Calculate new index
+    const allItems = [...container.querySelectorAll('.playlist-item')];
+    const newIndex = allItems.indexOf(draggedElement);
     
-    console.log('Moving item from', draggedFromIndex, 'to', newIndex);
+    console.log('Drop: moving from', originalIndex, 'to', newIndex);
     
-    if (newIndex !== draggedFromIndex && newIndex !== -1) {
-      // Update the data
-      reorderPlaylistItems(playlistId, draggedFromIndex, newIndex);
+    if (newIndex !== originalIndex && newIndex !== -1) {
+      // Update the backend data
+      reorderPlaylistItems(playlistId, originalIndex, newIndex);
       
-      // Update the data-item-index attributes
-      items.forEach((item, index) => {
+      // Update all item indices
+      allItems.forEach((item, index) => {
         item.dataset.itemIndex = index;
       });
       
-      console.log('Reorder completed successfully');
+      console.log('Reorder successful');
     }
   }
 
+  // Drag end handler
   function handleDragEnd(e) {
-    if (draggedItem) {
-      draggedItem.classList.remove('dragging');
-      draggedItem = null;
-      draggedFromIndex = null;
+    if (draggedElement) {
+      draggedElement.classList.remove('dragging');
     }
+    draggedElement = null;
+    originalIndex = null;
   }
+
+  // Helper function to find insertion point
+  function getDragAfterElement(container, y) {
+    const draggableElements = [...container.querySelectorAll('.playlist-item:not(.dragging)')];
+    
+    return draggableElements.reduce((closest, child) => {
+      const box = child.getBoundingClientRect();
+      const offset = y - box.top - box.height / 2;
+      
+      if (offset < 0 && offset > closest.offset) {
+        return { offset: offset, element: child };
+      } else {
+        return closest;
+      }
+    }, { offset: Number.NEGATIVE_INFINITY }).element;
+  }
+
+  // Store references for cleanup
+  container._dragStart = handleDragStart;
+  container._dragOver = handleDragOver;
+  container._drop = handleDrop;
+  container._dragEnd = handleDragEnd;
+
+  // Add event listeners
+  container.addEventListener('dragstart', handleDragStart);
+  container.addEventListener('dragover', handleDragOver);
+  container.addEventListener('drop', handleDrop);
+  container.addEventListener('dragend', handleDragEnd);
+  
+  // Add touch support for mobile
+  let touchStartY = 0;
+  let touchItem = null;
+  
+  container.addEventListener('touchstart', (e) => {
+    const item = e.target.closest('.playlist-item');
+    if (!item) return;
+    
+    // Only allow from drag handle on touch
+    if (!e.target.closest('.drag-handle')) return;
+    
+    touchStartY = e.touches[0].clientY;
+    touchItem = item;
+    item.style.transform = 'scale(1.02)';
+  }, { passive: true });
+  
+  container.addEventListener('touchmove', (e) => {
+    if (!touchItem) return;
+    
+    const touchY = e.touches[0].clientY;
+    const deltaY = touchY - touchStartY;
+    
+    if (Math.abs(deltaY) > 10) {
+      e.preventDefault();
+      
+      // Find the item to swap with
+      const items = [...container.querySelectorAll('.playlist-item')];
+      const currentIndex = items.indexOf(touchItem);
+      const targetIndex = deltaY > 0 ? currentIndex + 1 : currentIndex - 1;
+      
+      if (targetIndex >= 0 && targetIndex < items.length) {
+        const targetItem = items[targetIndex];
+        if (deltaY > 0) {
+          container.insertBefore(touchItem, targetItem.nextSibling);
+        } else {
+          container.insertBefore(touchItem, targetItem);
+        }
+        touchStartY = touchY;
+      }
+    }
+  }, { passive: false });
+  
+  container.addEventListener('touchend', (e) => {
+    if (!touchItem) return;
+    
+    touchItem.style.transform = '';
+    
+    // Update indices and save
+    const items = [...container.querySelectorAll('.playlist-item')];
+    const newIndex = items.indexOf(touchItem);
+    const oldIndex = parseInt(touchItem.dataset.itemIndex);
+    
+    if (newIndex !== oldIndex) {
+      reorderPlaylistItems(playlistId, oldIndex, newIndex);
+      items.forEach((item, index) => {
+        item.dataset.itemIndex = index;
+      });
+    }
+    
+    touchItem = null;
+    touchStartY = 0;
+  }, { passive: true });
+  
+  console.log('Drag and drop setup complete for playlist:', playlistId);
 }
 
 // Removed getDragAfterElement - using simpler approach
