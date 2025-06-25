@@ -277,11 +277,12 @@ body {
 
 /* Popularity Legend */
 .popularity-legend {
-   font-size: 11px;
-   color: rgba(255, 255, 255, 0.5);
-   margin-top: 8px;
-   padding: 0 4px;
+   font-size: 10px;
+   color: rgba(255, 255, 255, 0.4);
+   margin-top: 6px;
+   padding: 0 2px;
    text-align: center;
+   line-height: 1.2;
 }
 
 /* Track Header with Popularity Badge */
@@ -329,9 +330,26 @@ body {
 
 /* Bigger Action Buttons */
 .track-action-btn.big-btn {
-   width: 40px;
-   height: 40px;
-   padding: 10px;
+   width: 44px;
+   height: 44px;
+   padding: 12px;
+   font-size: 14px;
+}
+
+/* Fix z-index for clickable icons */
+.track-action-btn svg {
+   pointer-events: none;
+   z-index: 1;
+}
+
+/* Make menu button more prominent */
+.track-action-btn.menu.big-btn {
+   background: rgba(255, 255, 255, 0.12);
+   border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.track-action-btn.menu.big-btn:hover {
+   background: rgba(255, 255, 255, 0.2);
 }
 
 /* Three-Dot Context Menu - IMPROVED UX */
