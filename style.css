@@ -1406,25 +1406,47 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
    top: 18px;
    cursor: grab;
    color: var(--text-secondary);
-   opacity: 0.5;
+   opacity: 0.7;
    transition: opacity 0.2s ease;
-   padding: 4px;
-   z-index: 1;
-   background: rgba(0, 0, 0, 0.3);
-   border-radius: 4px;
+   padding: 12px;
+   z-index: 10;
+   background: rgba(0, 0, 0, 0.7);
+   border-radius: 8px;
+   touch-action: manipulation;
+   user-select: none;
+   min-width: 32px;
+   min-height: 32px;
+   display: flex;
+   align-items: center;
+   justify-content: center;
 }
 
-.drag-handle:hover {
+.drag-handle:hover,
+.drag-handle:active {
    opacity: 1;
+   background: rgba(0, 0, 0, 0.9);
+   cursor: grabbing;
+}
+
+@media (hover: none) {
+   .drag-handle {
+       opacity: 0.9;
+       padding: 16px;
+   }
 }
 
 /* Ensure the main container maintains proper flex layout */
 .saved-loop.playlist-item {
    display: flex;
    flex-direction: column;
-   padding-left: 40px;
-   cursor: grab;
+   padding-left: 50px;
+   position: relative;
    box-sizing: border-box;
+   transition: opacity 0.2s ease;
+}
+
+.saved-loop.playlist-item[draggable="true"] {
+   cursor: grab;
 }
 
 .saved-loop.playlist-item .loop-stats {
