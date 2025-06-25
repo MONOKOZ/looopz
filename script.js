@@ -4013,7 +4013,7 @@ function setupPlaylistDragAndDrop(playlistId) {
     console.log('Drag started for item at index:', originalIndex);
   }
 
-  // Drag over handler with throttling
+  // Drag over handler - working version with gentle throttling
   let lastDragOver = 0;
   function handleDragOver(e) {
     e.preventDefault();
@@ -4021,25 +4021,17 @@ function setupPlaylistDragAndDrop(playlistId) {
     
     if (!draggedElement) return;
     
-    // Throttle drag over events to reduce jumpiness
+    // Light throttling to smooth out but not break functionality
     const now = Date.now();
-    if (now - lastDragOver < 50) return; // 50ms throttle
+    if (now - lastDragOver < 16) return; // ~60fps throttle
     lastDragOver = now;
 
     const afterElement = getDragAfterElement(container, e.clientY);
     
-    // Only move if there's actually a change
-    const currentNext = draggedElement.nextElementSibling;
-    const shouldMove = (afterElement !== currentNext) && 
-                      (afterElement !== draggedElement) &&
-                      (afterElement !== null || draggedElement !== container.lastElementChild);
-    
-    if (shouldMove) {
-      if (afterElement == null) {
-        container.appendChild(draggedElement);
-      } else {
-        container.insertBefore(draggedElement, afterElement);
-      }
+    if (afterElement == null) {
+      container.appendChild(draggedElement);
+    } else {
+      container.insertBefore(draggedElement, afterElement);
     }
   }
 
@@ -4131,36 +4123,29 @@ function setupPlaylistDragAndDrop(playlistId) {
     const touchY = e.touches[0].clientY;
     const deltaY = touchY - touchStartY;
     
-    // Require more movement before considering it a drag
-    if (Math.abs(deltaY) > 30) {
+    // Lower threshold for better responsiveness
+    if (Math.abs(deltaY) > 15) {
       e.preventDefault();
       touchMoved = true;
       
-      // Throttle touch moves
+      // Gentler throttling
       const now = Date.now();
-      if (now - lastTouchMove < 100) return;
+      if (now - lastTouchMove < 50) return;
       lastTouchMove = now;
       
       // Find the item to swap with
       const items = [...container.querySelectorAll('.playlist-item')];
       const currentIndex = items.indexOf(touchItem);
+      const targetIndex = deltaY > 0 ? currentIndex + 1 : currentIndex - 1;
       
-      // Calculate how many items to move based on distance
-      const itemHeight = touchItem.offsetHeight + 12; // item + margin
-      const moveSteps = Math.floor(Math.abs(deltaY) / itemHeight);
-      const direction = deltaY > 0 ? 1 : -1;
-      const targetIndex = currentIndex + (direction * moveSteps);
-      
-      if (targetIndex >= 0 && targetIndex < items.length && targetIndex !== currentIndex) {
+      if (targetIndex >= 0 && targetIndex < items.length) {
         const targetItem = items[targetIndex];
-        if (direction > 0) {
+        if (deltaY > 0) {
           container.insertBefore(touchItem, targetItem.nextSibling);
         } else {
           container.insertBefore(touchItem, targetItem);
         }
-        
-        // Update touch start position to prevent excessive jumping
-        touchStartY = touchY - (deltaY % itemHeight);
+        touchStartY = touchY; // Reset position after move
       }
     }
   }, { passive: false });
