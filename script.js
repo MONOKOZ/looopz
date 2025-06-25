@@ -3705,6 +3705,10 @@ function renderPlaylistsOverview() {
                   </svg>
                   View Tracks
                 </button>
+                <button class="playlist-action-btn play-playlist-btn" data-playlist-id="${playlist.id}">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-refresh-cw"><polyline points="23 4 23 10 17 10"></polyline><polyline points="1 20 1 14 7 14"></polyline><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></svg>
+                  Restart
+                </button>
               ` : `
                 <button class="playlist-action-btn play-playlist-btn" data-playlist-id="${playlist.id}">
                   <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-play"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
@@ -3963,17 +3967,20 @@ function setupPlaylistDragAndDrop(playlistId) {
   let draggedIndex = null;
 
   container.addEventListener('dragstart', (e) => {
-      if (!e.target.classList.contains('playlist-item')) return;
+      // Find the playlist-item element (could be the element itself or a parent)
+      const playlistItem = e.target.closest('.playlist-item');
+      if (!playlistItem) return;
 
-      draggedElement = e.target;
-      draggedIndex = parseInt(e.target.dataset.itemIndex);
-      e.target.classList.add('dragging');
+      draggedElement = playlistItem;
+      draggedIndex = parseInt(playlistItem.dataset.itemIndex);
+      playlistItem.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
   });
 
   container.addEventListener('dragend', (e) => {
-      if (!e.target.classList.contains('playlist-item')) return;
-      e.target.classList.remove('dragging');
+      const playlistItem = e.target.closest('.playlist-item');
+      if (!playlistItem) return;
+      playlistItem.classList.remove('dragging');
   });
 
   container.addEventListener('dragover', (e) => {
@@ -3999,7 +4006,7 @@ function setupPlaylistDragAndDrop(playlistId) {
           // Re-render items
           const playlist = savedPlaylists.find(p => p.id === playlistId);
           if (playlist) {
-              container.innerHTML = renderPlaylistItems(playlist);
+              container.innerHTML = renderPlaylistItemsAsCards(playlist);
               setupPlaylistDragAndDrop(playlistId);
           }
       }
