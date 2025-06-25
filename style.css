@@ -1822,7 +1822,7 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
    }
 
    .search-container {
-       padding: var(--space-4) var(--space-3);
+       /*padding: var(--space-4) var(--space-3);*/
    }
 
    .search-input {
