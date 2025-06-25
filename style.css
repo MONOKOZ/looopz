@@ -195,8 +195,8 @@ body {
 .track-item {
    display: flex;
    align-items: center;
-   padding: 12px;
-   margin-bottom: 12px;
+   padding: 10px 8px;
+   margin-bottom: 8px;
    background: var(--gray);
    border-radius: 12px;
    cursor: pointer;
@@ -300,13 +300,13 @@ body {
 
 /* Trend/Popularity Badges */
 .trend-badge {
-   font-size: 12px;
+   font-size: 10px;
    font-weight: 600;
-   padding: 3px 8px;
-   border-radius: 12px;
+   padding: 2px 6px;
+   border-radius: 10px;
    display: inline-flex;
    align-items: center;
-   gap: 3px;
+   gap: 2px;
    flex-shrink: 0;
    background: rgba(255, 255, 255, 0.1);
    color: rgba(255, 255, 255, 0.9);
