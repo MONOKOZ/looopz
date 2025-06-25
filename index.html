@@ -31,9 +31,19 @@
         <span id="status-text">Ready</span>
     </div>
 
-    <div class="now-playing-indicator" id="now-playing-indicator">
-        <div id="mini-track-title">Now Playing</div>
-        <div style="font-size: 10px; opacity: 0.8;" id="mini-track-artist">Artist</div>
+    <!-- Mini Player (Spotify-style) -->
+    <div class="mini-player hidden" id="mini-player">
+        <div class="mini-player-content">
+            <div class="mini-track-info">
+                <div class="mini-track-title" id="mini-track-title">Track Name</div>
+                <div class="mini-track-artist" id="mini-track-artist">Artist</div>
+            </div>
+            <button class="mini-play-btn" id="mini-play-btn">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-play">
+                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+            </button>
+        </div>
     </div>
 
     <div class="main-container">
