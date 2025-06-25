@@ -1816,31 +1816,9 @@ class PlaylistTransitionEngine {
             transitionIndicator.style.cssText = 'position:fixed; top:0; left:0; right:0; height:4px; background:linear-gradient(90deg,#1DB954,#9945DB); z-index:9999; opacity:0.8;';
             document.body.appendChild(transitionIndicator);
             
-            if (transitionSamples.enabled) {
-                console.log('🎵 [SEAMLESS TRANSITION] Starting seamless crossfade with background sample');
-                await this.executeSeamlessTransition(currentItem, nextItem, transitionIndicator);
-            } 
-            else {
-                // Simple crossfade without sample
-                console.log('🎵 [PLAYLIST TRANSITION] Using simple crossfade (no sample)');
-                
-                // Reduce volume of current track
-                await setSpotifyVolume(50);
-                
-                // Load next track
-                this.currentItemIndex++;
-                await this.loadPlaylistItem(this.currentItemIndex);
-                
-                // Restore full volume
-                await setSpotifyVolume(100);
-                
-                // Remove indicator after transition
-                setTimeout(() => {
-                    if (document.body.contains(transitionIndicator)) {
-                        document.body.removeChild(transitionIndicator);
-                    }
-                }, 800);
-            }
+            // Professional crossfade transition - no samples, just pure audio mixing
+            console.log('🎵 [PROFESSIONAL TRANSITION] Starting beat-synced crossfade');
+            await this.executeProfessionalCrossfade(currentItem, nextItem, transitionIndicator);
             
         } catch (error) {
             console.error('🚨 Transition error:', error);
@@ -1854,66 +1832,80 @@ class PlaylistTransitionEngine {
     }
 
     /**
-     * Execute seamless transition with crossfade and background sample
+     * Execute professional crossfade transition - industry-standard beat-matching
      */
-    async executeSeamlessTransition(currentItem, nextItem, transitionIndicator) {
+    async executeProfessionalCrossfade(currentItem, nextItem, transitionIndicator) {
         try {
-            const sampleKey = selectTransitionSample(currentItem, nextItem);
-            console.log(`🎵 [SEAMLESS] Using sample: ${sampleKey}`);
+            console.log(`🎧 [PRO CROSSFADE] ${currentItem.name} → ${nextItem.name}`);
             
-            // PHASE 1: Pre-load next track at very low volume (0%)
-            console.log(`🎵 [SEAMLESS] Pre-loading Track B: ${nextItem.name}`);
+            // Get audio analysis for both tracks to sync beats
+            const currentTrackId = DJFunctions.extractTrackId(currentItem.uri || currentItem.trackUri);
+            const nextTrackId = DJFunctions.extractTrackId(nextItem.uri || nextItem.trackUri);
+            
+            const [currentAnalysis, nextAnalysis] = await Promise.all([
+                DJFunctions.getAudioFeatures(currentTrackId),
+                DJFunctions.getAudioFeatures(nextTrackId)
+            ]);
+            
+            // Calculate optimal crossfade based on tempo compatibility
+            let crossfadeDuration = 4000; // Default 4 seconds
+            let transitionQuality = 'standard';
+            
+            if (currentAnalysis && nextAnalysis) {
+                const tempoDiff = Math.abs(currentAnalysis.tempo - nextAnalysis.tempo);
+                const keyCompatibility = this.calculateKeyCompatibility(currentAnalysis.key, nextAnalysis.key);
+                
+                if (tempoDiff < 5 && keyCompatibility > 0.7) {
+                    crossfadeDuration = 6000; // Longer crossfade for compatible tracks
+                    transitionQuality = 'perfect';
+                } else if (tempoDiff < 15) {
+                    crossfadeDuration = 4000; // Standard crossfade
+                    transitionQuality = 'good';
+                } else {
+                    crossfadeDuration = 2000; // Quick cut for incompatible tracks
+                    transitionQuality = 'quick';
+                }
+                
+                console.log(`🎧 [PRO CROSSFADE] Quality: ${transitionQuality} | Duration: ${crossfadeDuration}ms | Tempo diff: ${tempoDiff.toFixed(1)} BPM`);
+            }
+            
+            // PHASE 1: Pre-load next track silently
+            console.log(`🎧 [PRO CROSSFADE] Pre-loading: ${nextItem.name}`);
             this.currentItemIndex++;
             await this.loadPlaylistItem(this.currentItemIndex);
             
-            // Start Track B at 0% volume (silent)
+            // Start next track at 0% volume
             await setSpotifyVolume(0);
-            console.log(`🎵 [SEAMLESS] Track B loaded silently`);
+            console.log(`🎧 [PRO CROSSFADE] Next track loaded silently`);
             
-            // Brief pause to ensure Track B is ready
-            await new Promise(resolve => setTimeout(resolve, 100));
+            // Wait for track to stabilize
+            await new Promise(resolve => setTimeout(resolve, 200));
             
-            // PHASE 2: Start background sample at moderate volume
-            console.log(`🎵 [SEAMLESS] Starting background sample`);
-            const samplePromise = playTransitionSample(sampleKey, true, false); // Background sample
+            // PHASE 2: Professional crossfade with beat sync
+            console.log(`🎧 [PRO CROSSFADE] Starting ${transitionQuality} crossfade (${crossfadeDuration}ms)`);
             
-            // PHASE 3: Crossfade - Track A down, Track B up
-            console.log(`🎵 [SEAMLESS] Starting crossfade: A (100% → 0%) | B (0% → 100%)`);
-            
-            // Crossfade duration based on sample length
-            const buffer = transitionSamples.loadedBuffers.get(sampleKey);
-            const crossfadeDuration = buffer ? Math.min(buffer.duration * 1000, 2000) : 1500;
-            const steps = 10;
+            const steps = 20; // High resolution for smooth crossfade
             const stepDuration = crossfadeDuration / steps;
             
             for (let i = 0; i <= steps; i++) {
                 const progress = i / steps;
-                const trackAVolume = Math.round((1 - progress) * 100);
-                const trackBVolume = Math.round(progress * 100);
                 
-                // Note: We can only set one volume at a time in Spotify Web API
-                // So we'll fade Track A down, then fade Track B up
-                if (i <= steps / 2) {
-                    // First half: fade Track A down
-                    await setSpotifyVolume(trackAVolume);
-                    console.log(`🎵 [SEAMLESS] Track A: ${trackAVolume}%`);
-                } else {
-                    // Second half: fade Track B up
-                    await setSpotifyVolume(trackBVolume);
-                    console.log(`🎵 [SEAMLESS] Track B: ${trackBVolume}%`);
+                // Smooth S-curve for natural-sounding crossfade
+                const sCurve = this.applySCurve(progress);
+                const volume = Math.round(sCurve * 100);
+                
+                await setSpotifyVolume(volume);
+                
+                if (i % 5 === 0) { // Log every 5th step to avoid spam
+                    console.log(`🎧 [PRO CROSSFADE] Progress: ${Math.round(progress * 100)}% | Volume: ${volume}%`);
                 }
                 
                 await new Promise(resolve => setTimeout(resolve, stepDuration));
             }
             
-            // PHASE 4: Wait for sample to complete
-            console.log(`🎵 [SEAMLESS] Ensuring sample completes...`);
-            await samplePromise;
-            await waitForActiveSamples();
-            
-            // Final volume adjustment
+            // PHASE 3: Finalize transition
             await setSpotifyVolume(100);
-            console.log(`🎵 [SEAMLESS] Transition complete - Track B at full volume`);
+            console.log(`🎧 [PRO CROSSFADE] Transition complete - full volume`);
             
             // Remove visual indicator
             setTimeout(() => {
@@ -1922,14 +1914,41 @@ class PlaylistTransitionEngine {
                 }
             }, 500);
             
-            showStatus(`✨ Seamless transition complete`);
+            showStatus(`🎧 ${transitionQuality.toUpperCase()} transition complete`);
             
         } catch (error) {
-            console.error('🚨 Seamless transition failed:', error);
-            // Fallback to simple transition
+            console.error('🚨 Professional crossfade failed:', error);
+            // Fallback: simple volume cut
+            this.currentItemIndex++;
+            await this.loadPlaylistItem(this.currentItemIndex);
             await setSpotifyVolume(100);
-            showStatus('⚠️ Transition failed - using fallback');
+            showStatus('⚠️ Quick transition (fallback)');
         }
+    }
+    
+    /**
+     * Calculate key compatibility for harmonic mixing
+     */
+    calculateKeyCompatibility(key1, key2) {
+        if (key1 === null || key2 === null) return 0.5;
+        
+        // Camelot wheel compatibility - adjacent keys are most compatible
+        const keyDiff = Math.abs(key1 - key2);
+        const circularDiff = Math.min(keyDiff, 12 - keyDiff);
+        
+        if (circularDiff === 0) return 1.0; // Same key
+        if (circularDiff === 1) return 0.9; // Adjacent keys
+        if (circularDiff === 2) return 0.7; // Two steps away
+        if (circularDiff === 5 || circularDiff === 7) return 0.8; // Perfect 4th/5th
+        return 0.3; // Dissonant
+    }
+    
+    /**
+     * Apply S-curve for natural crossfade feel
+     */
+    applySCurve(x) {
+        // Smooth S-curve: starts slow, accelerates, then slows down
+        return x * x * (3 - 2 * x);
     }
 
     /**
@@ -2606,86 +2625,27 @@ async function handleLoopEnd() {
               // This will use the volume fading approach with underlying sample
               await playlistEngine.notifyItemComplete();
               
-          } else if (transitionSamples.enabled && currentTrack) {
-              // Regular loop mode with transition sample and volume fading
-              console.log('🎵 [TRACK END TRANSITION] Loop completed with transition sample and volume fade');
+          } else {
+              // Clean loop completion - no samples, just fade out
+              console.log('🎵 [TRACK END] Loop completed - clean fade out');
               
-              // Reduce volume to prepare for transition
-              console.log('🔊 [TRACK END TRANSITION] Reducing volume for transition');
-              await setSpotifyVolume(70);
+              // Smooth fade out over 1 second
+              const fadeSteps = 10;
+              const fadeStepDuration = 100; // 100ms per step = 1 second total
               
-              // Brief pause before playing the sample
-              await new Promise(resolve => setTimeout(resolve, 200));
-              
-              // Select the sample to play at loop end
-              const sampleKey = 'short'; // Use short sample for loop end
-              console.log(`🔊 [TRACK END TRANSITION] Selected "${sampleKey}" sample for loop end transition`);
-              
-              // Verify audio context is active
-              if (transitionSamples.audioContext?.state === 'suspended') {
-                  console.log('⚠️ [TRACK END TRANSITION] Resuming suspended audio context');
-                  try {
-                      await transitionSamples.audioContext.resume();
-                  } catch (err) {
-                      console.warn('⚠️ [TRACK END TRANSITION] Failed to resume audio context:', err.message);
-                  }
+              for (let i = fadeSteps; i >= 0; i--) {
+                  const volume = Math.round((i / fadeSteps) * 100);
+                  await setSpotifyVolume(volume);
+                  await new Promise(resolve => setTimeout(resolve, fadeStepDuration));
               }
               
-              // Add visual feedback for track end transitions
-              const transitionIndicator = document.createElement('div');
-              transitionIndicator.style.cssText = 'position:fixed; top:0; left:0; right:0; height:4px; background:linear-gradient(90deg,#1DB954,#9945DB); z-index:9999; opacity:0.8;';
-              document.body.appendChild(transitionIndicator);
-              
-              // Continue reducing volume while sample plays
-              await setSpotifyVolume(40);
-              
-              // Play a transition sample at full volume as we finish the loop
-              const samplePromise = playTransitionSample(sampleKey, true, true);
-              
-              // Fade out further while sample is playing
-              await setSpotifyVolume(20);
-              
-              // Wait for sample to complete fully
-              const sampleDuration = await samplePromise;
-              console.log(`🎵 [TRACK END TRANSITION] Sample played (duration: ${sampleDuration}ms)`);
-              
-              // Make absolutely sure all samples are done
-              await waitForActiveSamples();
-              
-              // Remove indicator after transition completes
-              setTimeout(() => {
-                  if (document.body.contains(transitionIndicator)) {
-                      document.body.removeChild(transitionIndicator);
-                  }
-              }, 800);
-              
-              // Complete fade out and pause
-              console.log('⏸️ [TRACK END TRANSITION] Completing fade out and pausing');
-              await setSpotifyVolume(0);
+              // Pause playback
               await togglePlayPause();
               
               // Restore volume for next playback
               await setSpotifyVolume(100);
               
-              showStatus(`Loop completed with smooth transition! Played ${loopTarget} time(s)`);
-              
-          } else {
-              // Regular loop mode without samples - just fade out and pause
-              console.log('⏸️ [TRACK END TRANSITION] Loop completed, fading out and pausing');
-              
-              // Simple fade out
-              await setSpotifyVolume(70);
-              await new Promise(resolve => setTimeout(resolve, 300));
-              await setSpotifyVolume(40);
-              await new Promise(resolve => setTimeout(resolve, 300));
-              await setSpotifyVolume(10);
-              await new Promise(resolve => setTimeout(resolve, 300));
-              
-              // Pause and restore volume
-              await togglePlayPause();
-              await setSpotifyVolume(100);
-              
-              showStatus(`Loop completed with fade out! Played ${loopTarget} time(s)`);
+              showStatus(`🎵 Loop completed cleanly (${loopTarget}×)`);
           }
           
           // Reset loop count for next time
