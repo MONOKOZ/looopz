@@ -1291,6 +1291,7 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
    padding: 18px;
    margin-bottom: 12px;
    transition: all 0.3s ease;
+   position: relative;
 }
 
 .saved-loop:hover { transform: translateY(-2px); border-color: rgba(29, 185, 84, 0.2); }
@@ -1367,6 +1368,73 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
 .loop-action-btn:hover { background: rgba(29, 185, 84, 0.15); border-color: var(--primary); }
 .loop-action-btn.danger:hover { background: rgba(192, 57, 43, 0.15); border-color: var(--danger); }
 
+/* Delete X button */
+.delete-x-btn {
+   position: absolute;
+   top: 12px;
+   right: 12px;
+   background: rgba(255, 255, 255, 0.05);
+   border: 1px solid rgba(255, 255, 255, 0.1);
+   border-radius: 50%;
+   width: 28px;
+   height: 28px;
+   display: flex;
+   align-items: center;
+   justify-content: center;
+   cursor: pointer;
+   transition: all 0.2s ease;
+   color: var(--text-secondary);
+   z-index: 2;
+}
+
+.delete-x-btn:hover {
+   background: rgba(239, 83, 80, 0.2);
+   border-color: var(--danger);
+   color: var(--danger);
+   transform: scale(1.1);
+}
+
+.delete-x-btn svg {
+   width: 14px;
+   height: 14px;
+}
+
+/* Drag handle for playlist items */
+.drag-handle {
+   position: absolute;
+   left: 8px;
+   top: 50%;
+   transform: translateY(-50%);
+   cursor: grab;
+   color: var(--text-secondary);
+   opacity: 0.5;
+   transition: opacity 0.2s ease;
+   padding: 4px;
+}
+
+.drag-handle:hover {
+   opacity: 1;
+}
+
+.saved-loop.playlist-item {
+   padding-left: 40px;
+   cursor: grab;
+}
+
+.saved-loop.playlist-item.dragging {
+   opacity: 0.5;
+   cursor: grabbing;
+}
+
+/* Editable playlist name */
+.playlist-name[contenteditable="true"] {
+   background: rgba(255, 255, 255, 0.05);
+   padding: 2px 8px;
+   border-radius: 4px;
+   outline: none;
+   border: 1px solid var(--primary);
+}
+
 .loop-edit-form {
    display: none;
    background: rgba(0, 0, 0, 0.3);
@@ -1413,62 +1481,6 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
    outline: none;
    border-color: var(--primary);
    box-shadow: 0 0 0 3px rgba(29, 185, 84, 0.1);
-}
-
-/* Enhanced Edit Form */
-.edit-form-content {
-   display: flex;
-   flex-direction: column;
-   gap: 16px;
-}
-
-.edit-form-field {
-   display: flex;
-   flex-direction: column;
-   gap: 6px;
-}
-
-.edit-form-row {
-   display: grid;
-   grid-template-columns: 1fr 1fr 80px;
-   gap: 12px;
-}
-
-.edit-form-label {
-   font-size: 11px;
-   color: var(--text-secondary);
-   text-transform: uppercase;
-   font-weight: 600;
-   letter-spacing: 0.5px;
-}
-
-.edit-form-input {
-   background: var(--bg-tertiary);
-   border: 1px solid var(--border-subtle);
-   color: var(--text-primary);
-   padding: 8px 12px;
-   border-radius: 6px;
-   font-size: 13px;
-   font-family: inherit;
-}
-
-.edit-form-input:focus {
-   outline: none;
-   border-color: var(--primary);
-   box-shadow: 0 0 0 2px rgba(29, 185, 84, 0.1);
-}
-
-.edit-form-actions {
-   display: flex;
-   gap: 8px;
-   justify-content: flex-end;
-   margin-top: 8px;
-}
-
-.edit-save-btn,
-.edit-cancel-btn {
-   padding: 8px 12px;
-   font-size: 12px;
 }
 
 .edit-actions {
@@ -1521,108 +1533,6 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
    margin: 0;
    color: var(--text-secondary);
    font-size: 13px;
-}
-
-/* Playlist Edit Header */
-.playlist-edit-header {
-   display: flex;
-   align-items: center;
-   gap: var(--space-3);
-   padding: var(--space-4) var(--space-4) var(--space-3);
-   border-bottom: 1px solid var(--border-subtle);
-   margin-bottom: var(--space-3);
-}
-
-.playlist-edit-header .back-btn {
-   background: none;
-   border: none;
-   color: var(--text-secondary);
-   padding: var(--space-2);
-   border-radius: var(--radius-sm);
-   cursor: pointer;
-   transition: all 0.2s ease;
-   display: flex;
-   align-items: center;
-   justify-content: center;
-}
-
-.playlist-edit-header .back-btn:hover {
-   background: var(--bg-tertiary);
-   color: var(--text-primary);
-}
-
-.playlist-edit-info {
-   flex: 1;
-}
-
-.playlist-name-edit {
-   background: none;
-   border: none;
-   color: var(--text-primary);
-   font-size: 18px;
-   font-weight: 700;
-   padding: var(--space-1);
-   border-radius: var(--radius-sm);
-   outline: none;
-   width: 100%;
-   margin-bottom: var(--space-1);
-}
-
-.playlist-name-edit:focus {
-   background: var(--bg-tertiary);
-}
-
-.playlist-edit-info p {
-   margin: 0;
-   color: var(--text-secondary);
-   font-size: 13px;
-}
-
-.save-playlist-btn {
-   background: var(--success);
-   color: white;
-   border: none;
-   padding: var(--space-2);
-   border-radius: var(--radius-sm);
-   cursor: pointer;
-   transition: all 0.2s ease;
-   display: flex;
-   align-items: center;
-   justify-content: center;
-}
-
-.save-playlist-btn:hover {
-   background: #4CAF50;
-   transform: scale(1.05);
-}
-
-/* Playlist Edit Items */
-.playlist-edit-item {
-   cursor: grab;
-}
-
-.playlist-edit-item.dragging {
-   opacity: 0.5;
-   cursor: grabbing;
-}
-
-.track-drag-handle {
-   display: flex;
-   align-items: center;
-   justify-content: center;
-   color: var(--text-muted);
-   padding: var(--space-2);
-   margin-right: var(--space-2);
-   cursor: grab;
-   transition: all 0.2s ease;
-}
-
-.track-drag-handle:hover {
-   color: var(--text-secondary);
-}
-
-.playlist-edit-item:active .track-drag-handle {
-   cursor: grabbing;
 }
 
 /* Playlist Track States */
@@ -1688,6 +1598,7 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
    margin-bottom: 12px;
    transition: all 0.3s ease;
    cursor: pointer;
+   position: relative;
 }
 
 .playlist-card:hover {
@@ -1915,33 +1826,6 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
    outline: none;
    border-color: var(--primary);
    box-shadow: 0 0 0 3px rgba(29, 185, 84, 0.1);
-}
-
-/* Save Loop Form */
-.save-loop-form {
-   display: flex;
-   flex-direction: column;
-   gap: 16px;
-}
-
-.loop-preview {
-   background: var(--bg-secondary);
-   border: 1px solid var(--border-subtle);
-   border-radius: 8px;
-   padding: 16px;
-   margin: 8px 0;
-}
-
-.loop-preview-track {
-   font-size: 16px;
-   font-weight: 600;
-   color: var(--text-primary);
-   margin-bottom: 4px;
-}
-
-.loop-preview-details {
-   font-size: 14px;
-   color: var(--text-secondary);
 }
 
 /* Add to Playlist Popup */
