@@ -2479,8 +2479,8 @@ function displaySearchResults(tracks, hasMore = false) {
   // Add popularity legend at the top of results (scrolls with content)
   let html = `
       <div class="popularity-legend">
-          Spotify Popularity Score: 🔥 80-100 (Hot)
-          ⭐ 50-79 (Popular)
+          Spotify Popularity Score: 🔥 80-100 (Hot)</br>
+          ⭐ 50-79 (Popular)</br>
           💎 0-49 (Hidden Gems)
       </div>
   `;
