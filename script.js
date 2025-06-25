@@ -1992,6 +1992,26 @@ class PlaylistTransitionEngine {
     }
 
     /**
+     * Skip to specific item in playlist
+     * @param {number} itemIndex - Index of item to skip to
+     */
+    async skipToItem(itemIndex) {
+        if (this.transitionInProgress) return;
+        if (!this.currentPlaylist || itemIndex < 0 || itemIndex >= this.currentPlaylist.items.length) return;
+
+        this.transitionInProgress = true;
+        this.currentItemIndex = itemIndex;
+
+        try {
+            await this.loadPlaylistItem(this.currentItemIndex);
+        } catch (error) {
+            console.error('🚨 Skip to item error:', error);
+        } finally {
+            this.transitionInProgress = false;
+        }
+    }
+
+    /**
      * Stop playlist and cleanup
      */
     stopPlaylist() {
@@ -2112,6 +2132,11 @@ function setupPlaylistEngineCallbacks() {
   playlistEngine.onItemChange = (item, index) => {
       console.log('🎵 Playlist item changed:', item);
       updatePlaylistNowPlaying(item, index);
+      
+      // Update playlist track display to show new current track
+      if (currentView === 'playlists' && isPlaylistMode) {
+          updatePlaylistTrackDisplay();
+      }
 
       // Update main player UI and let it handle the loops
       if (item.type === 'loop') {
@@ -2674,11 +2699,18 @@ function showView(view) {
 
   if (view === 'login') els.loginScreen.classList.remove('hidden');
   if (view === 'search') els.searchSection.classList.remove('hidden');
-  if (view === 'player') els.playerSection.classList.remove('hidden');
+  if (view === 'player') {
+      els.playerSection.classList.remove('hidden');
+      hidePlaylistNowPlaying(); // Hide playlist overlay in player view
+  }
   if (view === 'library') els.librarySection.classList.remove('hidden');
   if (view === 'playlists') {
       els.playlistsSection.classList.remove('hidden');
-      renderPlaylistsList();
+      if (isPlaylistMode && currentPlaylist) {
+          updatePlaylistTrackDisplay();
+      } else {
+          renderPlaylistsList();
+      }
   }
 
   document.querySelectorAll('.nav-btn').forEach(btn => btn.classList.remove('active'));
@@ -3274,10 +3306,10 @@ async function playPlaylist(playlistId, startIndex = 0) {
       // Load playlist into engine
       await playlistEngine.loadPlaylist(playlist, startIndex);
 
-      // Show player view with playlist controls
-      showView('player');
-      showPlaylistNowPlaying();
-
+      // Stay in playlist view - don't jump to player
+      // User can tap mini player or nav to enter loop mode
+      updatePlaylistTrackDisplay();
+      
       showStatus(`🎵 Playing playlist: ${playlist.name}`);
 
   } catch (error) {
@@ -3421,6 +3453,65 @@ function renderPlaylistItems(playlist) {
           <button class="playlist-item-remove" onclick="removeFromPlaylist('${playlist.id}', ${index})">×</button>
       </div>
   `).join('');
+}
+
+// Render playlist as track list when playing (like search results)
+function updatePlaylistTrackDisplay() {
+  if (!currentPlaylist || !isPlaylistMode) {
+    renderPlaylistsList();
+    return;
+  }
+
+  const currentIndex = playlistEngine ? playlistEngine.currentItemIndex : 0;
+  
+  const html = `
+    <div class="playlist-now-playing-header">
+      <h3>🎵 ${currentPlaylist.name}</h3>
+      <p>${currentPlaylist.items.length} tracks</p>
+    </div>
+    
+    ${currentPlaylist.items.map((item, index) => {
+      const isPlaying = index === currentIndex;
+      const isUpcoming = index > currentIndex;
+      const isDone = index < currentIndex;
+      
+      return `
+        <div class="track-item playlist-track ${isPlaying ? 'now-playing' : ''} ${isDone ? 'played' : ''}" 
+             data-track-index="${index}">
+          <div class="track-info">
+            <div class="track-header">
+              <div class="track-name">${item.name}</div>
+              ${isPlaying ? '<div class="now-playing-indicator">🎵</div>' : ''}
+            </div>
+            <div class="track-artist">${item.artist}</div>
+            <div class="track-type">
+              ${item.type === 'loop' 
+                ? `Loop: ${formatTime(item.start, false)} - ${formatTime(item.end, false)}` 
+                : 'Full Track'}
+            </div>
+          </div>
+          <div class="track-actions">
+            ${!isPlaying ? `
+              <button class="track-action-btn big-btn play-playlist-track-btn" data-track-index="${index}">
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-play">
+                  <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                </svg>
+              </button>
+            ` : ''}
+            <button class="track-action-btn big-btn menu track-menu-btn" data-track-index="${index}">
+              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-more-horizontal">
+                <circle cx="12" cy="12" r="1"></circle>
+                <circle cx="19" cy="12" r="1"></circle>
+                <circle cx="5" cy="12" r="1"></circle>
+              </svg>
+            </button>
+          </div>
+        </div>
+      `;
+    }).join('')}
+  `;
+
+  els.playlistsList.innerHTML = html;
 }
 
 function editPlaylist(playlistId) {
@@ -4317,6 +4408,13 @@ function setupEventListeners() {
               e.preventDefault();
               const playlistId = target.dataset.playlistId;
               await playPlaylist(playlistId);
+          }
+          else if (target.matches('.play-playlist-track-btn')) {
+              e.preventDefault();
+              const trackIndex = parseInt(target.dataset.trackIndex);
+              if (playlistEngine && isPlaylistMode) {
+                  await playlistEngine.skipToItem(trackIndex);
+              }
           }
           else if (target.matches('.edit-playlist-btn')) {
               e.preventDefault();
