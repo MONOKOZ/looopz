@@ -634,58 +634,102 @@ async function seekToPosition(positionMs) {
 // const audioAnalysisCache = new Map(); // Already defined above
 // const trackFeaturesCache = new Map(); // Renamed to maintain compatibility with existing audioFeaturesCache
 
+// API debouncing to prevent 403 errors
+const apiRequestQueue = new Map();
+const API_RATE_LIMIT_MS = 1000; // Minimum 1 second between API calls for same track
+
+/**
+ * Debounced API request function with retry logic and better error handling
+ */
+async function debouncedAPIRequest(url, trackId, cacheMap, retryCount = 0) {
+    // Check cache first
+    if (cacheMap.has(trackId)) {
+        return cacheMap.get(trackId);
+    }
+    
+    // Check if request is already in progress
+    if (apiRequestQueue.has(url)) {
+        return await apiRequestQueue.get(url);
+    }
+    
+    // Create new request promise with enhanced error handling
+    const requestPromise = fetch(url, {
+        headers: { 'Authorization': `Bearer ${spotifyAccessToken}` }
+    }).then(async response => {
+        if (!response.ok) {
+            // Handle specific error cases
+            if (response.status === 403) {
+                console.warn('🚫 Spotify API: Insufficient permissions or rate limited');
+                showStatus('⚠️ Spotify API rate limited');
+                throw new Error(`Spotify API permission denied: ${response.status}`);
+            } else if (response.status === 404) {
+                console.warn('🔍 Spotify API: Resource not found (track may be unavailable)');
+                throw new Error(`Track not found: ${response.status}`);
+            } else if (response.status === 429) {
+                console.warn('⏱️ Spotify API: Rate limit exceeded');
+                showStatus('⚠️ Too many requests - slowing down');
+                // Exponential backoff for rate limiting
+                const delay = Math.min(5000, 1000 * Math.pow(2, retryCount));
+                await new Promise(resolve => setTimeout(resolve, delay));
+                if (retryCount < 2) {
+                    return await debouncedAPIRequest(url, trackId, cacheMap, retryCount + 1);
+                }
+                throw new Error(`Rate limit exceeded: ${response.status}`);
+            } else if (response.status >= 500) {
+                console.warn('🌐 Spotify API: Server error');
+                showStatus('⚠️ Spotify server error');
+                throw new Error(`Spotify server error: ${response.status}`);
+            } else {
+                throw new Error(`API request failed: ${response.status}`);
+            }
+        }
+        const data = await response.json();
+        cacheMap.set(trackId, data);
+        return data;
+    }).catch(error => {
+        // Enhanced error logging
+        console.warn('🎵 API request failed:', {
+            url: url.replace(spotifyAccessToken, '[TOKEN]'),
+            error: error.message,
+            trackId: trackId,
+            retryCount: retryCount
+        });
+        
+        // Only show user-friendly messages for certain errors
+        if (error.message.includes('permission denied') || error.message.includes('Rate limit')) {
+            // Already handled above
+        } else if (retryCount === 0 && !error.message.includes('not found')) {
+            showStatus('⚠️ Spotify API temporarily unavailable');
+        }
+        
+        return null;
+    }).finally(() => {
+        // Remove from queue and add delay before next request
+        apiRequestQueue.delete(url);
+        setTimeout(() => {}, API_RATE_LIMIT_MS);
+    });
+    
+    // Store promise in queue
+    apiRequestQueue.set(url, requestPromise);
+    return await requestPromise;
+}
+
 /**
  * Fetches Spotify's audio analysis for a track (beats, bars, sections)
  * @param {string} trackId - Spotify track ID
  * @returns {Object|null} Audio analysis data or null if failed
  */
 async function getAudioAnalysis(trackId) {
-    if (audioAnalysisCache.has(trackId)) {
-        return audioAnalysisCache.get(trackId);
-    }
-
-    try {
-        const response = await fetch(`https://api.spotify.com/v1/audio-analysis/${trackId}`, {
-            headers: { 'Authorization': `Bearer ${spotifyAccessToken}` }
-        });
-
-        if (!response.ok) {
-            throw new Error(`Audio analysis failed: ${response.status}`);
-        }
-
-        const analysis = await response.json();
-        audioAnalysisCache.set(trackId, analysis);
-        return analysis;
-    } catch (error) {
-        console.warn('🎵 Audio analysis unavailable:', error.message);
-        return null;
-    }
+    const url = `https://api.spotify.com/v1/audio-analysis/${trackId}`;
+    return await debouncedAPIRequest(url, trackId, audioAnalysisCache);
 }
 
 /**
  * Fetches Spotify's audio features for a track (tempo, key, energy, etc.)
  */
 async function getAudioFeatures(trackId) {
-    if (trackFeaturesCache.has(trackId)) {
-        return trackFeaturesCache.get(trackId);
-    }
-
-    try {
-        const response = await fetch(`https://api.spotify.com/v1/audio-features/${trackId}`, {
-            headers: { 'Authorization': `Bearer ${spotifyAccessToken}` }
-        });
-
-        if (!response.ok) {
-            throw new Error(`Audio features failed: ${response.status}`);
-        }
-
-        const features = await response.json();
-        trackFeaturesCache.set(trackId, features);
-        return features;
-    } catch (error) {
-        console.warn('🎵 Audio features unavailable:', error.message);
-        return null;
-    }
+    const url = `https://api.spotify.com/v1/audio-features/${trackId}`;
+    return await debouncedAPIRequest(url, trackId, trackFeaturesCache);
 }
 
 // ===========================================
@@ -1008,6 +1052,7 @@ const DJFunctions = {
 let essentiaInstance = null;
 let analysisCache = new Map();
 let essentiaReady = false;
+let aiEnabled = false; // AI toggle state
 
 /**
  * Initialize Essentia.js (loaded from CDN)
@@ -1106,9 +1151,9 @@ async function determineOptimalTransitionWithAI(fromTrack, toTrack, context = {}
         useAI: false
     };
     
-    // Check if Essentia is ready
-    if (!essentiaReady) {
-        console.log('AI not ready, using standard logic');
+    // Check if AI is enabled and Essentia is ready
+    if (!aiEnabled || !essentiaReady) {
+        console.log('AI disabled or not ready, using standard logic');
         return transitionPlan;
     }
     
@@ -1188,7 +1233,7 @@ async function determineOptimalTransitionWithAI(fromTrack, toTrack, context = {}
  * Find optimal loop points using onset detection
  */
 async function findOptimalLoopPoints(trackId, manualStart, manualEnd) {
-    if (!essentiaReady) {
+    if (!aiEnabled || !essentiaReady) {
         return { start: manualStart, end: manualEnd, optimized: false };
     }
     
@@ -1225,7 +1270,7 @@ async function findOptimalLoopPoints(trackId, manualStart, manualEnd) {
  * Enhanced playlist preparation with AI pre-analysis
  */
 async function preparePlaylistWithAI(playlist) {
-    if (!essentiaReady) return false;
+    if (!aiEnabled || !essentiaReady) return false;
     
     console.log('🤖 AI pre-analyzing playlist tracks...');
     
@@ -1249,6 +1294,26 @@ async function preparePlaylistWithAI(playlist) {
     } catch (error) {
         console.error('AI playlist prep failed:', error);
         return false;
+    }
+}
+
+/**
+ * Toggle AI functionality on/off
+ */
+function toggleAI() {
+    aiEnabled = !aiEnabled;
+    
+    const aiToggleBtn = document.getElementById('ai-toggle');
+    if (aiToggleBtn) {
+        if (aiEnabled) {
+            aiToggleBtn.classList.add('active');
+            console.log('🤖 AI analysis enabled');
+            showStatus('🤖 AI analysis enabled');
+        } else {
+            aiToggleBtn.classList.remove('active');
+            console.log('🤖 AI analysis disabled');
+            showStatus('🤖 AI analysis disabled');
+        }
     }
 }
 
@@ -1726,7 +1791,7 @@ class PlaylistTransitionEngine {
             
             // NEW: Get AI recommendation
             let aiPlan = null;
-            if (essentiaReady) {
+            if (aiEnabled && essentiaReady) {
                 aiPlan = await determineOptimalTransitionWithAI(currentItem, nextItem, {
                     isPlaylistMode: true,
                     playlistName: this.currentPlaylist.name
@@ -1775,35 +1840,34 @@ class PlaylistTransitionEngine {
                 console.log(`🔊 [PLAYLIST TRANSITION] Further reducing volume of track A to 30%`);
                 await setSpotifyVolume(30);
                 
-                // STEP 2: Load the next track while sample is playing
-                console.log(`🔊 [PLAYLIST TRANSITION] Loading next track while sample plays`);
+                // CRITICAL FIX: Wait for sample to finish BEFORE loading next track
+                console.log(`🔊 [PLAYLIST TRANSITION] Waiting for transition sample to complete...`);
+                await samplePromise;
+                
+                // Make absolutely sure all samples are done
+                await waitForActiveSamples();
+                console.log(`✅ [PLAYLIST TRANSITION] Sample playback confirmed complete`);
+                
+                // STEP 2: Now load the next track (after sample completes)
+                console.log(`🔊 [PLAYLIST TRANSITION] Loading next track after sample completion`);
                 this.currentItemIndex++;
                 await this.loadPlaylistItem(this.currentItemIndex);
                 
-                // Start next track at 30% volume
-                console.log(`🔊 [PLAYLIST TRANSITION] Starting track B at 30% volume`);
-                await setSpotifyVolume(30);
-                
-                // Increase volume of next track to 70%
-                console.log(`🔊 [PLAYLIST TRANSITION] Increasing volume of track B to 70%`);
+                // Start next track at 70% volume (no need for gradual fade since sample is done)
+                console.log(`🔊 [PLAYLIST TRANSITION] Starting track B at 70% volume`);
                 await setSpotifyVolume(70);
+                
+                // Quick fade to full volume
+                await new Promise(resolve => setTimeout(resolve, 200));
+                console.log(`🔊 [PLAYLIST TRANSITION] Restoring full volume for track B`);
+                await setSpotifyVolume(100);
                 
                 // Remove indicator after transition
                 setTimeout(() => {
                     if (document.body.contains(transitionIndicator)) {
                         document.body.removeChild(transitionIndicator);
                     }
-                }, 800);
-                
-                // Wait for sample to finish completely
-                await samplePromise;
-                
-                // Make absolutely sure all samples are done
-                await waitForActiveSamples();
-                
-                // Restore full volume for next track
-                console.log(`🔊 [PLAYLIST TRANSITION] Restoring full volume for track B`);
-                await setSpotifyVolume(100);
+                }, 300);
                 
                 showStatus(`🎵 Smooth transition with sample complete`);
             } 
@@ -2362,27 +2426,55 @@ function setupPlaylistEngineCallbacks() {
   };
 }
 
-// FIX 7: Increased update frequency for better precision
+// FIX 7: Enhanced progress updates with better error handling and sync recovery
 function startProgressUpdates() {
   stopProgressUpdates();
+  let consecutiveFailures = 0;
+  
   updateTimer = setInterval(async () => {
-      if (isPlaying && spotifyPlayer && !isLooping) {
-          try {
+      try {
+          // Always try to update progress when connected, even during loops
+          if (spotifyPlayer && isConnected) {
               const state = await spotifyPlayer.getCurrentState();
+              
               if (state && state.position !== undefined) {
                   currentTime = state.position / 1000;
                   updateProgress();
-
-                  // Check loops for both regular and playlist mode
-                  if (loopEnabled) {
+                  consecutiveFailures = 0; // Reset failure counter on success
+                  
+                  // Only check loop end if playing and not in the middle of a loop operation
+                  if (isPlaying && loopEnabled && !isLooping) {
                       await checkLoopEnd();
                   }
+              } else if (state) {
+                  // State exists but no position - likely paused or stopped
+                  consecutiveFailures = 0;
+              } else {
+                  consecutiveFailures++;
+                  
+                  // If too many consecutive failures, try to recover
+                  if (consecutiveFailures > 20) { // 1 second of failures at 50ms intervals
+                      console.warn('🔄 Progress sync lost, attempting recovery...');
+                      consecutiveFailures = 0;
+                      showStatus('🔄 Reconnecting to Spotify...');
+                      // Let the next iteration try again
+                  }
               }
-          } catch (error) {
-              console.warn('State check failed:', error.message);
+          }
+      } catch (error) {
+          consecutiveFailures++;
+          if (consecutiveFailures <= 5) { // Only log first few failures to avoid spam
+              console.warn('Progress update failed:', error.message);
+          }
+          
+          // If many failures, there might be a connection issue
+          if (consecutiveFailures > 40) { // 2 seconds of failures
+              console.error('🚨 Persistent progress update failures - connection may be lost');
+              showStatus('⚠️ Connection issues detected');
+              consecutiveFailures = 20; // Prevent overflow
           }
       }
-  }, 50); // Changed from 100ms to 50ms for better precision
+  }, 50); // Keep 50ms for good precision
 }
 
 function stopProgressUpdates() {
@@ -2424,6 +2516,12 @@ async function handleLoopEnd() {
           if (isPlaylistMode && playlistEngine) {
               console.log('🎵 [PLAYLIST TRANSITION] Playlist mode active, moving to next playlist item');
               
+              // CRITICAL FIX: Pause immediately to prevent track from playing through
+              if (isPlaying) {
+                  console.log('⏸️ [PLAYLIST TRANSITION] Pausing playback to prevent overrun');
+                  await togglePlayPause();
+              }
+              
               // Add visual feedback for playlist transitions
               const transitionIndicator = document.createElement('div');
               transitionIndicator.style.cssText = 'position:fixed; top:0; left:0; right:0; height:4px; background:linear-gradient(90deg,#1DB954,#9945DB); z-index:9999; opacity:0.8;';
@@ -2435,6 +2533,11 @@ async function handleLoopEnd() {
                       document.body.removeChild(transitionIndicator);
                   }
               }, 1000);
+              
+              // Ensure loop state is properly reset before transition
+              loopEnabled = false;
+              loopCount = 0;
+              console.log('🔄 [PLAYLIST TRANSITION] Loop state reset for transition');
               
               // This will use the volume fading approach with underlying sample
               await playlistEngine.notifyItemComplete();
@@ -2883,7 +2986,7 @@ function setupLoopHandles() {
           
           // Optimize loop points with AI when user finishes dragging
           if (dragTarget === els.loopStartHandle || dragTarget === els.loopEndHandle) {
-              if (essentiaReady && currentTrack) {
+              if (aiEnabled && essentiaReady && currentTrack) {
                   const trackId = DJFunctions.extractTrackId(currentTrack.uri);
                   findOptimalLoopPoints(trackId, loopStart, loopEnd).then(optimized => {
                       if (optimized.optimized) {
@@ -4189,18 +4292,36 @@ function setupEventListeners() {
               const newTime = Math.min(duration, currentTime + 10);
               await seekToPosition(newTime * 1000);
           }
+          else if (target.matches('#ai-toggle')) {
+              e.preventDefault();
+              toggleAI();
+          }
 
-          // FIX 2: Changed "Start Loop" to "Set Loop" behavior
+          // FIX 5: "Set Loop" button positions progress bar to loop start without auto-play
           else if (target.matches('#start-loop-btn')) {
               e.preventDefault();
               if (!currentTrack || !loopEnabled) {
                   showStatus('Please select a track and enable loop mode');
                   return;
               }
-              // Just enable the loop, don't seek to start
+              
+              // Reset loop state
               loopCount = 0;
               loopStartTime = Date.now();
-              showStatus(`Loop set: ${formatTime(loopStart)} - ${formatTime(loopEnd)} (${loopTarget}×)`);
+              
+              // Position progress bar to loop start point without auto-playing
+              if (isPlaying) {
+                  // If playing, pause first, then seek
+                  await togglePlayPause();
+                  await seekToPosition(loopStart * 1000);
+                  showStatus(`▶️ Paused at loop start: ${formatTime(loopStart)}`);
+              } else {
+                  // If paused, just seek to position
+                  await seekToPosition(loopStart * 1000);
+                  showStatus(`📍 Positioned at loop start: ${formatTime(loopStart)}`);
+              }
+              
+              console.log(`🎯 Set Loop: positioned at ${formatTime(loopStart)} without auto-play`);
           }
           else if (target.matches('#repeat-decrease')) {
               e.preventDefault();
@@ -4550,6 +4671,7 @@ function init() {
       playPauseBtn: document.getElementById('play-pause-btn'),
       backwardBtn: document.getElementById('backward-btn'),
       forwardBtn: document.getElementById('forward-btn'),
+      aiToggle: document.getElementById('ai-toggle'),
       startLoopBtn: document.getElementById('start-loop-btn'),
       saveLoopBtn: document.getElementById('save-loop-btn'),
       addToPlaylistBtn: document.getElementById('add-to-playlist-btn'),
