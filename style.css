@@ -655,8 +655,8 @@ body {
 .now-playing-indicator {
    position: fixed;
    top: 70px;
-   right: 20px;
-   background: rgba(29, 185, 84, 0.95);
+   right: 12px;
+   background: rgba(29, 185, 84, 0.15);
    backdrop-filter: blur(10px);
    color: white;
    padding: 8px 12px;
