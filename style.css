@@ -311,7 +311,6 @@ body {
    outline: none;
    transition: all 0.2s ease;
    min-height: 52px;
-   margin: 0 var(--space-4);
    box-sizing: border-box;
 }
 
