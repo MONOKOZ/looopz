@@ -5,7 +5,8 @@ const SPOTIFY_CLIENT_ID = '46637d8f5adb41c0a4be34e0df0c1597';
 const SPOTIFY_REDIRECT_URI = 'https://looopz.vercel.app/';
 const SPOTIFY_SCOPES = 'streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state';
 
-// Audio analysis caches
+// Audio analysis caches with size limits to prevent memory leaks
+const CACHE_SIZE_LIMIT = 100; // Maximum items per cache
 const audioAnalysisCache = new Map();
 const trackFeaturesCache = new Map();
 
@@ -32,6 +33,10 @@ let loopEnabled = false, loopCount = 0, loopTarget = 1, loopStartTime = 0;
 let updateTimer = null, savedLoops = [], isLooping = false, isDragging = false;
 let currentView = 'login', currentSearchResults = [], currentEditingLoopId = null;
 let currentContextMenuTrackIndex = null;
+
+// Request management to prevent race conditions
+let currentTrackOperation = null;
+let operationCounter = 0;
 
 // UNIFIED LOOP SYSTEM - Fixed timing and state management
 let lastSeekTime = 0; // For debouncing seeks
@@ -95,6 +100,97 @@ function showStatus(message, duration = 3000) {
   els.statusText.textContent = message;
   els.statusBar.classList.add('show');
   setTimeout(() => els.statusBar.classList.remove('show'), duration);
+}
+
+/**
+ * Safe track loading with race condition prevention
+ */
+async function loadTrackSafely(trackData, startPositionMs = 0, preserveLoopPoints = false) {
+  // Cancel any existing operation
+  if (currentTrackOperation) {
+    currentTrackOperation.cancelled = true;
+    console.log('🚫 Cancelling previous track operation');
+  }
+  
+  // Create new operation with unique ID
+  const operationId = ++operationCounter;
+  currentTrackOperation = { id: operationId, cancelled: false };
+  
+  console.log(`🎵 [SAFE LOAD ${operationId}] Loading: ${trackData.name}`);
+  
+  try {
+    // Store current loop points if requested
+    const preservedLoop = preserveLoopPoints ? {
+      start: loopStart,
+      end: loopEnd,
+      target: loopTarget,
+      enabled: loopEnabled
+    } : null;
+    
+    // Check if operation was cancelled before proceeding
+    if (currentTrackOperation.cancelled || currentTrackOperation.id !== operationId) {
+      console.log(`🚫 [SAFE LOAD ${operationId}] Operation cancelled before load`);
+      return false;
+    }
+    
+    // Clear stale track info immediately
+    currentTrack = null;
+    
+    // Load track
+    await loadTrackIntoSpotify(trackData, startPositionMs);
+    
+    // Final cancellation check
+    if (currentTrackOperation.cancelled || currentTrackOperation.id !== operationId) {
+      console.log(`🚫 [SAFE LOAD ${operationId}] Operation cancelled after load`);
+      return false;
+    }
+    
+    // Update current track info
+    currentTrack = trackData;
+    
+    // Restore loop points if requested
+    if (preservedLoop) {
+      loopStart = preservedLoop.start;
+      loopEnd = preservedLoop.end;
+      loopTarget = preservedLoop.target;
+      loopEnabled = preservedLoop.enabled;
+      console.log(`🔄 [SAFE LOAD ${operationId}] Restored loop points: ${formatTime(loopStart)} - ${formatTime(loopEnd)}`);
+    } else {
+      // Reset loop state for new track
+      resetLoopState();
+    }
+    
+    console.log(`✅ [SAFE LOAD ${operationId}] Successfully loaded: ${trackData.name}`);
+    return true;
+    
+  } catch (error) {
+    if (currentTrackOperation.cancelled || currentTrackOperation.id !== operationId) {
+      console.log(`🚫 [SAFE LOAD ${operationId}] Cancelled during error`);
+      return false;
+    }
+    
+    console.error(`🚨 [SAFE LOAD ${operationId}] Failed to load track:`, error);
+    showStatus('⚠️ Failed to load track');
+    return false;
+    
+  } finally {
+    // Clear operation if it's still ours
+    if (currentTrackOperation && currentTrackOperation.id === operationId) {
+      currentTrackOperation = null;
+    }
+  }
+}
+
+/**
+ * Reset loop state to defaults
+ */
+function resetLoopState() {
+  loopStart = 0;
+  loopEnd = 30;
+  loopTarget = 1;
+  loopCount = 0;
+  loopEnabled = false;
+  loopStartTime = Date.now();
 }
 
 function updateProgress() {
@@ -231,7 +327,7 @@ async function handleAddToPlaylist() {
       type: 'track',
       uri: track.uri,
       name: track.name,
-      artist: track.artists[0].name,
+      artist: track.artists && track.artists.length > 0 ? track.artists[0].name : 'Unknown Artist',
       duration: track.duration_ms / 1000,
       image: track.album.images[0]?.url || '',
       playCount: 1
@@ -246,7 +342,8 @@ async function handleCreateLoop() {
 
   hideTrackContextMenu();
   // Same as clicking the + button - select the track
-  await selectTrack(track.uri, track.name, track.artists[0].name, track.duration_ms, track.album.images[0]?.url || '');
+  const artistName = track.artists && track.artists.length > 0 ? track.artists[0].name : 'Unknown Artist';
+  await selectTrack(track.uri, track.name, artistName, track.duration_ms, track.album.images[0]?.url || '');
 }
 
 async function handleShare() {
@@ -256,12 +353,13 @@ async function handleShare() {
   hideTrackContextMenu();
 
   const shareUrl = `https://open.spotify.com/track/${track.id}`;
-  const shareText = `🎵 Check out "${track.name}" by ${track.artists[0].name}`;
+  const artistName = track.artists && track.artists.length > 0 ? track.artists[0].name : 'Unknown Artist';
+  const shareText = `🎵 Check out "${track.name}" by ${artistName}`;
 
   try {
       if (navigator.share && navigator.canShare && navigator.canShare({ url: shareUrl })) {
           await navigator.share({
-              title: `${track.name} - ${track.artists[0].name}`,
+              title: `${track.name} - ${artistName}`,
               text: shareText,
               url: shareUrl
           });
@@ -658,7 +756,16 @@ async function debouncedAPIRequest(url, trackId, cacheMap, retryCount = 0) {
     }).then(async response => {
         if (!response.ok) {
             // Handle specific error cases
-            if (response.status === 403) {
+            if (response.status === 401) {
+                console.warn('🔐 Spotify API: Token expired');
+                const refreshSuccess = await refreshSpotifyToken();
+                if (refreshSuccess && retryCount < 1) {
+                    // Retry once with new token
+                    return await debouncedAPIRequest(url, trackId, cacheMap, retryCount + 1);
+                } else {
+                    throw new Error(`Authentication failed: ${response.status}`);
+                }
+            } else if (response.status === 403) {
                 console.warn('🚫 Spotify API: Insufficient permissions or rate limited');
                 showStatus('⚠️ Spotify API rate limited');
                 throw new Error(`Spotify API permission denied: ${response.status}`);
@@ -684,6 +791,14 @@ async function debouncedAPIRequest(url, trackId, cacheMap, retryCount = 0) {
             }
         }
         const data = await response.json();
+        
+        // Cache with size limit to prevent memory leaks
+        if (cacheMap.size >= CACHE_SIZE_LIMIT) {
+            // Remove oldest entries (first 10 items)
+            const keysToDelete = Array.from(cacheMap.keys()).slice(0, 10);
+            keysToDelete.forEach(key => cacheMap.delete(key));
+        }
+        
         cacheMap.set(trackId, data);
         return data;
     }).catch(error => {
@@ -1125,8 +1240,13 @@ async function analyzeAudioWithAI(audioBuffer, trackId = null) {
         
         console.log('✅ AI analysis complete:', analysis);
         
-        // Cache the results
+        // Cache the results with size limit
         if (trackId) {
+            if (analysisCache.size >= CACHE_SIZE_LIMIT) {
+                // Remove oldest entries (first 10 items)
+                const keysToDelete = Array.from(analysisCache.keys()).slice(0, 10);
+                keysToDelete.forEach(key => analysisCache.delete(key));
+            }
             analysisCache.set(trackId, analysis);
         }
         
@@ -2166,14 +2286,19 @@ class PlaylistTransitionEngine {
 
             // Load track into Spotify
             const startPosition = item.type === 'loop' ? item.start * 1000 : 0;
-
-            await loadTrackIntoSpotify({
+            const trackData = {
                 uri: item.type === 'loop' ? item.trackUri : item.uri,
                 name: item.name || 'Unknown Track',
                 artist: item.artist || 'Unknown Artist',
                 duration: item.duration || 180,
                 image: item.image || ''
-            }, startPosition);
+            };
+
+            const loadSuccess = await loadTrackSafely(trackData, startPosition, false);
+            if (!loadSuccess) {
+                console.log('🚫 Playlist item load cancelled or failed');
+                return; // Exit early if load was cancelled
+            }
 
             // Set up loop parameters if this is a loop item
             if (item.type === 'loop') {
@@ -2414,13 +2539,15 @@ function initializeSpotifyPlayer() {
 
               if (currentTrack && currentTrack.uri !== `spotify:track:${track.id}`) {
                   console.log('🔄 Track changed via Spotify, updating current track');
+                  const artistName = track.artists && track.artists.length > 0 ? track.artists[0].name : 'Unknown Artist';
+                  
                   currentTrack.uri = `spotify:track:${track.id}`;
-                  currentTrack.name = track.name;
-                  currentTrack.artist = track.artists[0].name;
+                  currentTrack.name = track.name || 'Unknown Track';
+                  currentTrack.artist = artistName;
                   currentTrack.duration = duration;
 
-                  els.currentTrack.textContent = track.name;
-                  els.currentArtist.textContent = track.artists[0].name;
+                  els.currentTrack.textContent = track.name || 'Unknown Track';
+                  els.currentArtist.textContent = artistName;
               }
           }
       });
@@ -2476,58 +2603,113 @@ function setupPlaylistEngineCallbacks() {
   };
 }
 
-// FIX 7: Enhanced progress updates with better error handling and sync recovery
+// Enhanced progress updates with bulletproof timer management
+let progressUpdateActive = false;
+let lastProgressUpdate = 0;
+
 function startProgressUpdates() {
+  // Prevent multiple timers
+  if (progressUpdateActive) {
+    console.log('⚠️ Progress updates already active');
+    return;
+  }
+  
   stopProgressUpdates();
+  progressUpdateActive = true;
   let consecutiveFailures = 0;
+  let lastKnownPosition = 0;
+  
+  console.log('🎵 Starting progress updates');
   
   updateTimer = setInterval(async () => {
+      // Safety check - ensure we should still be running
+      if (!progressUpdateActive) {
+          console.log('🚫 Progress updates deactivated, stopping timer');
+          clearInterval(updateTimer);
+          updateTimer = null;
+          return;
+      }
+      
       try {
-          // Always try to update progress when connected, even during loops
+          // Always try to update progress when connected
           if (spotifyPlayer && isConnected) {
               const state = await spotifyPlayer.getCurrentState();
               
               if (state && state.position !== undefined) {
-                  currentTime = state.position / 1000;
-                  updateProgress();
-                  consecutiveFailures = 0; // Reset failure counter on success
+                  const newTime = state.position / 1000;
                   
-                  // Only check loop end if playing and not in the middle of a loop operation
-                  if (isPlaying && loopEnabled && !isLooping) {
-                      await checkLoopEnd();
+                  // Validate position makes sense (no crazy jumps backwards)
+                  if (Math.abs(newTime - lastKnownPosition) < 10 || newTime > lastKnownPosition) {
+                      currentTime = newTime;
+                      lastKnownPosition = newTime;
+                      lastProgressUpdate = Date.now();
+                      updateProgress();
+                      consecutiveFailures = 0;
+                      
+                      // Update playing state based on actual playback
+                      const actuallyPlaying = state.paused === false;
+                      if (isPlaying !== actuallyPlaying) {
+                          isPlaying = actuallyPlaying;
+                          updatePlayPauseButton();
+                      }
+                      
+                      // Only check loop end if playing and not in loop operation
+                      if (isPlaying && loopEnabled && !isLooping) {
+                          await checkLoopEnd();
+                      }
+                  } else {
+                      console.warn(`🔄 Invalid position jump: ${lastKnownPosition}s → ${newTime}s`);
                   }
+                  
               } else if (state) {
-                  // State exists but no position - likely paused or stopped
+                  // State exists but no position - likely paused
                   consecutiveFailures = 0;
               } else {
                   consecutiveFailures++;
                   
-                  // If too many consecutive failures, try to recover
-                  if (consecutiveFailures > 20) { // 1 second of failures at 50ms intervals
+                  // Recovery logic
+                  if (consecutiveFailures === 20) { // 1 second of failures
                       console.warn('🔄 Progress sync lost, attempting recovery...');
-                      consecutiveFailures = 0;
-                      showStatus('🔄 Reconnecting to Spotify...');
-                      // Let the next iteration try again
+                      showStatus('🔄 Reconnecting...');
+                  } else if (consecutiveFailures > 60) { // 3 seconds of total failure
+                      console.error('🚨 Progress updates completely failed, restarting...');
+                      progressUpdateActive = false;
+                      setTimeout(() => startProgressUpdates(), 1000);
+                      return;
                   }
+              }
+          } else {
+              // Not connected - slow down polling
+              consecutiveFailures++;
+              if (consecutiveFailures > 100) {
+                  console.log('📡 Not connected, reducing update frequency');
+                  progressUpdateActive = false;
+                  setTimeout(() => startProgressUpdates(), 2000);
+                  return;
               }
           }
       } catch (error) {
           consecutiveFailures++;
-          if (consecutiveFailures <= 5) { // Only log first few failures to avoid spam
-              console.warn('Progress update failed:', error.message);
+          if (consecutiveFailures <= 3) { // Only log first few failures
+              console.warn('Progress update error:', error.message);
           }
           
-          // If many failures, there might be a connection issue
-          if (consecutiveFailures > 40) { // 2 seconds of failures
-              console.error('🚨 Persistent progress update failures - connection may be lost');
-              showStatus('⚠️ Connection issues detected');
-              consecutiveFailures = 20; // Prevent overflow
+          // Complete failure recovery
+          if (consecutiveFailures > 80) { // 4 seconds of errors
+              console.error('🚨 Critical progress update failure, forcing restart');
+              showStatus('⚠️ Connection issues - restarting...');
+              progressUpdateActive = false;
+              setTimeout(() => startProgressUpdates(), 2000);
+              return;
           }
       }
-  }, 50); // Keep 50ms for good precision
+  }, 50); // 50ms for smooth updates
 }
 
 function stopProgressUpdates() {
+  console.log('🛑 Stopping progress updates');
+  progressUpdateActive = false;
+  
   if (updateTimer) {
       clearInterval(updateTimer);
       updateTimer = null;
@@ -2751,7 +2933,7 @@ function displaySearchResults(tracks, hasMore = false) {
           <img src="${track.album.images[2]?.url || ''}" alt="Album cover" class="track-cover" onerror="this.style.display='none'">
           <div class="track-info">
               <div class="track-name">${track.name}</div>
-              <div class="track-artist">${track.artists[0].name}</div>
+              <div class="track-artist">${track.artists && track.artists.length > 0 ? track.artists[0].name : 'Unknown Artist'}</div>
           </div>
           <div class="track-duration">${formatTime(track.duration_ms / 1000, false)}</div>
           <div class="track-actions">
@@ -2830,17 +3012,21 @@ async function playTrackInBackground(track) {
   try {
       showStatus('🎵 Loading track...');
 
-      currentTrack = {
+      const trackData = {
           uri: track.uri,
           name: track.name,
-          artist: track.artists[0].name,
+          artist: track.artists && track.artists.length > 0 ? track.artists[0].name : 'Unknown Artist',
           duration: track.duration_ms / 1000,
           image: track.album.images[0]?.url || ''
       };
 
-      duration = currentTrack.duration;
+      duration = trackData.duration;
 
-      await loadTrackIntoSpotify(currentTrack);
+      const loadSuccess = await loadTrackSafely(trackData, 0, false);
+      if (!loadSuccess) {
+          console.log('🚫 Background play cancelled or failed');
+          return; // Exit early if load was cancelled
+      }
 
       updateSearchTrackHighlighting(track.uri);
       updateNowPlayingIndicator(currentTrack);
@@ -2855,77 +3041,47 @@ async function playTrackInBackground(track) {
 // SEAMLESS SEARCH-TO-PLAYER TRANSITION - NEW IMPLEMENTATION
 async function selectTrack(uri, name, artist, durationMs, imageUrl) {
   try {
-      // 1. DETECTION LOGIC - Check if same track is already playing
-      let seamlessTransition = false;
-      let preservedPosition = 0;
-
-      if (currentTrack && currentTrack.uri === uri && isPlaying) {
-          console.log('🔄 Seamless transition detected - same track already playing');
-          seamlessTransition = true;
-          preservedPosition = currentTime * 1000; // Convert to milliseconds
-          showStatus('🔄 Taking over playback seamlessly...');
-      } else {
-          showStatus('🎵 Loading selected track...');
+      // Check if same track is already playing
+      const isCurrentTrack = currentTrack && currentTrack.uri === uri && isPlaying;
+      
+      if (isCurrentTrack) {
+          console.log('🔄 Same track already playing, no reload needed');
+          showStatus('🔄 Track already playing');
+          return;
       }
 
-      // Update current track data
-      currentTrack = { uri, name, artist, duration: durationMs / 1000, image: imageUrl };
-      duration = currentTrack.duration;
+      // Create track data object
+      const trackData = { 
+          uri, 
+          name, 
+          artist, 
+          duration: durationMs / 1000, 
+          image: imageUrl 
+      };
 
-      // Update UI display
+      // Use safe loading with proper race condition handling
+      const loadSuccess = await loadTrackSafely(trackData, 0, false);
+      
+      if (!loadSuccess) {
+          console.warn('⚠️ Track loading was cancelled or failed');
+          return;
+      }
+
+      // Update UI state after successful load
+      duration = trackData.duration;
       els.currentTrack.textContent = name;
       els.currentArtist.textContent = artist;
-
-      // 2. MODIFIED TRACK LOADING - Use preserved position for seamless transitions
-      if (seamlessTransition) {
-          // Don't reload the track, just continue from current position
-          console.log('✅ Seamless transition - continuing from position:', preservedPosition);
-
-          // Ensure progress updates are running and UI is synced
-          updateProgress();
-          updatePlayPauseButton();
-          updateNowPlayingIndicator(currentTrack);
-          startProgressUpdates();
-      } else {
-          // Normal loading for different tracks
-          await loadTrackIntoSpotify(currentTrack);
-
-          // Only pause if it's a different track and currently playing
-          if (isPlaying) {
-              await togglePlayPause();
-          }
-      }
-
-      // 3. LOOP HANDLE ADJUSTMENT - Position intelligently around current time
-      if (seamlessTransition) {
-          const currentPos = currentTime;
-
-          // Ensure loop start doesn't exceed current position
-          if (loopStart > currentPos) {
-              loopStart = Math.max(0, currentPos - 10); // Start 10s before current
-              console.log('🔄 Adjusted loop start to accommodate current position');
-          }
-
-          // Ensure loop end gives reasonable loop duration from current position
-          if (loopEnd <= currentPos) {
-              loopEnd = Math.min(duration, currentPos + 20); // End 20s after current
-              console.log('🔄 Adjusted loop end to accommodate current position');
-          }
-
-          // If current position is way past our loop region, create a new sensible loop around it
-          if (currentPos > loopEnd || currentPos + 30 < loopStart) {
-              loopStart = Math.max(0, currentPos - 5); // 5s before current
-              loopEnd = Math.min(duration, currentPos + 25); // 25s after current
-              console.log('🔄 Created new loop region around current position');
-          }
-
-          showStatus(`✅ Seamless takeover: ${name} (continuing from ${formatTime(currentPos)})`);
-      } else {
-          // Normal loop positioning for new tracks
-          loopStart = 0;
-          loopEnd = Math.min(30, duration);
-          showStatus(`✅ Selected: ${name}`);
-      }
+      
+      // Reset loop points for new track
+      loopStart = 0;
+      loopEnd = Math.min(30, duration);
+      
+      // Update UI components
+      updatePlayPauseButton();
+      updateNowPlayingIndicator(currentTrack);
+      startProgressUpdates();
+      
+      showStatus(`✅ Selected: ${name}`);
 
       updateLoopVisuals();
       updateProgress();
@@ -2939,6 +3095,12 @@ async function selectTrack(uri, name, artist, durationMs, imageUrl) {
 
 // Views
 function showView(view) {
+  // Cancel any ongoing track operations to prevent race conditions
+  if (currentTrackOperation) {
+    currentTrackOperation.cancelled = true;
+    currentTrackOperation = null;
+  }
+  
   currentView = view;
 
   els.loginScreen.classList.add('hidden');
@@ -3206,7 +3368,7 @@ async function loadSavedLoop(loopId) {
       loop.playCount = (loop.playCount || 0) + 1;
       saveLooopsToStorage();
 
-      currentTrack = {
+      const trackData = {
           uri: loop.track.uri,
           name: loop.track.name,
           artist: loop.track.artist,
@@ -3214,7 +3376,7 @@ async function loadSavedLoop(loopId) {
           image: loop.track.image || ''
       };
 
-      duration = currentTrack.duration;
+      duration = trackData.duration;
       els.currentTrack.textContent = loop.track.name;
       els.currentArtist.textContent = loop.track.artist;
 
@@ -3227,7 +3389,11 @@ async function loadSavedLoop(loopId) {
       updateRepeatDisplay();
       updateLoopVisuals();
 
-      await loadTrackIntoSpotify(currentTrack, loopStart * 1000);
+      const loadSuccess = await loadTrackSafely(trackData, loopStart * 1000, true);
+      if (!loadSuccess) {
+          console.log('🚫 Load saved loop cancelled or failed');
+          return; // Exit early if load was cancelled
+      }
 
       loopCount = 0;
       loopStartTime = Date.now();
@@ -4046,17 +4212,17 @@ async function loadSharedLoop() {
       }
 
       if (choice === 'load') {
-          currentTrack = {
+          const trackData = {
               uri: track.uri,
               name: track.name,
-              artist: track.artists[0].name,
+              artist: track.artists && track.artists.length > 0 ? track.artists[0].name : 'Unknown Artist',
               duration: track.duration_ms / 1000,
               image: track.album.images[0]?.url || ''
           };
 
-          duration = currentTrack.duration;
+          duration = trackData.duration;
           els.currentTrack.textContent = track.name;
-          els.currentArtist.textContent = track.artists[0].name;
+          els.currentArtist.textContent = track.artists && track.artists.length > 0 ? track.artists[0].name : 'Unknown Artist';
 
           loopStart = sharedLoop.start;
           loopEnd = sharedLoop.end;
@@ -4067,7 +4233,11 @@ async function loadSharedLoop() {
           updateRepeatDisplay();
           updateLoopVisuals();
 
-          await loadTrackIntoSpotify(currentTrack, loopStart * 1000);
+          const loadSuccess = await loadTrackSafely(trackData, loopStart * 1000, true);
+          if (!loadSuccess) {
+              console.log('🚫 Shared loop load cancelled or failed');
+              return; // Exit early if load was cancelled
+          }
 
           loopCount = 0;
           loopStartTime = Date.now();
@@ -4113,7 +4283,7 @@ async function showSharedLoopDialog(track, sharedLoop) {
               <div style="font-size: 18px; font-weight: 600; margin-bottom: 4px; color: #1DB954;">
                   "${track.name}"
               </div>
-              <div style="color: #b3b3b3; margin-bottom: 8px;">by ${track.artists[0].name}</div>
+              <div style="color: #b3b3b3; margin-bottom: 8px;">by ${track.artists && track.artists.length > 0 ? track.artists[0].name : 'Unknown Artist'}</div>
               <div style="color: #b3b3b3; font-size: 14px; margin-bottom: 20px;">
                   Loop: ${formatTime(sharedLoop.start)} - ${formatTime(sharedLoop.end)}${repeatText}
               </div>
@@ -4222,21 +4392,99 @@ async function validateToken(token) {
       });
 
       if (response.ok) {
+          console.log('✅ Token valid, initializing player');
           initializeSpotifyPlayer();
+      } else if (response.status === 401) {
+          // Token expired - try to refresh
+          console.log('🔄 Token expired, attempting refresh...');
+          const refreshSuccess = await refreshSpotifyToken();
+          if (refreshSuccess) {
+              // Retry initialization with new token
+              initializeSpotifyPlayer();
+          } else {
+              forceReauth('Token refresh failed');
+          }
       } else {
-          localStorage.removeItem('spotify_access_token');
-          localStorage.removeItem('spotify_refresh_token');
-          spotifyAccessToken = null;
-          showView('login');
-          showStatus('Session expired. Please reconnect.');
+          forceReauth('Token validation failed');
       }
   } catch (error) {
-      localStorage.removeItem('spotify_access_token');
-      localStorage.removeItem('spotify_refresh_token');
-      spotifyAccessToken = null;
-      showView('login');
-      showStatus('Connection error. Please reconnect.');
+      console.error('🚨 Token validation error:', error);
+      forceReauth('Connection error');
   }
+}
+
+/**
+ * Attempt to refresh Spotify access token using refresh token
+ */
+async function refreshSpotifyToken() {
+  const refreshToken = localStorage.getItem('spotify_refresh_token');
+  
+  if (!refreshToken) {
+      console.warn('⚠️ No refresh token available');
+      return false;
+  }
+  
+  try {
+      console.log('🔄 Refreshing Spotify token...');
+      
+      const response = await fetch('https://accounts.spotify.com/api/token', {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'Authorization': `Basic ${btoa(SPOTIFY_CLIENT_ID + ':')}`
+          },
+          body: new URLSearchParams({
+              grant_type: 'refresh_token',
+              refresh_token: refreshToken
+          })
+      });
+      
+      if (response.ok) {
+          const data = await response.json();
+          
+          // Update tokens
+          spotifyAccessToken = data.access_token;
+          localStorage.setItem('spotify_access_token', data.access_token);
+          
+          // Update refresh token if provided
+          if (data.refresh_token) {
+              localStorage.setItem('spotify_refresh_token', data.refresh_token);
+          }
+          
+          console.log('✅ Token refreshed successfully');
+          showStatus('🔄 Session refreshed');
+          return true;
+          
+      } else {
+          console.warn('⚠️ Token refresh failed:', response.status);
+          return false;
+      }
+      
+  } catch (error) {
+      console.error('🚨 Token refresh error:', error);
+      return false;
+  }
+}
+
+/**
+ * Force re-authentication when tokens cannot be refreshed
+ */
+function forceReauth(reason) {
+  console.log(`🚨 Forcing re-auth: ${reason}`);
+  
+  // Clear all auth data
+  localStorage.removeItem('spotify_access_token');
+  localStorage.removeItem('spotify_refresh_token');
+  spotifyAccessToken = null;
+  
+  // Reset player state
+  isConnected = false;
+  spotifyPlayer = null;
+  spotifyDeviceId = null;
+  
+  // Return to login
+  showView('login');
+  showStatus(`Session expired: ${reason}. Please reconnect.`);
 }
 
 // Enhanced Event Delegation
@@ -4421,7 +4669,8 @@ function setupEventListeners() {
               const track = currentSearchResults[index];
               if (track) {
                   updateSearchTrackHighlighting(track.uri, true);
-                  await selectTrack(track.uri, track.name, track.artists[0].name, track.duration_ms, track.album.images[0]?.url || '');
+                  const artistName = track.artists && track.artists.length > 0 ? track.artists[0].name : 'Unknown Artist';
+                  await selectTrack(track.uri, track.name, artistName, track.duration_ms, track.album.images[0]?.url || '');
               }
           }
           else if (target.matches('.track-menu-btn')) {
@@ -4436,7 +4685,8 @@ function setupEventListeners() {
               const index = parseInt(item.dataset.trackIndex);
               const track = currentSearchResults[index];
               if (track) {
-                  await selectTrack(track.uri, track.name, track.artists[0].name, track.duration_ms, track.album.images[0]?.url || '');
+                  const artistName = track.artists && track.artists.length > 0 ? track.artists[0].name : 'Unknown Artist';
+                  await selectTrack(track.uri, track.name, artistName, track.duration_ms, track.album.images[0]?.url || '');
               }
           }
 
