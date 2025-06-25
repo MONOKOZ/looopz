@@ -2476,7 +2476,14 @@ function displaySearchResults(tracks, hasMore = false) {
       return;
   }
 
-  let html = tracks.map((track, index) => `
+  // Add popularity legend at the top of results (scrolls with content)
+  let html = `
+      <div class="popularity-legend">
+          Spotify Popularity Score: 🔥 80-100 (Hot) • ⭐ 50-79 (Popular) • 💎 0-49 (Hidden Gems)
+      </div>
+  `;
+
+  html += tracks.map((track, index) => `
       <div class="track-item" data-track-index="${index}">
           <img src="${track.album.images[2]?.url || ''}" alt="Album cover" class="track-cover" onerror="this.style.display='none'">
           <div class="track-info">
