@@ -2459,6 +2459,17 @@ async function loadMoreTracks() {
   await searchTracks(searchState.query);
 }
 
+// Analyze Spotify popularity score and return appropriate badge
+function getPopularityBadge(popularity) {
+  if (popularity >= 80) {
+    return `<span class="trend-badge trend-hot">🔥 ${popularity}</span>`;
+  } else if (popularity >= 50) {
+    return `<span class="trend-badge trend-popular">⭐ ${popularity}</span>`;
+  } else {
+    return `<span class="trend-badge trend-gem">💎 ${popularity}</span>`;
+  }
+}
+
 function displaySearchResults(tracks, hasMore = false) {
   if (tracks.length === 0) {
       els.searchResults.innerHTML = '<div style="text-align: center; padding: 40px; color: var(--light-gray);">No results found</div>';
@@ -2469,19 +2480,18 @@ function displaySearchResults(tracks, hasMore = false) {
       <div class="track-item" data-track-index="${index}">
           <img src="${track.album.images[2]?.url || ''}" alt="Album cover" class="track-cover" onerror="this.style.display='none'">
           <div class="track-info">
-              <div class="track-name">${track.name}</div>
+              <div class="track-header">
+                  <div class="track-name">${track.name}</div>
+                  ${getPopularityBadge(track.popularity)}
+              </div>
               <div class="track-artist">${track.artists && track.artists.length > 0 ? track.artists[0].name : 'Unknown Artist'}</div>
           </div>
-          <div class="track-duration">${formatTime(track.duration_ms / 1000, false)}</div>
           <div class="track-actions">
-              <button class="track-action-btn play-track-btn" data-track-index="${index}">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-play"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+              <button class="track-action-btn play-track-btn big-btn" data-track-index="${index}">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-play"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
               </button>
-              <button class="track-action-btn secondary select-track-btn" data-track-index="${index}">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-plus"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-              </button>
-              <button class="track-action-btn menu track-menu-btn" data-track-index="${index}">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-more-vertical"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
+              <button class="track-action-btn menu track-menu-btn big-btn" data-track-index="${index}">
+                <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-more-vertical"><circle cx="12" cy="5" r="1"></circle><circle cx="12" cy="12" r="1"></circle><circle cx="12" cy="19" r="1"></circle></svg>
               </button>
           </div>
       </div>
@@ -4199,17 +4209,7 @@ function setupEventListeners() {
               const track = currentSearchResults[index];
               if (track) await playTrackInBackground(track);
           }
-          else if (target.matches('.select-track-btn')) {
-              e.stopPropagation();
-              e.preventDefault();
-              const index = parseInt(target.dataset.trackIndex);
-              const track = currentSearchResults[index];
-              if (track) {
-                  updateSearchTrackHighlighting(track.uri, true);
-                  const artistName = track.artists && track.artists.length > 0 ? track.artists[0].name : 'Unknown Artist';
-                  await selectTrack(track.uri, track.name, artistName, track.duration_ms, track.album.images[0]?.url || '');
-              }
-          }
+          // select-track-btn removed - functionality now available via context menu
           else if (target.matches('.track-menu-btn')) {
               e.stopPropagation();
               e.preventDefault();
