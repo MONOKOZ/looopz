@@ -3474,8 +3474,10 @@ function renderPlaylistEditView(playlist) {
         </div>
       </div>
       
-      <div id="playlist-items-container">
-        ${renderPlaylistItemsAsCards(playlist)}
+      <div class="playlist-items-wrapper">
+        <div class="playlist-items-scroll-container" id="playlist-items-container">
+          ${renderPlaylistItemsAsCards(playlist)}
+        </div>
       </div>
     </div>
   `;
@@ -3983,137 +3985,150 @@ function setupPlaylistDragAndDrop(playlistId) {
 
   let draggedElement = null;
   let draggedIndex = null;
+  let isDragging = false;
 
   console.log('Setting up drag and drop for playlist:', playlistId);
 
-  // Remove any existing listeners to prevent duplicates
+  // Ensure container has proper drag and drop setup
+  container.style.position = 'relative';
+  container.style.minHeight = '100px';
+
+  // Clear any existing event listeners
   const newContainer = container.cloneNode(true);
   container.parentNode.replaceChild(newContainer, container);
-  const freshContainer = document.getElementById('playlist-items-container');
+  const dragContainer = document.getElementById('playlist-items-container');
 
   // Handle drag start
-  freshContainer.addEventListener('dragstart', (e) => {
-      console.log('Drag start triggered', e.target);
+  dragContainer.addEventListener('dragstart', (e) => {
       const playlistItem = e.target.closest('.playlist-item');
-      if (!playlistItem) {
-          console.log('No playlist item found');
-          return;
-      }
+      if (!playlistItem) return;
 
-      // Allow drag from anywhere on the item or specifically from drag handle
+      // Only allow drag from drag handle or the item itself (not buttons)
       const isDragHandle = e.target.closest('.drag-handle');
-      const isButton = e.target.closest('button');
+      const isDeleteBtn = e.target.closest('.delete-x-btn');
+      const isActionBtn = e.target.closest('.loop-action-btn');
       
-      // Prevent drag if clicking on buttons (except drag handle)
-      if (isButton && !isDragHandle) {
-          console.log('Preventing drag from button');
+      if ((isDeleteBtn || isActionBtn) && !isDragHandle) {
           e.preventDefault();
           return;
       }
 
-      console.log('Starting drag for item:', playlistItem.dataset.itemIndex);
       draggedElement = playlistItem;
       draggedIndex = parseInt(playlistItem.dataset.itemIndex);
+      isDragging = true;
+      
       playlistItem.classList.add('dragging');
       e.dataTransfer.effectAllowed = 'move';
       e.dataTransfer.setData('text/plain', draggedIndex.toString());
+      
+      console.log('Drag started for item:', draggedIndex);
   });
 
   // Handle drag end
-  freshContainer.addEventListener('dragend', (e) => {
-      console.log('Drag end');
+  dragContainer.addEventListener('dragend', (e) => {
+      isDragging = false;
       if (draggedElement) {
           draggedElement.classList.remove('dragging');
       }
       
-      // Remove any placeholder
-      const placeholders = freshContainer.querySelectorAll('.drag-placeholder');
+      // Clean up all placeholders
+      const placeholders = dragContainer.querySelectorAll('.drag-placeholder');
       placeholders.forEach(p => p.remove());
+      
+      console.log('Drag ended');
   });
 
-  // Handle drag over
-  freshContainer.addEventListener('dragover', (e) => {
+  // Handle drag over with auto-scroll
+  dragContainer.addEventListener('dragover', (e) => {
       e.preventDefault();
       e.dataTransfer.dropEffect = 'move';
 
-      if (!draggedElement) return;
+      if (!isDragging || !draggedElement) return;
 
-      const afterElement = getDragAfterElement(freshContainer, e.clientY);
+      // Auto-scroll functionality
+      const containerRect = dragContainer.getBoundingClientRect();
+      const scrollThreshold = 60;
+      const scrollSpeed = 8;
       
+      if (e.clientY < containerRect.top + scrollThreshold) {
+          dragContainer.scrollTop = Math.max(0, dragContainer.scrollTop - scrollSpeed);
+      } else if (e.clientY > containerRect.bottom - scrollThreshold) {
+          dragContainer.scrollTop += scrollSpeed;
+      }
+
       // Remove existing placeholder
-      const existingPlaceholder = freshContainer.querySelector('.drag-placeholder');
+      const existingPlaceholder = dragContainer.querySelector('.drag-placeholder');
       if (existingPlaceholder) {
           existingPlaceholder.remove();
       }
 
-      // Create new placeholder
+      // Find insertion point
+      const afterElement = getDragAfterElement(dragContainer, e.clientY);
+      
+      // Create and position placeholder
       const placeholder = document.createElement('div');
       placeholder.className = 'drag-placeholder';
       placeholder.style.cssText = `
-          height: 4px;
+          height: 3px;
           background: var(--primary);
           border-radius: 2px;
-          margin: 4px 0;
+          margin: 8px 16px;
           opacity: 0.8;
+          transition: all 0.1s ease;
       `;
 
       if (afterElement == null) {
-          freshContainer.appendChild(placeholder);
+          dragContainer.appendChild(placeholder);
       } else {
-          freshContainer.insertBefore(placeholder, afterElement);
+          dragContainer.insertBefore(placeholder, afterElement);
       }
   });
 
   // Handle drop
-  freshContainer.addEventListener('drop', (e) => {
+  dragContainer.addEventListener('drop', (e) => {
       e.preventDefault();
-      console.log('Drop triggered');
-
-      if (!draggedElement) {
-          console.log('No dragged element');
-          return;
-      }
-
-      const placeholder = freshContainer.querySelector('.drag-placeholder');
-      if (!placeholder) {
-          console.log('No placeholder found');
-          return;
-      }
-
-      // Calculate new position
-      const allItems = [...freshContainer.querySelectorAll('.playlist-item:not(.dragging)')];
-      let newIndex = 0;
       
-      // Find where placeholder is relative to other items
-      const placeholderRect = placeholder.getBoundingClientRect();
-      for (let i = 0; i < allItems.length; i++) {
-          const itemRect = allItems[i].getBoundingClientRect();
-          if (placeholderRect.top < itemRect.top) {
-              newIndex = i;
-              break;
+      if (!isDragging || !draggedElement) return;
+
+      const placeholder = dragContainer.querySelector('.drag-placeholder');
+      if (!placeholder) return;
+
+      // Calculate new index based on placeholder position
+      const allItems = [...dragContainer.querySelectorAll('.playlist-item')];
+      const allChildren = [...dragContainer.children];
+      
+      let newIndex = 0;
+      const placeholderIndex = allChildren.indexOf(placeholder);
+      
+      // Count playlist items before the placeholder
+      for (let i = 0; i < placeholderIndex; i++) {
+          if (allChildren[i].classList.contains('playlist-item') && allChildren[i] !== draggedElement) {
+              newIndex++;
           }
-          newIndex = i + 1;
       }
 
-      console.log('Moving from index', draggedIndex, 'to', newIndex);
+      console.log('Reordering from', draggedIndex, 'to', newIndex);
 
       if (newIndex !== draggedIndex) {
-          // Reorder the items
+          // Perform the reorder
           reorderPlaylistItems(playlistId, draggedIndex, newIndex);
 
-          // Re-render the playlist
-          const playlist = savedPlaylists.find(p => p.id === playlistId);
-          if (playlist) {
-              const container = document.getElementById('playlist-items-container');
-              if (container) {
-                  container.innerHTML = renderPlaylistItemsAsCards(playlist);
-                  setupPlaylistDragAndDrop(playlistId);
+          // Update display
+          setTimeout(() => {
+              const playlist = savedPlaylists.find(p => p.id === playlistId);
+              if (playlist) {
+                  const container = document.getElementById('playlist-items-container');
+                  if (container) {
+                      container.innerHTML = renderPlaylistItemsAsCards(playlist);
+                      setupPlaylistDragAndDrop(playlistId);
+                  }
               }
-          }
+          }, 50);
       }
 
-      // Clean up
+      // Cleanup
       placeholder.remove();
+      isDragging = false;
       draggedElement = null;
       draggedIndex = null;
   });
