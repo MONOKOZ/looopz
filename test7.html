@@ -1724,5 +1724,46 @@ document.addEventListener('DOMContentLoaded', function() {
     }, 1000);
 });
 </script>
+
+<script>
+// Handle OAuth callback on testing page
+document.addEventListener('DOMContentLoaded', function() {
+    // Check if we have a code in the URL (OAuth callback)
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    
+    if (code) {
+        console.log('🔐 OAuth callback detected on testing page!');
+        
+        // Exchange the code for a token
+        if (typeof window.exchangeCodeForToken === 'function') {
+            console.log('📝 Exchanging code for token...');
+            window.exchangeCodeForToken(code).then(() => {
+                console.log('✅ Token exchange complete!');
+                // Stay on testing page - don't redirect
+                window.history.replaceState({}, document.title, window.location.pathname);
+                
+                // Hide login screen and show main content
+                const loginScreen = document.getElementById('login-screen');
+                const searchSection = document.getElementById('search-section');
+                
+                if (loginScreen) loginScreen.classList.add('hidden');
+                if (searchSection) searchSection.classList.remove('hidden');
+                
+                // Update connection status
+                const connectionStatus = document.getElementById('connection-status');
+                if (connectionStatus) {
+                    connectionStatus.style.display = 'flex';
+                }
+                
+                console.log('🧪 Ready for testing!');
+            }).catch(error => {
+                console.error('❌ Token exchange failed:', error);
+            });
+        }
+    }
+});
+</script>
+
 </body>
 </html>
