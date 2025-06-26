@@ -1669,5 +1669,60 @@
             }, 3000); // Increased delay to ensure everything loads
         });
     </script>
+<script>
+// Fix the Connect button
+document.addEventListener('DOMContentLoaded', function() {
+    // Wait a bit for script.js to load
+    setTimeout(() => {
+        // Ensure constants are available
+        window.SPOTIFY_CLIENT_ID = window.SPOTIFY_CLIENT_ID || '46637d8f5adb41c0a4be34e0df0c1597';
+        window.SPOTIFY_REDIRECT_URI = window.location.origin + window.location.pathname;
+        window.SPOTIFY_SCOPES = window.SPOTIFY_SCOPES || 'streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state';
+
+        // Attach click handler to Connect button
+        const connectBtn = document.getElementById('connect-btn');
+        if (connectBtn) {
+            connectBtn.addEventListener('click', async () => {
+                console.log('🔐 Connect button clicked!');
+                
+                // If the original connectToSpotify function exists, use it
+                if (typeof window.connectToSpotify === 'function') {
+                    window.connectToSpotify();
+                } else if (typeof window.getSpotifyAuthUrl === 'function') {
+                    // Otherwise, do it manually
+                    const authUrl = await window.getSpotifyAuthUrl();
+                    window.location.href = authUrl;
+                } else {
+                    // Fallback: construct auth URL manually
+                    const codeVerifier = generateCodeVerifier();
+                    const codeChallenge = await generateCodeChallenge(codeVerifier);
+                    localStorage.setItem('code_verifier', codeVerifier);
+                    
+                    const authUrl = `https://accounts.spotify.com/authorize?` +
+                        `client_id=${window.SPOTIFY_CLIENT_ID}` +
+                        `&response_type=code` +
+                        `&redirect_uri=${encodeURIComponent(window.SPOTIFY_REDIRECT_URI)}` +
+                        `&scope=${encodeURIComponent(window.SPOTIFY_SCOPES)}` +
+                        `&code_challenge_method=S256` +
+                        `&code_challenge=${codeChallenge}` +
+                        `&show_dialog=true`;
+                    
+                    console.log('🔗 Redirecting to:', authUrl);
+                    window.location.href = authUrl;
+                }
+            });
+            
+            console.log('✅ Connect button handler attached');
+        } else {
+            console.error('❌ Connect button not found!');
+        }
+        
+        // Also ensure the testing panel buttons work
+        console.log('🧪 Testing environment ready');
+        console.log('Client ID:', window.SPOTIFY_CLIENT_ID);
+        console.log('Redirect URI:', window.SPOTIFY_REDIRECT_URI);
+    }, 1000);
+});
+</script>
 </body>
 </html>
