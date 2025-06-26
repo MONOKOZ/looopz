@@ -629,6 +629,53 @@
     <button class="toggle-testing" onclick="toggleTestingPanel()">🧪</button>
 
     <!-- Import LOOOPZ JavaScript -->
+<script>
+// Prevent redirects to main site in testing environment
+(function() {
+    // Store original functions
+    const originalReplace = window.location.replace;
+    const originalAssign = window.location.assign;
+    const originalHref = Object.getOwnPropertyDescriptor(window.location, 'href');
+    
+    // Override redirect methods
+    window.location.replace = function(url) {
+        console.log('🚫 Blocked redirect to:', url);
+        if (url.includes('index.html') || url === '/') {
+            console.log('✅ Staying on testing page');
+            return;
+        }
+        originalReplace.call(this, url);
+    };
+    
+    window.location.assign = function(url) {
+        console.log('🚫 Blocked redirect to:', url);
+        if (url.includes('index.html') || url === '/') {
+            console.log('✅ Staying on testing page');
+            return;
+        }
+        originalAssign.call(this, url);
+    };
+    
+    Object.defineProperty(window.location, 'href', {
+        get: originalHref.get,
+        set: function(url) {
+            console.log('🚫 Blocked href change to:', url);
+            if (url.includes('index.html') || url === '/') {
+                console.log('✅ Staying on testing page');
+                return;
+            }
+            originalHref.set.call(this, url);
+        }
+    });
+    
+    // Also set a flag to indicate we're in testing mode
+    window.LOOOPZ_TESTING_MODE = true;
+})();
+</script>
+
+<!-- NOW load script.js -->
+<script src="script.js"></script>
+
     <script src="script.js"></script>
     <script src="https://sdk.scdn.co/spotify-player.js"></script>
 
