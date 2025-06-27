@@ -931,25 +931,28 @@ body {
 .loop-handle::after {
    content: '💡 Double-tap for precision';
    position: absolute;
-   bottom: -35px;
+   top: -45px;
    left: 50%;
    transform: translateX(-50%);
-   background: rgba(0, 0, 0, 0.9);
+   background: rgba(0, 0, 0, 0.95);
    color: var(--primary);
-   padding: 6px 10px;
-   border-radius: 6px;
-   font-size: 11px;
-   font-weight: 500;
+   padding: 8px 12px;
+   border-radius: 8px;
+   font-size: 12px;
+   font-weight: 600;
    white-space: nowrap;
    opacity: 0;
    pointer-events: none;
-   transition: opacity 0.2s ease;
-   border: 1px solid var(--primary);
+   transition: all 0.3s ease;
+   border: 2px solid var(--primary);
    backdrop-filter: blur(10px);
+   z-index: 1000;
+   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
 
 .loop-handle:hover::after {
    opacity: 1;
+   transform: translateX(-50%) translateY(-3px);
 }
 
 .time-popup {
