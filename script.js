@@ -3221,11 +3221,14 @@ function setupLoopHandles() {
       // Double-tap detection for precision mode
       const now = Date.now();
       const timeSinceLastTap = now - precisionZoom.lastTapTime;
+      const currentHandleType = target === els.loopStartHandle ? 'start' : 'end';
       
-      if (timeSinceLastTap < 300 && precisionZoom.handleType === (target === els.loopStartHandle ? 'start' : 'end')) {
+      console.log(`🎯 Tap detected: time since last=${timeSinceLastTap}ms, same handle=${precisionZoom.handleType === currentHandleType}`);
+      
+      if (timeSinceLastTap < 300 && precisionZoom.handleType === currentHandleType) {
           // Double-tap detected!
           precisionZoom.tapCount = 0;
-          console.log(`🎯 Double-tap detected on ${precisionZoom.handleType} handle`);
+          console.log(`🎯 DOUBLE-TAP ACTIVATED on ${currentHandleType} handle!`);
           
           // Start drag in precision mode
           isDragging = true;
@@ -3233,15 +3236,23 @@ function setupLoopHandles() {
           target.classList.add('dragging');
           
           // Immediately activate precision zoom
-          showPrecisionZoom(precisionZoom.handleType);
+          showPrecisionZoom(currentHandleType);
           
           // Visual feedback
           target.style.transform = 'translateX(-50%) translateY(-50%) scale(1.2)';
           target.style.boxShadow = '0 0 25px rgba(29, 185, 84, 1)';
+          
+          // Show time popup in precision mode
+          const popup = target.querySelector('.time-popup');
+          if (popup) {
+              popup.classList.add('show');
+              popup.style.background = 'rgba(29, 185, 84, 0.95)';
+          }
       } else {
           // Single tap - normal drag
+          console.log(`🎯 Single tap - normal drag mode`);
           precisionZoom.lastTapTime = now;
-          precisionZoom.handleType = target === els.loopStartHandle ? 'start' : 'end';
+          precisionZoom.handleType = currentHandleType;
           
           isDragging = true;
           dragTarget = target;
