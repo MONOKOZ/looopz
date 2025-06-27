@@ -2803,6 +2803,17 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
     animation: precision-drag-pulse 1.2s ease-in-out infinite;
 }
 
+/* Prevent iOS text selection and magnifier on loop handles */
+.loop-handle {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: pan-x pan-y;
+}
+
 @keyframes precision-drag-pulse {
     0%, 100% {
         box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
