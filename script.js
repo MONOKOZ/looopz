@@ -1722,26 +1722,30 @@ function triggerHapticFeedback(score) {
 
 /**
  * Trigger zone-based haptic feedback like "locking points" during dragging
+ * Designed to avoid conflicts with iOS text selection magnifier
  */
 function triggerZoneHapticFeedback(score) {
-    if (!navigator.vibrate) return;
+    // Skip haptic feedback if not available or if we're not actively dragging a loop handle
+    if (!navigator.vibrate || !isDragging || !dragTarget) return;
+    
+    // Avoid conflicts with iOS text selection by only triggering for loop handles
+    if (!dragTarget.classList.contains('loop-handle')) return;
     
     const now = Date.now();
     
-    // Create "locking points" at different score thresholds
+    // Create fewer, more distinct "locking points" to avoid spam
     const zones = [
-        { threshold: 9.5, pattern: [40, 30, 40], lastFeedback: 'zone95' },
-        { threshold: 8.5, pattern: [30, 20, 30], lastFeedback: 'zone85' },
-        { threshold: 7.5, pattern: [25, 15, 25], lastFeedback: 'zone75' },
-        { threshold: 6.5, pattern: [20, 10, 20], lastFeedback: 'zone65' }
+        { threshold: 9.0, pattern: [50], lastFeedback: 'zone90' },      // Single strong pulse for excellent
+        { threshold: 7.5, pattern: [30], lastFeedback: 'zone75' },     // Medium pulse for good
+        { threshold: 6.0, pattern: [20], lastFeedback: 'zone60' }      // Light pulse for decent
     ];
     
     // Find the highest zone we've crossed
     for (const zone of zones) {
         if (score >= zone.threshold) {
-            // Check if we haven't provided feedback for this zone recently
+            // Check if we haven't provided feedback for this zone recently (longer cooldown)
             if (!triggerZoneHapticFeedback[zone.lastFeedback] || 
-                now - triggerZoneHapticFeedback[zone.lastFeedback] > 300) {
+                now - triggerZoneHapticFeedback[zone.lastFeedback] > 800) {
                 
                 navigator.vibrate(zone.pattern);
                 triggerZoneHapticFeedback[zone.lastFeedback] = now;
@@ -1804,6 +1808,12 @@ async function findOptimalSnapPosition(currentTime, handleType = 'start') {
  */
 function initializeSmartLoopAssist() {
     if (!els.smartAssistToggle) return;
+
+    // Make the Smart Loop Assist visible
+    const smartAssistContainer = document.getElementById('smart-loop-assist');
+    if (smartAssistContainer) {
+        smartAssistContainer.classList.add('visible');
+    }
 
     // Set initial state
     els.smartAssistToggle.checked = smartLoopAssistEnabled;
