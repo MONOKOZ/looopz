@@ -203,7 +203,21 @@
     </style>
 </head>
 <body>
-    <!-- EXACT LOOOPZ STRUCTURE FROM index.html -->
+
+    <!-- ADD THIS ERROR PREVENTION SCRIPT FIRST -->
+    <script>
+        // Prevent script.js errors on missing elements
+        window.addEventListener('error', function(e) {
+            if (e.message && e.message.includes('Cannot read properties of null')) {
+                console.warn('⚠️ Caught null element error:', e.message);
+                e.preventDefault();
+            }
+        });
+    </script>
+    
+    <!-- Your existing HTML content continues here... -->
+
+ <!-- EXACT LOOOPZ STRUCTURE FROM index.html -->
     <div class="app-header">
         <div class="header-content">
             <div class="logo">LOOOPZ [TESTING]</div>
