@@ -3272,53 +3272,40 @@ function setupLoopHandles() {
       // Calculate speed in pixels per second
       const speed = timeDelta > 0 ? (movementDistance / timeDelta) * 1000 : 0;
       
-      // Gradual precision levels based on speed
-      let precisionLevel = 0; // 0 = normal, 1 = medium, 2 = high precision
-      let windowSize = duration; // Default to full duration
-      
-      if (speed < 120) {
-          precisionLevel = 1;
-          windowSize = duration * 0.1; // 10% of song duration
-      }
-      if (speed < 60) {
-          precisionLevel = 2; 
-          windowSize = 10; // 10 seconds
-      }
-      if (speed < 20) {
-          precisionLevel = 3;
-          windowSize = 2; // 2 seconds - finest precision
-      }
-      
-      // Update precision state and window
-      if (precisionLevel > 0 && duration > 0) {
-          if (!precisionZoom.active || precisionZoom.precisionLevel !== precisionLevel) {
+      // Linear speed-to-precision mapping (smooth and predictable)
+      if (speed < 100 && duration > 0) {
+          // Activate precision mode with linear scaling
+          if (!precisionZoom.active) {
               precisionZoom.active = true;
-              precisionZoom.precisionLevel = precisionLevel;
-              
-              // Calculate window around current position
-              const currentTime = precisionZoom.handleType === 'start' ? loopStart : loopEnd;
-              precisionZoom.windowStart = Math.max(0, currentTime - windowSize / 2);
-              precisionZoom.windowEnd = Math.min(duration, currentTime + windowSize / 2);
-              
-              console.log(`🎯 Precision level ${precisionLevel}: ${speed.toFixed(1)} px/s, window: ${windowSize}s`);
+              console.log(`🎯 Entering precision mode: ${speed.toFixed(1)} px/s`);
           }
           
-          // Visual feedback based on precision level
+          // Linear precision: 100 px/s = full duration, 0 px/s = 5 seconds
+          const precisionFactor = Math.max(0, Math.min(1, speed / 100)); // 0 to 1
+          const windowSize = 5 + (precisionFactor * (duration - 5)); // 5s to full duration
+          
+          // Update window around current position
+          const currentTime = precisionZoom.handleType === 'start' ? loopStart : loopEnd;
+          precisionZoom.windowStart = Math.max(0, currentTime - windowSize / 2);
+          precisionZoom.windowEnd = Math.min(duration, currentTime + windowSize / 2);
+          
+          // Linear visual feedback
           if (dragTarget) {
-              const intensity = precisionLevel / 3; // 0.33, 0.66, 1.0
-              const scale = 1 + (intensity * 0.15); // 1.05, 1.1, 1.15
-              const glow = 10 + (intensity * 15); // 15, 20, 25px
-              const alpha = 0.4 + (intensity * 0.4); // 0.4, 0.6, 0.8
+              const intensity = 1 - precisionFactor; // More precision = more glow
+              const scale = 1 + (intensity * 0.1); // 1.0 to 1.1
+              const glow = 10 + (intensity * 15); // 10 to 25px
+              const alpha = 0.3 + (intensity * 0.5); // 0.3 to 0.8
               
               dragTarget.style.transform = `translateX(-50%) translateY(-50%) scale(${scale})`;
               dragTarget.style.boxShadow = `0 0 ${glow}px rgba(29, 185, 84, ${alpha})`;
           }
+          
+          console.log(`🎯 Speed: ${speed.toFixed(1)} px/s, Window: ${windowSize.toFixed(1)}s`);
       } else {
           // Exit precision mode
           if (precisionZoom.active) {
               console.log(`🎯 Exiting precision mode: ${speed.toFixed(1)} px/s`);
               precisionZoom.active = false;
-              precisionZoom.precisionLevel = 0;
               precisionZoom.windowStart = null;
               precisionZoom.windowEnd = null;
               
@@ -3428,7 +3415,6 @@ let precisionZoom = {
     handleType: null,
     lastPosition: 0,
     lastMoveTime: 0,
-    precisionLevel: 0,
     windowStart: null,
     windowEnd: null
 };
@@ -6319,12 +6305,12 @@ window.testPrecisionMode = function() {
     console.log('Duration:', duration);
     console.log('Loop positions:', `${formatTime(loopStart)} - ${formatTime(loopEnd)}`);
     
-    console.log('\n✨ Gradual precision levels:');
-    console.log('  • Normal speed (>120 px/s): Full song duration');
-    console.log('  • Medium speed (<120 px/s): 10% of song duration');  
-    console.log('  • Slow speed (<60 px/s): 10 second window');
-    console.log('  • Precise speed (<20 px/s): 2 second window');
-    console.log('  • Visual feedback increases with precision level!');
+    console.log('\n✨ Linear precision mapping:');
+    console.log('  • Fast speed (>100 px/s): Full song duration');
+    console.log('  • Medium speed (50 px/s): ~Half song window');  
+    console.log('  • Slow speed (25 px/s): ~Quarter song window');
+    console.log('  • Precise speed (0 px/s): 5 second window');
+    console.log('  • Smooth linear scaling - no sudden jumps!');
     
     if (duration > 0) {
         console.log('\n💡 Usage: Drag any handle slowly to feel the precision!');
