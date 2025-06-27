@@ -629,53 +629,6 @@
     <button class="toggle-testing" onclick="toggleTestingPanel()">🧪</button>
 
     <!-- Import LOOOPZ JavaScript -->
-<script>
-// Prevent redirects to main site in testing environment
-(function() {
-    // Store original functions
-    const originalReplace = window.location.replace;
-    const originalAssign = window.location.assign;
-    const originalHref = Object.getOwnPropertyDescriptor(window.location, 'href');
-    
-    // Override redirect methods
-    window.location.replace = function(url) {
-        console.log('🚫 Blocked redirect to:', url);
-        if (url.includes('index.html') || url === '/') {
-            console.log('✅ Staying on testing page');
-            return;
-        }
-        originalReplace.call(this, url);
-    };
-    
-    window.location.assign = function(url) {
-        console.log('🚫 Blocked redirect to:', url);
-        if (url.includes('index.html') || url === '/') {
-            console.log('✅ Staying on testing page');
-            return;
-        }
-        originalAssign.call(this, url);
-    };
-    
-    Object.defineProperty(window.location, 'href', {
-        get: originalHref.get,
-        set: function(url) {
-            console.log('🚫 Blocked href change to:', url);
-            if (url.includes('index.html') || url === '/') {
-                console.log('✅ Staying on testing page');
-                return;
-            }
-            originalHref.set.call(this, url);
-        }
-    });
-    
-    // Also set a flag to indicate we're in testing mode
-    window.LOOOPZ_TESTING_MODE = true;
-})();
-</script>
-
-<!-- NOW load script.js -->
-<script src="script.js"></script>
-
     <script src="script.js"></script>
     <script src="https://sdk.scdn.co/spotify-player.js"></script>
 
@@ -683,229 +636,151 @@
     <script src="https://cdn.jsdelivr.net/npm/essentia.js@0.1.3/dist/essentia-wasm.web.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/essentia.js@0.1.3/dist/essentia.js-core.js"></script>
 
-    <!-- FIX AUTHENTICATION AND STORAGE FOR TESTING ENVIRONMENT -->
-    <script>
-        // Override redirect URI for testing environment
-        (function() {
-            const originalSpotifyRedirectUri = window.SPOTIFY_REDIRECT_URI || 'https://looopz.vercel.app/';
+   <!-- FIX AUTHENTICATION AND STORAGE FOR TESTING ENVIRONMENT -->
+<script>
+    // Set the correct redirect URI for test7.html
+    window.SPOTIFY_REDIRECT_URI = 'https://looopz.vercel.app/test7.html';
+    
+    // AUTO-CONNECT TO SPOTIFY USING EXISTING TOKENS
+    function autoConnectSpotify() {
+        // Check for existing tokens in localStorage (from main LOOOPZ site)
+        const existingToken = localStorage.getItem('spotify_access_token');
+        const existingRefresh = localStorage.getItem('spotify_refresh_token');
+        
+        console.log('🔍 Checking for existing Spotify tokens...');
+        console.log('Access token:', existingToken ? 'Found' : 'Missing');
+        console.log('Refresh token:', existingRefresh ? 'Found' : 'Missing');
+        
+        if (existingToken) {
+            console.log('✅ Found existing access token, attempting auto-connect...');
+            window.spotifyAccessToken = existingToken;
             
-            // Update redirect URI to current origin for testing
-            if (typeof window.SPOTIFY_REDIRECT_URI !== 'undefined') {
-                window.SPOTIFY_REDIRECT_URI = window.location.origin + window.location.pathname;
-                console.log('🔧 Updated SPOTIFY_REDIRECT_URI for testing:', window.SPOTIFY_REDIRECT_URI);
-            }
-            
-            // Override the SPOTIFY_REDIRECT_URI constant in the global scope
-            Object.defineProperty(window, 'SPOTIFY_REDIRECT_URI', {
-                value: window.location.origin + window.location.pathname,
-                writable: false,
-                configurable: false
-            });
-            
-            // Also update the constant directly if it exists
-            if (typeof SPOTIFY_REDIRECT_URI !== 'undefined') {
-                SPOTIFY_REDIRECT_URI = window.location.origin + window.location.pathname;
-            }
-        })();
-
-        // AUTO-CONNECT TO SPOTIFY USING EXISTING TOKENS
-        function autoConnectSpotify() {
-            // Check for existing tokens in localStorage (from main LOOOPZ site)
-            const existingToken = localStorage.getItem('spotify_access_token');
-            const existingRefresh = localStorage.getItem('spotify_refresh_token');
-            
-            console.log('🔍 Checking for existing Spotify tokens...');
-            console.log('Access token:', existingToken ? 'Found' : 'Missing');
-            console.log('Refresh token:', existingRefresh ? 'Found' : 'Missing');
-            
-            if (existingToken) {
-                console.log('✅ Found existing access token, attempting auto-connect...');
-                window.spotifyAccessToken = existingToken;
-                
-                // Validate the token
-                fetch('https://api.spotify.com/v1/me', {
-                    headers: { 'Authorization': `Bearer ${existingToken}` }
-                }).then(response => {
-                    if (response.ok) {
-                        console.log('✅ Existing token is valid, initializing player...');
-                        if (typeof initializeSpotifyPlayer === 'function') {
-                            initializeSpotifyPlayer();
-                        }
-                        if (typeof showStatus === 'function') {
-                            showStatus('Auto-connected with existing token!');
-                        }
-                    } else if (response.status === 401) {
-                        console.log('⚠️ Token expired, attempting refresh...');
-                        if (existingRefresh && typeof refreshSpotifyToken === 'function') {
-                            refreshSpotifyToken().then(success => {
-                                if (success) {
-                                    console.log('✅ Token refreshed, initializing player...');
-                                    if (typeof initializeSpotifyPlayer === 'function') {
-                                        initializeSpotifyPlayer();
-                                    }
-                                } else {
-                                    console.log('❌ Token refresh failed, manual connection required');
-                                    if (typeof showStatus === 'function') {
-                                        showStatus('Please connect to Spotify manually');
-                                    }
-                                }
-                            });
-                        } else {
-                            console.log('❌ No refresh token, manual connection required');
-                            if (typeof showStatus === 'function') {
-                                showStatus('Please connect to Spotify manually');
-                            }
-                        }
-                    } else {
-                        console.log('❌ Token validation failed, manual connection required');
-                        if (typeof showStatus === 'function') {
-                            showStatus('Please connect to Spotify manually');
-                        }
-                    }
-                }).catch(error => {
-                    console.error('❌ Token validation error:', error);
-                    if (typeof showStatus === 'function') {
-                        showStatus('Please connect to Spotify manually');
-                    }
-                });
-            } else {
-                console.log('❌ No existing token found, manual connection required');
-                if (typeof showStatus === 'function') {
-                    showStatus('Please connect to Spotify to begin testing');
-                }
-            }
-        }
-
-        // MANUAL TOKEN INPUT (FOR CONVENIENCE)
-        function quickConnectWithToken() {
-            const token = prompt('Enter your Spotify access token (from main LOOOPZ site):');
-            if (token && token.trim()) {
-                localStorage.setItem('spotify_access_token', token.trim());
-                window.spotifyAccessToken = token.trim();
-                
-                fetch('https://api.spotify.com/v1/me', {
-                    headers: { 'Authorization': `Bearer ${token.trim()}` }
-                }).then(response => {
-                    if (response.ok) {
-                        console.log('✅ Manual token is valid, initializing player...');
-                        if (typeof initializeSpotifyPlayer === 'function') {
-                            initializeSpotifyPlayer();
-                        }
-                        if (typeof showStatus === 'function') {
-                            showStatus('Successfully connected with manual token!');
-                        }
-                    } else {
-                        alert('Invalid token. Please check your token and try again.');
-                        localStorage.removeItem('spotify_access_token');
-                        window.spotifyAccessToken = null;
-                    }
-                }).catch(error => {
-                    alert('Error validating token: ' + error.message);
-                });
-            }
-        }
-
-        // Force load saved data on initialization
-        document.addEventListener('DOMContentLoaded', function() {
-            setTimeout(function() {
-                // Auto-connect if possible
-                autoConnectSpotify();
-                
-                // Force load saved loops and playlists
-                if (typeof loadSavedLoops === 'function') {
-                    loadSavedLoops();
-                    console.log('🔄 Loaded saved loops:', window.savedLoops ? window.savedLoops.length : 0);
-                }
-                
-                if (typeof loadSavedPlaylists === 'function') {
-                    loadSavedPlaylists();
-                    console.log('🔄 Loaded saved playlists:', window.savedPlaylists ? window.savedPlaylists.length : 0);
-                }
-                
-                // Force render if data exists
-                if (typeof renderLoopsList === 'function' && window.savedLoops && window.savedLoops.length > 0) {
-                    renderLoopsList();
-                }
-                
-                if (typeof renderPlaylistsList === 'function' && window.savedPlaylists && window.savedPlaylists.length > 0) {
-                    renderPlaylistsList();
-                }
-                
-                // Force update badges
-                if (typeof updateLoopCountBadge === 'function') {
-                    updateLoopCountBadge();
-                }
-                
-                if (typeof updatePlaylistCountBadge === 'function') {
-                    updatePlaylistCountBadge();
-                }
-                
-                console.log('✅ Testing environment storage initialized');
-            }, 1000);
-        });
-
-        // Override getSpotifyAuthUrl to use correct redirect URI
-        if (typeof getSpotifyAuthUrl === 'function') {
-            const originalGetSpotifyAuthUrl = getSpotifyAuthUrl;
-            window.getSpotifyAuthUrl = async function() {
-                const codeVerifier = generateCodeVerifier();
-                const codeChallenge = await generateCodeChallenge(codeVerifier);
-                localStorage.setItem('code_verifier', codeVerifier);
-                
-                const currentRedirectUri = window.location.origin + window.location.pathname;
-                const authUrl = `https://accounts.spotify.com/authorize?client_id=${SPOTIFY_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(currentRedirectUri)}&scope=${encodeURIComponent(SPOTIFY_SCOPES)}&code_challenge_method=S256&code_challenge=${codeChallenge}&show_dialog=true`;
-                
-                console.log('🔐 Generated auth URL with redirect:', currentRedirectUri);
-                return authUrl;
-            };
-        }
-
-        // Override exchangeCodeForToken to use correct redirect URI
-        if (typeof exchangeCodeForToken === 'function') {
-            const originalExchangeCodeForToken = exchangeCodeForToken;
-            window.exchangeCodeForToken = async function(code) {
-                const codeVerifier = localStorage.getItem('code_verifier');
-                if (!codeVerifier) throw new Error('Code verifier not found');
-
-                const currentRedirectUri = window.location.origin + window.location.pathname;
-                
-                const response = await fetch('https://accounts.spotify.com/api/token', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-                    body: new URLSearchParams({
-                        grant_type: 'authorization_code',
-                        code: code,
-                        redirect_uri: currentRedirectUri,
-                        client_id: SPOTIFY_CLIENT_ID,
-                        code_verifier: codeVerifier,
-                    }),
-                });
-
-                const data = await response.json();
-                if (data.access_token) {
-                    window.spotifyAccessToken = data.access_token;
-                    localStorage.setItem('spotify_access_token', data.access_token);
-                    if (data.refresh_token) localStorage.setItem('spotify_refresh_token', data.refresh_token);
-                    localStorage.removeItem('code_verifier');
-                    window.history.replaceState({}, document.title, window.location.pathname);
-                    
-                    console.log('✅ Token exchange successful for testing environment');
+            // Validate the token
+            fetch('https://api.spotify.com/v1/me', {
+                headers: { 'Authorization': `Bearer ${existingToken}` }
+            }).then(response => {
+                if (response.ok) {
+                    console.log('✅ Existing token is valid, initializing player...');
                     if (typeof initializeSpotifyPlayer === 'function') {
                         initializeSpotifyPlayer();
                     }
                     if (typeof showStatus === 'function') {
-                        showStatus('Successfully authenticated!');
+                        showStatus('Auto-connected with existing token!');
+                    }
+                } else if (response.status === 401) {
+                    console.log('⚠️ Token expired, attempting refresh...');
+                    if (existingRefresh && typeof refreshSpotifyToken === 'function') {
+                        refreshSpotifyToken().then(success => {
+                            if (success) {
+                                console.log('✅ Token refreshed, initializing player...');
+                                if (typeof initializeSpotifyPlayer === 'function') {
+                                    initializeSpotifyPlayer();
+                                }
+                            } else {
+                                console.log('❌ Token refresh failed, manual connection required');
+                                if (typeof showStatus === 'function') {
+                                    showStatus('Please connect to Spotify manually');
+                                }
+                            }
+                        });
+                    } else {
+                        console.log('❌ No refresh token, manual connection required');
+                        if (typeof showStatus === 'function') {
+                            showStatus('Please connect to Spotify manually');
+                        }
                     }
                 } else {
-                    throw new Error('Failed to get access token: ' + (data.error_description || data.error));
+                    console.log('❌ Token validation failed, manual connection required');
+                    if (typeof showStatus === 'function') {
+                        showStatus('Please connect to Spotify manually');
+                    }
                 }
-            };
+            }).catch(error => {
+                console.error('❌ Token validation error:', error);
+                if (typeof showStatus === 'function') {
+                    showStatus('Please connect to Spotify manually');
+                }
+            });
+        } else {
+            console.log('❌ No existing token found, manual connection required');
+            if (typeof showStatus === 'function') {
+                showStatus('Please connect to Spotify to begin testing');
+            }
         }
+    }
 
-        // Make functions globally available
-        window.autoConnectSpotify = autoConnectSpotify;
-        window.quickConnectWithToken = quickConnectWithToken;
-    </script>
+    // MANUAL TOKEN INPUT (FOR CONVENIENCE)
+    function quickConnectWithToken() {
+        const token = prompt('Enter your Spotify access token (from main LOOOPZ site):');
+        if (token && token.trim()) {
+            localStorage.setItem('spotify_access_token', token.trim());
+            window.spotifyAccessToken = token.trim();
+            
+            fetch('https://api.spotify.com/v1/me', {
+                headers: { 'Authorization': `Bearer ${token.trim()}` }
+            }).then(response => {
+                if (response.ok) {
+                    console.log('✅ Manual token is valid, initializing player...');
+                    if (typeof initializeSpotifyPlayer === 'function') {
+                        initializeSpotifyPlayer();
+                    }
+                    if (typeof showStatus === 'function') {
+                        showStatus('Successfully connected with manual token!');
+                    }
+                } else {
+                    alert('Invalid token. Please check your token and try again.');
+                    localStorage.removeItem('spotify_access_token');
+                    window.spotifyAccessToken = null;
+                }
+            }).catch(error => {
+                alert('Error validating token: ' + error.message);
+            });
+        }
+    }
+
+    // Force load saved data on initialization
+    document.addEventListener('DOMContentLoaded', function() {
+        setTimeout(function() {
+            // Auto-connect if possible
+            autoConnectSpotify();
+            
+            // Force load saved loops and playlists
+            if (typeof loadSavedLoops === 'function') {
+                loadSavedLoops();
+                console.log('🔄 Loaded saved loops:', window.savedLoops ? window.savedLoops.length : 0);
+            }
+            
+            if (typeof loadSavedPlaylists === 'function') {
+                loadSavedPlaylists();
+                console.log('🔄 Loaded saved playlists:', window.savedPlaylists ? window.savedPlaylists.length : 0);
+            }
+            
+            // Force render if data exists
+            if (typeof renderLoopsList === 'function' && window.savedLoops && window.savedLoops.length > 0) {
+                renderLoopsList();
+            }
+            
+            if (typeof renderPlaylistsList === 'function' && window.savedPlaylists && window.savedPlaylists.length > 0) {
+                renderPlaylistsList();
+            }
+            
+            // Force update badges
+            if (typeof updateLoopCountBadge === 'function') {
+                updateLoopCountBadge();
+            }
+            
+            if (typeof updatePlaylistCountBadge === 'function') {
+                updatePlaylistCountBadge();
+            }
+            
+            console.log('✅ Testing environment storage initialized');
+        }, 1000);
+    });
+
+    // Make functions globally available
+    window.autoConnectSpotify = autoConnectSpotify;
+    window.quickConnectWithToken = quickConnectWithToken;
+</script>
 
     <!-- INTERNAL TESTING SYSTEM -->
     <script>
