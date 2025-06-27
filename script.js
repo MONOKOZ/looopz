@@ -3389,17 +3389,26 @@ function setupPrecisionZoomLoopHandles() {
 
     // Update precision zoom display
     function updatePrecisionDisplay() {
-        if (!precisionZoom.active || !precisionZoom.overlay) return;
+        if (!precisionZoom.active || !precisionZoom.overlay) {
+            console.log(`🎯 UPDATE FAILED - active: ${precisionZoom.active}, overlay: ${!!precisionZoom.overlay}`);
+            return;
+        }
         
         const currentHandle = precisionZoom.handleType === 'start' ? loopStart : loopEnd;
         const zoomCenter = currentHandle;
         const zoomStart = Math.max(0, zoomCenter - precisionZoom.zoomRange / 2);
         const zoomEnd = Math.min(duration, zoomCenter + precisionZoom.zoomRange / 2);
         
+        console.log(`🎯 UPDATING DISPLAY: handle=${currentHandle}s, zoom=${zoomStart}s-${zoomEnd}s, duration=${duration}s`);
+        
         // Update range display
         const rangeDisplay = precisionZoom.overlay.querySelector('#precision-range-display');
         if (rangeDisplay) {
-            rangeDisplay.textContent = `${formatTime(zoomStart, false)} - ${formatTime(zoomEnd, false)}`;
+            const rangeText = `${formatTime(zoomStart, false)} - ${formatTime(zoomEnd, false)}`;
+            rangeDisplay.textContent = rangeText;
+            console.log(`🎯 Range display: ${rangeText}`);
+        } else {
+            console.log(`🎯 ERROR: Range display element not found`);
         }
         
         // Update progress bar
@@ -3407,6 +3416,9 @@ function setupPrecisionZoomLoopHandles() {
         if (progressBar) {
             const progressWidth = ((currentHandle - zoomStart) / (zoomEnd - zoomStart)) * 100;
             progressBar.style.width = `${Math.max(0, Math.min(100, progressWidth))}%`;
+            console.log(`🎯 Progress bar width: ${progressWidth}%`);
+        } else {
+            console.log(`🎯 ERROR: Progress bar element not found`);
         }
         
         // Update handle position
@@ -3415,6 +3427,9 @@ function setupPrecisionZoomLoopHandles() {
             const handlePos = ((currentHandle - zoomStart) / (zoomEnd - zoomStart)) * 100;
             handle.style.left = `${Math.max(0, Math.min(100, handlePos))}%`;
             handle.className = `precision-current-handle ${precisionZoom.handleType}`;
+            console.log(`🎯 Handle position: ${handlePos}%`);
+        } else {
+            console.log(`🎯 ERROR: Handle element not found`);
         }
         
         // Update time labels
@@ -3423,6 +3438,9 @@ function setupPrecisionZoomLoopHandles() {
         if (startLabel && endLabel) {
             startLabel.textContent = formatTime(loopStart);
             endLabel.textContent = formatTime(loopEnd);
+            console.log(`🎯 Time labels: ${formatTime(loopStart)} - ${formatTime(loopEnd)}`);
+        } else {
+            console.log(`🎯 ERROR: Time label elements not found`);
         }
         
         // Update markers
@@ -3463,6 +3481,8 @@ function setupPrecisionZoomLoopHandles() {
     function showPrecisionZoom(handleType) {
         if (precisionZoom.active) return;
         
+        console.log(`🎯 SHOWING PRECISION ZOOM for ${handleType}`);
+        
         precisionZoom.active = true;
         precisionZoom.handleType = handleType;
         
@@ -3472,14 +3492,22 @@ function setupPrecisionZoomLoopHandles() {
         // Add visual enhancements
         els.progressContainer?.classList.add('precision-active');
         
-        // Show overlay
-        requestAnimationFrame(() => {
-            overlay.classList.add('active');
-            updatePrecisionDisplay();
-        });
+        // Force immediate display for debugging
+        overlay.classList.add('active');
+        updatePrecisionDisplay();
         
-        showStatus('🎯 Precision mode activated');
-        console.log(`🎯 Precision zoom activated for ${handleType} handle`);
+        // Test content
+        console.log(`🎯 Overlay HTML:`, overlay.innerHTML);
+        console.log(`🎯 Overlay style:`, overlay.style.cssText);
+        console.log(`🎯 Overlay position:`, overlay.getBoundingClientRect());
+        
+        // Make it super obvious for testing
+        overlay.style.backgroundColor = 'rgba(255, 0, 0, 0.8)';
+        overlay.style.color = 'white';
+        overlay.style.fontSize = '20px';
+        overlay.style.border = '5px solid yellow';
+        
+        showStatus('🎯 PRECISION ZOOM ACTIVE - CHECK RED OVERLAY!');
     }
 
     // Hide precision zoom
