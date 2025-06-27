@@ -3335,7 +3335,9 @@ function setupPrecisionZoomLoopHandles() {
         holdTimer: null,
         zoomRange: 5, // seconds
         startTime: null,
-        endTime: null
+        endTime: null,
+        lastPosition: 0,
+        lastMoveTime: 0
     };
 
     // Create precision zoom overlay
@@ -3362,7 +3364,7 @@ function setupPrecisionZoomLoopHandles() {
                 <div class="precision-start-label" id="precision-start-label"></div>
                 <div class="precision-end-label" id="precision-end-label"></div>
             </div>
-            <div class="precision-hint">Continue dragging for millisecond precision</div>
+            <div class="precision-hint">Precision mode active - drag within ±5 second range</div>
         `;
         
         document.body.appendChild(overlay);
@@ -3504,26 +3506,55 @@ function setupPrecisionZoomLoopHandles() {
         console.log('🎯 Precision zoom deactivated');
     }
 
-    // Enhanced drag start with precision timing
+    // Enhanced drag start - just store initial position
     function enhancedStartDrag(e, target) {
+        // Clear any existing timers
         if (precisionZoom.holdTimer) {
             clearTimeout(precisionZoom.holdTimer);
+            precisionZoom.holdTimer = null;
         }
         
-        const handleType = target === els.loopStartHandle ? 'start' : 'end';
+        // Store initial drag position for pause detection
+        const rect = els.progressContainer.getBoundingClientRect();
+        const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
         
-        // Set up precision zoom activation timer
-        precisionZoom.holdTimer = setTimeout(() => {
-            if (isDragging && dragTarget === target) {
-                showPrecisionZoom(handleType);
-            }
-        }, 1500); // 1.5 second hold
+        precisionZoom.lastPosition = clientX;
+        precisionZoom.lastMoveTime = Date.now();
+        precisionZoom.handleType = target === els.loopStartHandle ? 'start' : 'end';
         
-        console.log(`🎯 Hold timer started for ${handleType} handle (1.5s)`);
+        console.log(`🎯 Drag started for ${precisionZoom.handleType} handle`);
     }
 
-    // Enhanced drag update with precision display
+    // Enhanced drag update with pause detection during dragging
     function enhancedUpdateDrag(e) {
+        if (!isDragging || !dragTarget) return;
+        
+        const now = Date.now();
+        const rect = els.progressContainer.getBoundingClientRect();
+        const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+        
+        // Calculate movement distance
+        const movementDistance = Math.abs(clientX - precisionZoom.lastPosition);
+        const timeSinceLastMove = now - precisionZoom.lastMoveTime;
+        
+        // If movement is very small (< 3px) for 1.5 seconds during drag, activate zoom
+        if (movementDistance < 3) {
+            if (timeSinceLastMove > 1500 && !precisionZoom.active) {
+                showPrecisionZoom(precisionZoom.handleType);
+            }
+        } else {
+            // Reset timer on significant movement
+            precisionZoom.lastPosition = clientX;
+            precisionZoom.lastMoveTime = now;
+            
+            // Clear any pending zoom activation
+            if (precisionZoom.holdTimer) {
+                clearTimeout(precisionZoom.holdTimer);
+                precisionZoom.holdTimer = null;
+            }
+        }
+        
+        // Update precision display if zoom is active
         if (precisionZoom.active) {
             updatePrecisionDisplay();
         }
