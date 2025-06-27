@@ -3337,7 +3337,8 @@ function setupPrecisionZoomLoopHandles() {
         startTime: null,
         endTime: null,
         lastPosition: 0,
-        lastMoveTime: 0
+        lastMoveTime: 0,
+        pauseStartTime: null
     };
 
     // Create precision zoom overlay
@@ -3508,6 +3509,10 @@ function setupPrecisionZoomLoopHandles() {
 
     // Enhanced drag start - just store initial position
     function enhancedStartDrag(e, target) {
+        // Prevent iOS text magnifier/selection
+        if (e.preventDefault) e.preventDefault();
+        if (e.stopPropagation) e.stopPropagation();
+        
         // Clear any existing timers
         if (precisionZoom.holdTimer) {
             clearTimeout(precisionZoom.holdTimer);
@@ -3521,6 +3526,7 @@ function setupPrecisionZoomLoopHandles() {
         precisionZoom.lastPosition = clientX;
         precisionZoom.lastMoveTime = Date.now();
         precisionZoom.handleType = target === els.loopStartHandle ? 'start' : 'end';
+        precisionZoom.pauseStartTime = null;
         
         console.log(`🎯 Drag started for ${precisionZoom.handleType} handle`);
     }
@@ -3529,29 +3535,39 @@ function setupPrecisionZoomLoopHandles() {
     function enhancedUpdateDrag(e) {
         if (!isDragging || !dragTarget) return;
         
+        // Prevent iOS magnifier during drag
+        if (e.preventDefault) e.preventDefault();
+        if (e.stopPropagation) e.stopPropagation();
+        
         const now = Date.now();
         const rect = els.progressContainer.getBoundingClientRect();
         const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
         
-        // Calculate movement distance
+        // Calculate movement distance from last recorded position
         const movementDistance = Math.abs(clientX - precisionZoom.lastPosition);
-        const timeSinceLastMove = now - precisionZoom.lastMoveTime;
         
-        // If movement is very small (< 3px) for 1.5 seconds during drag, activate zoom
-        if (movementDistance < 3) {
-            if (timeSinceLastMove > 1500 && !precisionZoom.active) {
+        // Check if we're in a "pause" state (minimal movement)
+        if (movementDistance < 2) { // Very tight threshold for pause detection
+            // Start tracking pause if not already started
+            if (!precisionZoom.pauseStartTime) {
+                precisionZoom.pauseStartTime = now;
+                console.log(`🎯 Pause detected - starting timer`);
+            }
+            
+            // Check if we've been paused long enough
+            const pauseDuration = now - precisionZoom.pauseStartTime;
+            if (pauseDuration > 1000 && !precisionZoom.active) { // Reduced to 1 second
+                console.log(`🎯 Activating precision zoom after ${pauseDuration}ms pause`);
                 showPrecisionZoom(precisionZoom.handleType);
             }
         } else {
-            // Reset timer on significant movement
+            // Significant movement detected - reset pause tracking
+            if (precisionZoom.pauseStartTime) {
+                console.log(`🎯 Movement detected - resetting pause timer`);
+            }
             precisionZoom.lastPosition = clientX;
             precisionZoom.lastMoveTime = now;
-            
-            // Clear any pending zoom activation
-            if (precisionZoom.holdTimer) {
-                clearTimeout(precisionZoom.holdTimer);
-                precisionZoom.holdTimer = null;
-            }
+            precisionZoom.pauseStartTime = null;
         }
         
         // Update precision display if zoom is active
