@@ -927,6 +927,31 @@ body {
    transform: translateX(-50%) translateY(-50%);
 }
 
+/* Double-tap hint on hover */
+.loop-handle::after {
+   content: '💡 Double-tap for precision';
+   position: absolute;
+   bottom: -35px;
+   left: 50%;
+   transform: translateX(-50%);
+   background: rgba(0, 0, 0, 0.9);
+   color: var(--primary);
+   padding: 6px 10px;
+   border-radius: 6px;
+   font-size: 11px;
+   font-weight: 500;
+   white-space: nowrap;
+   opacity: 0;
+   pointer-events: none;
+   transition: opacity 0.2s ease;
+   border: 1px solid var(--primary);
+   backdrop-filter: blur(10px);
+}
+
+.loop-handle:hover::after {
+   opacity: 1;
+}
+
 .time-popup {
    position: absolute;
    bottom: 200%;
