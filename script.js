@@ -3243,7 +3243,17 @@ function setupLoopHandles() {
       const rect = els.progressContainer.getBoundingClientRect();
       const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
       const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
-      const newTime = percent * duration;
+      
+      let newTime;
+      if (precisionZoom.active && precisionZoom.windowStart !== undefined && precisionZoom.windowEnd !== undefined) {
+          // Precision mode: Map mouse position to the small precision window
+          const windowDuration = precisionZoom.windowEnd - precisionZoom.windowStart;
+          newTime = precisionZoom.windowStart + (percent * windowDuration);
+          console.log(`🎯 PRECISION DRAG: ${percent.toFixed(3)} → ${formatTime(newTime)} (window: ${formatTime(precisionZoom.windowStart)}-${formatTime(precisionZoom.windowEnd)})`);
+      } else {
+          // Normal mode: Map mouse position to full song duration
+          newTime = percent * duration;
+      }
       
       // Precision zoom pause detection
       const now = Date.now();
@@ -3285,12 +3295,8 @@ function setupLoopHandles() {
       updateLoopVisuals();
       
       // Update precision zoom display if active
-      if (precisionZoom.active && precisionZoom.overlay) {
-          const timeSpan = precisionZoom.overlay.querySelector('#precision-current-time');
-          if (timeSpan) {
-              const currentTime = precisionZoom.handleType === 'start' ? loopStart : loopEnd;
-              timeSpan.textContent = formatTime(currentTime);
-          }
+      if (precisionZoom.active) {
+          updatePrecisionVisuals();
       }
 
       // Smart Loop Assist: Calculate and display real-time scores
@@ -3368,7 +3374,9 @@ let precisionZoom = {
     lastPosition: 0,
     lastMoveTime: 0,
     pauseStartTime: null,
-    zoomRange: 5
+    zoomRange: 5,
+    windowStart: null,
+    windowEnd: null
 };
 
 // Global precision zoom functions
@@ -3378,11 +3386,20 @@ function createPrecisionOverlay() {
     const overlay = document.createElement('div');
     overlay.className = 'precision-zoom-overlay';
     overlay.innerHTML = `
-        <div style="padding: 20px; text-align: center; background: rgba(29, 185, 84, 0.9); border-radius: 12px;">
-            <h2>🎯 PRECISION ZOOM ACTIVE</h2>
-            <p>Handle: <span id="precision-handle-type">${precisionZoom.handleType}</span></p>
-            <p>Time: <span id="precision-current-time">--</span></p>
-            <p>Range: ±${precisionZoom.zoomRange}s precision window</p>
+        <div style="padding: 16px; background: rgba(29, 185, 84, 0.95); border-radius: 12px; border: 2px solid #1DB954;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+                <h3 style="margin: 0; font-size: 14px;">🎯 PRECISION MODE</h3>
+                <span style="font-family: monospace; font-size: 12px; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;">±${precisionZoom.zoomRange}s</span>
+            </div>
+            <div style="background: rgba(0,0,0,0.2); height: 8px; border-radius: 4px; margin-bottom: 8px; position: relative;">
+                <div id="precision-progress-bar" style="background: white; height: 100%; border-radius: 4px; width: 50%; transition: width 0.1s ease;"></div>
+                <div id="precision-handle-dot" style="position: absolute; top: -2px; width: 12px; height: 12px; background: white; border: 2px solid #1DB954; border-radius: 50%; transform: translateX(-50%); left: 50%;"></div>
+            </div>
+            <div style="display: flex; justify-content: space-between; font-family: monospace; font-size: 11px;">
+                <span id="precision-window-start">--</span>
+                <span id="precision-current-time" style="font-weight: bold; color: white;">--</span>
+                <span id="precision-window-end">--</span>
+            </div>
         </div>
     `;
     
@@ -3399,6 +3416,11 @@ function showPrecisionZoom(handleType) {
     precisionZoom.active = true;
     precisionZoom.handleType = handleType;
     
+    // Calculate precision window around current handle position
+    const currentTime = handleType === 'start' ? loopStart : loopEnd;
+    precisionZoom.windowStart = Math.max(0, currentTime - precisionZoom.zoomRange / 2);
+    precisionZoom.windowEnd = Math.min(duration, currentTime + precisionZoom.zoomRange / 2);
+    
     const overlay = createPrecisionOverlay();
     
     // Position above progress bar
@@ -3411,24 +3433,54 @@ function showPrecisionZoom(handleType) {
         overlay.style.zIndex = '1000';
     }
     
-    // Update content
-    const handleSpan = overlay.querySelector('#precision-handle-type');
-    const timeSpan = overlay.querySelector('#precision-current-time');
-    if (handleSpan) handleSpan.textContent = handleType;
-    if (timeSpan) {
-        const currentTime = handleType === 'start' ? loopStart : loopEnd;
-        timeSpan.textContent = formatTime(currentTime);
-    }
+    // Update precision window display
+    const windowStartSpan = overlay.querySelector('#precision-window-start');
+    const windowEndSpan = overlay.querySelector('#precision-window-end');
+    const currentTimeSpan = overlay.querySelector('#precision-current-time');
+    
+    if (windowStartSpan) windowStartSpan.textContent = formatTime(precisionZoom.windowStart);
+    if (windowEndSpan) windowEndSpan.textContent = formatTime(precisionZoom.windowEnd);
+    if (currentTimeSpan) currentTimeSpan.textContent = formatTime(currentTime);
+    
+    // Update progress bar and handle position
+    updatePrecisionVisuals();
     
     overlay.classList.add('active');
     
-    showStatus('🎯 Precision mode activated! Continue dragging for millisecond accuracy.');
+    showStatus(`🎯 Precision mode: ${precisionZoom.zoomRange}s window for millisecond accuracy!`);
+}
+
+function updatePrecisionVisuals() {
+    if (!precisionZoom.active || !precisionZoom.overlay) return;
+    
+    const currentTime = precisionZoom.handleType === 'start' ? loopStart : loopEnd;
+    const windowDuration = precisionZoom.windowEnd - precisionZoom.windowStart;
+    const position = (currentTime - precisionZoom.windowStart) / windowDuration;
+    
+    // Update progress bar width and handle position
+    const progressBar = precisionZoom.overlay.querySelector('#precision-progress-bar');
+    const handleDot = precisionZoom.overlay.querySelector('#precision-handle-dot');
+    const currentTimeSpan = precisionZoom.overlay.querySelector('#precision-current-time');
+    
+    if (progressBar) {
+        progressBar.style.width = `${Math.max(0, Math.min(100, position * 100))}%`;
+    }
+    
+    if (handleDot) {
+        handleDot.style.left = `${Math.max(0, Math.min(100, position * 100))}%`;
+    }
+    
+    if (currentTimeSpan) {
+        currentTimeSpan.textContent = formatTime(currentTime);
+    }
 }
 
 function hidePrecisionZoom() {
     if (!precisionZoom.active) return;
     
     precisionZoom.active = false;
+    precisionZoom.windowStart = null;
+    precisionZoom.windowEnd = null;
     
     if (precisionZoom.overlay) {
         precisionZoom.overlay.classList.remove('active');
@@ -6325,6 +6377,7 @@ window.testPrecisionZoom = function() {
     console.log('Testing Precision Zoom System...');
     console.log('Precision zoom state:', precisionZoom);
     console.log('Duration set:', duration);
+    console.log('Loop start/end:', loopStart, loopEnd);
     console.log('Loop handles exist:', !!els.loopStartHandle, !!els.loopEndHandle);
     
     if (duration > 0) {
@@ -6332,12 +6385,25 @@ window.testPrecisionZoom = function() {
         precisionZoom.handleType = 'start';
         showPrecisionZoom('start');
         
+        // Simulate some position changes
+        setTimeout(() => {
+            console.log('✅ Simulating precision movements...');
+            loopStart += 0.05; // Move 50ms
+            updatePrecisionVisuals();
+        }, 1000);
+        
+        setTimeout(() => {
+            loopStart += 0.1; // Move another 100ms
+            updatePrecisionVisuals();
+        }, 2000);
+        
         setTimeout(() => {
             console.log('✅ Testing precision zoom deactivation...');
             hidePrecisionZoom();
-        }, 3000);
+        }, 4000);
     } else {
         console.log('❌ No track loaded - precision zoom requires active track');
+        console.log('💡 Load a track first, then run testPrecisionZoom()');
     }
 };
 
