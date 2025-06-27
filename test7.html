@@ -214,6 +214,123 @@
             }
         });
     </script>
+
+<script>
+// HANDLE OAUTH CALLBACK IMMEDIATELY (before anything else loads)
+(function() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const code = urlParams.get('code');
+    
+    if (code) {
+        // Check if we already handled this code
+        const handledCode = sessionStorage.getItem('handled_oauth_code');
+        if (handledCode === code) {
+            console.log('⚠️ This OAuth code was already handled');
+            return;
+        }
+        
+        console.log('📝 OAuth callback detected on test7.html!');
+        console.log('📍 Code:', code.substring(0, 20) + '...');
+        
+        // Mark this code as handled immediately
+        sessionStorage.setItem('handled_oauth_code', code);
+        
+        const codeVerifier = localStorage.getItem('code_verifier');
+        if (!codeVerifier) {
+            console.error('❌ Code verifier not found in localStorage');
+            alert('Authentication failed - missing code verifier. Please try again.');
+            window.location.href = '/test7.html';
+            return;
+        }
+        
+        console.log('✅ Found code_verifier:', codeVerifier.substring(0, 20) + '...');
+        console.log('🔄 Exchanging code for token...');
+        
+        // Build the token request
+        const tokenParams = {
+            grant_type: 'authorization_code',
+            code: code,
+            redirect_uri: 'https://looopz.vercel.app/test7.html',
+            client_id: '46637d8f5adb41c0a4be34e0df0c1597',
+            code_verifier: codeVerifier
+        };
+        
+        console.log('📤 Token request params:', {
+            ...tokenParams,
+            code: tokenParams.code.substring(0, 20) + '...',
+            code_verifier: tokenParams.code_verifier.substring(0, 20) + '...'
+        });
+        
+        fetch('https://accounts.spotify.com/api/token', {
+            method: 'POST',
+            headers: { 
+                'Content-Type': 'application/x-www-form-urlencoded',
+            },
+            body: new URLSearchParams(tokenParams)
+        })
+        .then(response => {
+            console.log('📥 Token response status:', response.status);
+            return response.json();
+        })
+        .then(data => {
+            console.log('📥 Token response data:', data);
+            
+            if (data.access_token) {
+                console.log('✅ Successfully got access token!');
+                
+                // Store tokens
+                window.spotifyAccessToken = data.access_token;
+                localStorage.setItem('spotify_access_token', data.access_token);
+                if (data.refresh_token) {
+                    localStorage.setItem('spotify_refresh_token', data.refresh_token);
+                }
+                
+                // Clear the code_verifier
+                localStorage.removeItem('code_verifier');
+                
+                // Clean URL
+                window.history.replaceState({}, document.title, '/test7.html');
+                
+                // Set flags
+                window.isConnected = true;
+                window.OAUTH_COMPLETED = true;
+                
+                console.log('🎉 Authentication complete! Token stored.');
+                
+                // Clear the handled code after success
+                sessionStorage.removeItem('handled_oauth_code');
+            } else {
+                console.error('❌ Token exchange failed:', data);
+                console.error('Error:', data.error);
+                console.error('Description:', data.error_description);
+                
+                // Clear the handled code so user can retry
+                sessionStorage.removeItem('handled_oauth_code');
+                localStorage.removeItem('code_verifier');
+                
+                alert('Authentication failed: ' + (data.error_description || data.error));
+                window.location.href = '/test7.html';
+            }
+        })
+        .catch(error => {
+            console.error('❌ Network error during token exchange:', error);
+            sessionStorage.removeItem('handled_oauth_code');
+            alert('Network error during authentication. Please try again.');
+            window.location.href = '/test7.html';
+        });
+    }
+})();
+
+// Prevent script.js from also handling the OAuth callback
+window.onSpotifyWebPlaybackSDKReady = function() {
+    console.log('🎵 Spotify SDK ready, but waiting for our auth flow...');
+};
+
+// Rest of your DOMContentLoaded code stays the same...
+document.addEventListener('DOMContentLoaded', function() {
+    // ... your existing connect button code ...
+});
+</script>
     
     <!-- Your existing HTML content continues here... -->
 
