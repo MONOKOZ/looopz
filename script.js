@@ -1875,14 +1875,9 @@ function initializeSmartLoopAssist() {
 
     console.log('✅ Smart Loop Assist initialized');
     
-    // Test vibration support
+    // Test vibration support (silent check)
     if (navigator.vibrate) {
-        console.log('✅ Vibration API available - testing basic vibration...');
-        // Test with a simple tap after 2 seconds
-        setTimeout(() => {
-            const testResult = navigator.vibrate(100);
-            console.log(`🔥 Test vibration result: ${testResult}`);
-        }, 2000);
+        console.log('✅ Vibration API available');
     } else {
         console.log('❌ Vibration API not available on this device/browser');
     }
@@ -3325,6 +3320,258 @@ function setupLoopHandles() {
   els.loopEndHandle.addEventListener('touchstart', (e) => startDrag(e.touches[0], els.loopEndHandle), { passive: false });
   document.addEventListener('touchmove', (e) => { if (isDragging && e.touches[0]) updateDrag(e.touches[0]); }, { passive: false });
   document.addEventListener('touchend', stopDrag, { passive: false });
+}
+
+// ===============================================
+// PRECISION ZOOM LOOP HANDLES - Clean UI Implementation
+// ===============================================
+
+function setupPrecisionZoomLoopHandles() {
+    // Precision zoom state
+    let precisionZoom = {
+        active: false,
+        overlay: null,
+        handleType: null,
+        holdTimer: null,
+        zoomRange: 5, // seconds
+        startTime: null,
+        endTime: null
+    };
+
+    // Create precision zoom overlay
+    function createPrecisionOverlay() {
+        if (precisionZoom.overlay) return precisionZoom.overlay;
+        
+        const overlay = document.createElement('div');
+        overlay.className = 'precision-zoom-overlay';
+        overlay.innerHTML = `
+            <div class="precision-zoom-header">
+                <div class="precision-title">
+                    🎯 Precision Mode
+                </div>
+                <div class="precision-range" id="precision-range-display"></div>
+            </div>
+            <div class="precision-zoom-bar">
+                <div class="precision-background">
+                    <div class="precision-progress" id="precision-progress"></div>
+                    <div class="precision-markers" id="precision-markers"></div>
+                    <div class="precision-current-handle" id="precision-current-handle"></div>
+                </div>
+            </div>
+            <div class="precision-time-labels">
+                <div class="precision-start-label" id="precision-start-label"></div>
+                <div class="precision-end-label" id="precision-end-label"></div>
+            </div>
+            <div class="precision-hint">Continue dragging for millisecond precision</div>
+        `;
+        
+        document.body.appendChild(overlay);
+        precisionZoom.overlay = overlay;
+        return overlay;
+    }
+
+    // Position overlay above progress bar
+    function positionOverlay() {
+        if (!precisionZoom.overlay || !els.progressContainer) return;
+        
+        const progressRect = els.progressContainer.getBoundingClientRect();
+        const overlay = precisionZoom.overlay;
+        
+        overlay.style.position = 'fixed';
+        overlay.style.left = `${progressRect.left}px`;
+        overlay.style.top = `${progressRect.top - 140}px`;
+        overlay.style.width = `${progressRect.width}px`;
+        overlay.style.minWidth = 'auto';
+    }
+
+    // Update precision zoom display
+    function updatePrecisionDisplay() {
+        if (!precisionZoom.active || !precisionZoom.overlay) return;
+        
+        const currentHandle = precisionZoom.handleType === 'start' ? loopStart : loopEnd;
+        const zoomCenter = currentHandle;
+        const zoomStart = Math.max(0, zoomCenter - precisionZoom.zoomRange / 2);
+        const zoomEnd = Math.min(duration, zoomCenter + precisionZoom.zoomRange / 2);
+        
+        // Update range display
+        const rangeDisplay = precisionZoom.overlay.querySelector('#precision-range-display');
+        if (rangeDisplay) {
+            rangeDisplay.textContent = `${formatTime(zoomStart, false)} - ${formatTime(zoomEnd, false)}`;
+        }
+        
+        // Update progress bar
+        const progressBar = precisionZoom.overlay.querySelector('#precision-progress');
+        if (progressBar) {
+            const progressWidth = ((currentHandle - zoomStart) / (zoomEnd - zoomStart)) * 100;
+            progressBar.style.width = `${Math.max(0, Math.min(100, progressWidth))}%`;
+        }
+        
+        // Update handle position
+        const handle = precisionZoom.overlay.querySelector('#precision-current-handle');
+        if (handle) {
+            const handlePos = ((currentHandle - zoomStart) / (zoomEnd - zoomStart)) * 100;
+            handle.style.left = `${Math.max(0, Math.min(100, handlePos))}%`;
+            handle.className = `precision-current-handle ${precisionZoom.handleType}`;
+        }
+        
+        // Update time labels
+        const startLabel = precisionZoom.overlay.querySelector('#precision-start-label');
+        const endLabel = precisionZoom.overlay.querySelector('#precision-end-label');
+        if (startLabel && endLabel) {
+            startLabel.textContent = formatTime(loopStart);
+            endLabel.textContent = formatTime(loopEnd);
+        }
+        
+        // Update markers
+        updatePrecisionMarkers(zoomStart, zoomEnd);
+    }
+
+    // Create time markers in precision view
+    function updatePrecisionMarkers(zoomStart, zoomEnd) {
+        const markersContainer = precisionZoom.overlay?.querySelector('#precision-markers');
+        if (!markersContainer) return;
+        
+        markersContainer.innerHTML = '';
+        
+        const zoomDuration = zoomEnd - zoomStart;
+        const majorInterval = zoomDuration <= 2 ? 0.1 : (zoomDuration <= 5 ? 0.25 : 0.5);
+        const minorInterval = majorInterval / 5;
+        
+        // Add markers
+        for (let time = Math.ceil(zoomStart / minorInterval) * minorInterval; time <= zoomEnd; time += minorInterval) {
+            const marker = document.createElement('div');
+            const position = ((time - zoomStart) / zoomDuration) * 100;
+            
+            const isMajor = Math.abs(time % majorInterval) < 0.001;
+            marker.className = `precision-marker ${isMajor ? 'major' : ''}`;
+            marker.style.left = `${position}%`;
+            
+            if (isMajor) {
+                const label = document.createElement('span');
+                label.textContent = formatTime(time, false);
+                marker.appendChild(label);
+            }
+            
+            markersContainer.appendChild(marker);
+        }
+    }
+
+    // Show precision zoom
+    function showPrecisionZoom(handleType) {
+        if (precisionZoom.active) return;
+        
+        precisionZoom.active = true;
+        precisionZoom.handleType = handleType;
+        
+        const overlay = createPrecisionOverlay();
+        positionOverlay();
+        
+        // Add visual enhancements
+        els.progressContainer?.classList.add('precision-active');
+        
+        // Show overlay
+        requestAnimationFrame(() => {
+            overlay.classList.add('active');
+            updatePrecisionDisplay();
+        });
+        
+        showStatus('🎯 Precision mode activated');
+        console.log(`🎯 Precision zoom activated for ${handleType} handle`);
+    }
+
+    // Hide precision zoom
+    function hidePrecisionZoom() {
+        if (!precisionZoom.active) return;
+        
+        precisionZoom.active = false;
+        
+        // Remove visual enhancements
+        els.progressContainer?.classList.remove('precision-active');
+        
+        if (precisionZoom.overlay) {
+            precisionZoom.overlay.classList.remove('active');
+            precisionZoom.overlay.classList.add('removing');
+            
+            setTimeout(() => {
+                if (precisionZoom.overlay) {
+                    precisionZoom.overlay.remove();
+                    precisionZoom.overlay = null;
+                }
+            }, 300);
+        }
+        
+        showStatus('🎯 Precision mode deactivated');
+        console.log('🎯 Precision zoom deactivated');
+    }
+
+    // Enhanced drag start with precision timing
+    function enhancedStartDrag(e, target) {
+        if (precisionZoom.holdTimer) {
+            clearTimeout(precisionZoom.holdTimer);
+        }
+        
+        const handleType = target === els.loopStartHandle ? 'start' : 'end';
+        
+        // Set up precision zoom activation timer
+        precisionZoom.holdTimer = setTimeout(() => {
+            if (isDragging && dragTarget === target) {
+                showPrecisionZoom(handleType);
+            }
+        }, 1500); // 1.5 second hold
+        
+        console.log(`🎯 Hold timer started for ${handleType} handle (1.5s)`);
+    }
+
+    // Enhanced drag update with precision display
+    function enhancedUpdateDrag(e) {
+        if (precisionZoom.active) {
+            updatePrecisionDisplay();
+        }
+    }
+
+    // Enhanced drag stop with precision cleanup
+    function enhancedStopDrag(e) {
+        // Clear hold timer
+        if (precisionZoom.holdTimer) {
+            clearTimeout(precisionZoom.holdTimer);
+            precisionZoom.holdTimer = null;
+        }
+        
+        // Hide precision zoom
+        if (precisionZoom.active) {
+            setTimeout(() => hidePrecisionZoom(), 100);
+        }
+    }
+
+    // Integrate with existing drag system
+    const originalStartDrag = window.startDrag;
+    const originalUpdateDrag = window.updateDrag; 
+    const originalStopDrag = window.stopDrag;
+
+    // Enhance existing functions
+    window.startDrag = function(e, target) {
+        if (originalStartDrag) originalStartDrag(e, target);
+        enhancedStartDrag(e, target);
+    };
+
+    window.updateDrag = function(e) {
+        if (originalUpdateDrag) originalUpdateDrag(e);
+        enhancedUpdateDrag(e);
+    };
+
+    window.stopDrag = function(e) {
+        enhancedStopDrag(e);
+        if (originalStopDrag) originalStopDrag(e);
+    };
+
+    // Handle window resize for overlay positioning
+    window.addEventListener('resize', () => {
+        if (precisionZoom.active) {
+            positionOverlay();
+        }
+    });
+
+    console.log('✅ Precision Zoom Loop Handles initialized');
 }
 
 // Loops Management
@@ -6167,6 +6414,7 @@ function init() {
 
   setupEventListeners();
   setupLoopHandles();
+  setupPrecisionZoomLoopHandles();
   initializeSmartLoopAssist();
   checkAuth();
   loadSavedLoops();
