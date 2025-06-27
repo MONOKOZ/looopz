@@ -3246,10 +3246,19 @@ function setupLoopHandles() {
       
       let newTime;
       if (precisionZoom.active && precisionZoom.windowStart !== undefined && precisionZoom.windowEnd !== undefined) {
-          // Precision mode: Map mouse position to the small precision window
+          // Precision mode: Calculate relative movement from last position
+          const movement = clientX - precisionZoom.lastPosition;
+          const currentTime = precisionZoom.handleType === 'start' ? loopStart : loopEnd;
           const windowDuration = precisionZoom.windowEnd - precisionZoom.windowStart;
-          newTime = precisionZoom.windowStart + (percent * windowDuration);
-          console.log(`🎯 PRECISION DRAG: ${percent.toFixed(3)} → ${formatTime(newTime)} (window: ${formatTime(precisionZoom.windowStart)}-${formatTime(precisionZoom.windowEnd)})`);
+          
+          // Scale movement based on precision level - smaller windows = finer control
+          const sensitivity = windowDuration / rect.width; // seconds per pixel
+          newTime = currentTime + (movement * sensitivity);
+          
+          // Keep within window bounds
+          newTime = Math.max(precisionZoom.windowStart, Math.min(precisionZoom.windowEnd, newTime));
+          
+          console.log(`🎯 PRECISION: movement=${movement}px, sensitivity=${sensitivity.toFixed(4)}s/px, time=${formatTime(newTime)}`);
       } else {
           // Normal mode: Map mouse position to full song duration
           newTime = percent * duration;
