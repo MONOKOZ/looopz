@@ -845,7 +845,7 @@ body {
 }
 
 .progress-container {
-   height: 16px;
+   height: 32px; /* Always use hover height for better precision */
    background: rgba(255, 255, 255, 0.08);
    border-radius: 8px;
    position: relative;
@@ -854,8 +854,6 @@ body {
    overflow: visible;
    touch-action: none;
 }
-
-.progress-container:hover { height: 32px; }
 
 .progress-bar {
    height: 100%;
@@ -906,9 +904,10 @@ body {
    visibility: hidden;
 }
 
-/* Show loop handles only when loop is enabled */
+/* Show loop handles always when loop is enabled */
 .loop-handle.show {
    visibility: visible;
+   opacity: 1; /* Always visible */
 }
 
 .progress-container:hover .loop-handle.show,
@@ -935,42 +934,21 @@ body {
    transform: translateX(-50%);
    background: rgba(0, 0, 0, 0.95);
    color: white;
-   padding: 12px 20px;
-   border-radius: 12px;
-   font-size: 16px;
+   padding: 8px 12px;
+   border-radius: 8px;
+   font-size: 14px;
    font-family: monospace;
    font-weight: 600;
    opacity: 0;
    transition: all 0.2s ease;
    z-index: 100;
    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
-   border: 2px solid transparent;
+   border: 2px solid var(--primary);
+   backdrop-filter: blur(10px);
 }
 
-.time-popup.show { opacity: 1; }
-
-/* Smart Loop Assist - Score-based time popup styling */
-.time-popup.smart-score-0 { background: rgba(239, 83, 80, 0.95); border-color: #ef5350; }
-.time-popup.smart-score-1 { background: rgba(244, 96, 80, 0.95); border-color: #f46050; }
-.time-popup.smart-score-2 { background: rgba(249, 108, 80, 0.95); border-color: #f96c50; }
-.time-popup.smart-score-3 { background: rgba(254, 121, 80, 0.95); border-color: #fe7950; }
-.time-popup.smart-score-4 { background: rgba(255, 152, 40, 0.95); border-color: #ff9828; }
-.time-popup.smart-score-5 { background: rgba(255, 183, 40, 0.95); border-color: #ffb728; }
-.time-popup.smart-score-6 { background: rgba(255, 214, 40, 0.95); border-color: #ffd628; }
-.time-popup.smart-score-7 { background: rgba(205, 220, 57, 0.95); border-color: #cddc39; }
-.time-popup.smart-score-8 { background: rgba(156, 204, 101, 0.95); border-color: #9ccc65; }
-.time-popup.smart-score-9 { background: rgba(102, 187, 106, 0.95); border-color: #66bb6a; }
-.time-popup.smart-score-10 {
-  background: rgba(29, 185, 84, 0.98);
-  border-color: var(--primary);
-  box-shadow: 0 0 20px rgba(29, 185, 84, 0.6), 0 4px 20px rgba(0, 0, 0, 0.5);
-  animation: perfectLoopPulse 0.8s ease-in-out;
-}
-
-@keyframes perfectLoopPulse {
-  0% { transform: translateX(-50%) scale(1); }
-  50% { transform: translateX(-50%) scale(1.1); }
-  100% { transform: translateX(-50%) scale(1); }
+.time-popup.show { 
+   opacity: 1; 
 }
 
 .time-display {
@@ -2827,16 +2805,7 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
 
 /* Enhanced time popup during precision dragging */
 .loop-handle.dragging .time-popup {
-    background: rgba(0, 0, 0, 0.95);
-    backdrop-filter: blur(10px);
-    border: 2px solid var(--primary);
-    font-size: 14px;
-    padding: 8px 12px;
-    border-radius: 8px;
     transform: translateX(-50%) scale(1.1);
-    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
-    font-family: monospace;
-    font-weight: 600;
     color: var(--primary);
 }
 
