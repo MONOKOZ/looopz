@@ -1724,7 +1724,7 @@ function triggerHapticFeedback(score) {
  * Trigger zone-based haptic feedback like "locking points" during dragging
  * Designed to avoid conflicts with iOS text selection magnifier
  */
-function triggerZoneHapticFeedback(score) {
+function triggerZoneHapticFeedback(score, dragTarget = null, isDragging = false) {
     // Debug logging to see what's happening
     console.log(`🔍 Haptic debug: score=${score}, vibrate=${!!navigator.vibrate}, isDragging=${isDragging}, dragTarget=${dragTarget?.id}`);
     
@@ -1874,6 +1874,18 @@ function initializeSmartLoopAssist() {
     });
 
     console.log('✅ Smart Loop Assist initialized');
+    
+    // Test vibration support
+    if (navigator.vibrate) {
+        console.log('✅ Vibration API available - testing basic vibration...');
+        // Test with a simple tap after 2 seconds
+        setTimeout(() => {
+            const testResult = navigator.vibrate(100);
+            console.log(`🔥 Test vibration result: ${testResult}`);
+        }, 2000);
+    } else {
+        console.log('❌ Vibration API not available on this device/browser');
+    }
 }
 
 
@@ -3262,6 +3274,10 @@ function setupLoopHandles() {
           if (!updateDrag.lastScoreUpdate || now - updateDrag.lastScoreUpdate > 50) {
               updateDrag.lastScoreUpdate = now;
               
+              // Capture current drag state for async callback
+              const currentDragTarget = dragTarget;
+              const currentIsDragging = isDragging;
+              
               // Calculate current loop score
               calculateLoopScore(loopStart, loopEnd).then(score => {
                   // Update UI with score
@@ -3272,7 +3288,7 @@ function setupLoopHandles() {
                   updateTimePopupColors(els.endPopup, score);
                   
                   // Trigger haptic feedback based on score zones (like locking points)
-                  triggerZoneHapticFeedback(score);
+                  triggerZoneHapticFeedback(score, currentDragTarget, currentIsDragging);
               }).catch(err => {
                   console.warn('Smart Loop Assist scoring failed:', err);
               });
