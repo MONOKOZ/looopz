@@ -1196,7 +1196,7 @@ const DJFunctions = {
 // ===========================================
 
 // Analysis state
-let essentiaInstance = null;
+// essentiaInstance already declared at line 76
 let analysisCache = new Map();
 let essentiaReady = false;
 let aiEnabled = false; // AI toggle state
