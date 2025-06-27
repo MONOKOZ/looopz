@@ -1437,8 +1437,8 @@ async function findOptimalLoopPoints(trackId, manualStart, manualEnd) {
         // In a full implementation, you'd analyze the actual audio
         console.log(`🎯 AI analyzing loop points: ${formatTime(manualStart)} - ${formatTime(manualEnd)}`);
         
-        // Snap to nearest beat (simplified)
-        const snapToGrid = (time) => Math.round(time * 4) / 4;
+        // Snap to nearest beat disabled for smooth linear movement
+        const snapToGrid = (time) => time; // Pass through without quantization
         
         const optimizedStart = snapToGrid(manualStart);
         const optimizedEnd = snapToGrid(manualEnd);
@@ -1725,32 +1725,34 @@ function triggerHapticFeedback(score) {
  * Designed to avoid conflicts with iOS text selection magnifier
  */
 function triggerZoneHapticFeedback(score) {
-    // Skip haptic feedback if not available or if we're not actively dragging a loop handle
+    // Skip haptic feedback if not available or not actively dragging
     if (!navigator.vibrate || !isDragging || !dragTarget) return;
     
-    // Avoid conflicts with iOS text selection by only triggering for loop handles
-    if (!dragTarget.classList.contains('loop-handle')) return;
+    // Check if dragging loop handles (they have IDs that contain 'loop' and 'handle')
+    const isLoopHandle = dragTarget.id && (dragTarget.id.includes('loop') && dragTarget.id.includes('handle'));
+    if (!isLoopHandle) return;
     
     const now = Date.now();
     
-    // Create fewer, more distinct "locking points" to avoid spam
+    // More sensitive zones with shorter cooldowns for better responsiveness
     const zones = [
-        { threshold: 9.0, pattern: [50], lastFeedback: 'zone90' },      // Single strong pulse for excellent
-        { threshold: 7.5, pattern: [30], lastFeedback: 'zone75' },     // Medium pulse for good
-        { threshold: 6.0, pattern: [20], lastFeedback: 'zone60' }      // Light pulse for decent
+        { threshold: 8.0, pattern: [60], lastFeedback: 'zone80' },      // Strong pulse for very good
+        { threshold: 6.5, pattern: [40], lastFeedback: 'zone65' },     // Medium pulse for good  
+        { threshold: 5.0, pattern: [25], lastFeedback: 'zone50' },     // Light pulse for okay
+        { threshold: 3.0, pattern: [15], lastFeedback: 'zone30' }      // Very light for poor
     ];
     
     // Find the highest zone we've crossed
     for (const zone of zones) {
         if (score >= zone.threshold) {
-            // Check if we haven't provided feedback for this zone recently (longer cooldown)
+            // Shorter cooldown for more responsive feedback
             if (!triggerZoneHapticFeedback[zone.lastFeedback] || 
-                now - triggerZoneHapticFeedback[zone.lastFeedback] > 800) {
+                now - triggerZoneHapticFeedback[zone.lastFeedback] > 400) {
                 
                 navigator.vibrate(zone.pattern);
                 triggerZoneHapticFeedback[zone.lastFeedback] = now;
                 
-                // Reset lower zone timers to allow feedback when crossing back up
+                // Reset lower zone timers
                 zones.forEach(z => {
                     if (z.threshold < zone.threshold) {
                         triggerZoneHapticFeedback[z.lastFeedback] = 0;
@@ -3229,9 +3231,9 @@ function setupLoopHandles() {
 
       // Smart Loop Assist: Calculate and display real-time scores
       if (smartLoopAssistEnabled && !isAnalyzingLoop) {
-          // Throttle scoring calculations to every 100ms for performance
+          // Reduced throttle for more responsive haptic feedback (50ms instead of 100ms)
           const now = Date.now();
-          if (!updateDrag.lastScoreUpdate || now - updateDrag.lastScoreUpdate > 100) {
+          if (!updateDrag.lastScoreUpdate || now - updateDrag.lastScoreUpdate > 50) {
               updateDrag.lastScoreUpdate = now;
               
               // Calculate current loop score
@@ -3258,41 +3260,13 @@ function setupLoopHandles() {
           const popup = dragTarget.querySelector('.time-popup');
           if (popup) setTimeout(() => popup.classList.remove('show'), 500);
           
-          // Smart Loop Assist: Auto-snap to optimal position when enabled
-          if (smartLoopAssistEnabled && (dragTarget === els.loopStartHandle || dragTarget === els.loopEndHandle)) {
-              const handleType = dragTarget === els.loopStartHandle ? 'start' : 'end';
-              const currentTime = handleType === 'start' ? loopStart : loopEnd;
-              
-              findOptimalSnapPosition(currentTime, handleType).then(optimalTime => {
-                  if (Math.abs(optimalTime - currentTime) > 0.05) { // Only snap if improvement is significant
-                      if (handleType === 'start') {
-                          loopStart = optimalTime;
-                          els.startPopup.textContent = formatTime(loopStart);
-                      } else {
-                          loopEnd = optimalTime;
-                          els.endPopup.textContent = formatTime(loopEnd);
-                      }
-                      updateLoopVisuals();
-                      
-                      // Show feedback for auto-snap
-                      showStatus(`⚡ Snapped to optimal ${handleType} position`);
-                      console.log(`⚡ Smart Loop Assist: Auto-snapped ${handleType} from ${formatTime(currentTime)} to ${formatTime(optimalTime)}`);
-                  }
-              });
-          }
-          // Legacy AI optimization (kept for compatibility)
-          else if (dragTarget === els.loopStartHandle || dragTarget === els.loopEndHandle) {
-              if (aiEnabled && essentiaReady && currentTrack) {
-                  const trackId = DJFunctions.extractTrackId(currentTrack.uri);
-                  findOptimalLoopPoints(trackId, loopStart, loopEnd).then(optimized => {
-                      if (optimized.optimized) {
-                          loopStart = optimized.start;
-                          loopEnd = optimized.end;
-                          updateLoopVisuals();
-                      }
-                  });
-              }
-          }
+          // Smart Loop Assist: Auto-snap disabled for smooth dragging
+          // Auto-snapping is now manual-only to maintain precise linear movement
+          // (You can double-tap a handle to trigger manual snapping later if needed)
+          
+          // Legacy AI optimization disabled for smooth linear dragging
+          // The automatic snapping was causing stepping behavior
+          // AI optimization can be triggered manually if needed
           
           isDragging = false;
           dragTarget = null;
