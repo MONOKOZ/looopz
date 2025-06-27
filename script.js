@@ -2143,8 +2143,14 @@ function initializeSpotifyPlayer() {
           updateConnectionStatus();
       });
 
+      let lastStateChange = 0;
       spotifyPlayer.addListener('player_state_changed', (state) => {
           if (!state) return;
+
+          // Throttle rapid state changes
+          const now = Date.now();
+          if (now - lastStateChange < 100) return; // 100ms throttle
+          lastStateChange = now;
 
           console.log('🎵 Player state changed - paused:', state.paused, 'position:', state.position);
 
@@ -2339,7 +2345,9 @@ function startProgressUpdates() {
 }
 
 function stopProgressUpdates() {
-  console.log('🛑 Stopping progress updates');
+  if (progressUpdateActive) {
+    console.log('🛑 Stopping progress updates');
+  }
   progressUpdateActive = false;
   
   if (updateTimer) {
@@ -2350,8 +2358,8 @@ function stopProgressUpdates() {
 
 // FIX 9: Unified loop end handling function with seamless transition preparation
 async function checkLoopEnd() {
-  // Debug logging for playlist loops
-  if (isPlaylistMode && loopEnabled) {
+  // Reduced debug logging for playlist loops (only log every 10th check)
+  if (isPlaylistMode && loopEnabled && Math.random() < 0.1) {
       console.log(`🔍 Checking playlist loop: time=${currentTime.toFixed(3)}s, end=${loopEnd.toFixed(3)}s, threshold=${LOOP_END_THRESHOLD}s, loopCount=${loopCount}/${loopTarget}`);
   }
 
