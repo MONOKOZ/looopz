@@ -3481,7 +3481,13 @@ function setupPrecisionZoomLoopHandles() {
     function showPrecisionZoom(handleType) {
         if (precisionZoom.active) return;
         
-        console.log(`🎯 SHOWING PRECISION ZOOM for ${handleType}`);
+        // Extra safety checks
+        if (!isDragging || !dragTarget || duration <= 0) {
+            console.log(`🎯 PRECISION ZOOM BLOCKED - isDragging:${isDragging}, dragTarget:${!!dragTarget}, duration:${duration}`);
+            return;
+        }
+        
+        console.log(`🎯 SHOWING PRECISION ZOOM for ${handleType} - duration:${duration}s, loopStart:${loopStart}s, loopEnd:${loopEnd}s`);
         
         precisionZoom.active = true;
         precisionZoom.handleType = handleType;
@@ -3494,20 +3500,34 @@ function setupPrecisionZoomLoopHandles() {
         
         // Force immediate display for debugging
         overlay.classList.add('active');
+        
+        // Fill with test content BEFORE showing
+        const rangeDisplay = overlay.querySelector('#precision-range-display');
+        if (rangeDisplay) rangeDisplay.textContent = 'TEST RANGE';
+        
+        const startLabel = overlay.querySelector('#precision-start-label');
+        if (startLabel) startLabel.textContent = 'START TIME';
+        
+        const endLabel = overlay.querySelector('#precision-end-label');
+        if (endLabel) endLabel.textContent = 'END TIME';
+        
         updatePrecisionDisplay();
         
-        // Test content
-        console.log(`🎯 Overlay HTML:`, overlay.innerHTML);
-        console.log(`🎯 Overlay style:`, overlay.style.cssText);
-        console.log(`🎯 Overlay position:`, overlay.getBoundingClientRect());
-        
         // Make it super obvious for testing
-        overlay.style.backgroundColor = 'rgba(255, 0, 0, 0.8)';
+        overlay.style.backgroundColor = 'rgba(255, 0, 0, 0.9)';
         overlay.style.color = 'white';
-        overlay.style.fontSize = '20px';
-        overlay.style.border = '5px solid yellow';
+        overlay.style.fontSize = '16px';
+        overlay.style.border = '3px solid yellow';
+        overlay.innerHTML = `
+            <div style="padding: 20px; text-align: center;">
+                <h2>🎯 PRECISION ZOOM ACTIVE!</h2>
+                <p>Handle: ${handleType}</p>
+                <p>Duration: ${duration}s</p>
+                <p>Loop: ${formatTime(loopStart)} - ${formatTime(loopEnd)}</p>
+            </div>
+        `;
         
-        showStatus('🎯 PRECISION ZOOM ACTIVE - CHECK RED OVERLAY!');
+        showStatus('🎯 PRECISION ZOOM ACTIVE - RED BOX SHOULD BE VISIBLE!');
     }
 
     // Hide precision zoom
@@ -3584,7 +3604,7 @@ function setupPrecisionZoomLoopHandles() {
             
             // Check if we've been paused long enough
             const pauseDuration = now - precisionZoom.pauseStartTime;
-            if (pauseDuration > 1000 && !precisionZoom.active) { // Reduced to 1 second
+            if (pauseDuration > 1000 && !precisionZoom.active && duration > 0) { // Also check duration exists
                 console.log(`🎯 Activating precision zoom after ${pauseDuration}ms pause`);
                 showPrecisionZoom(precisionZoom.handleType);
             }
