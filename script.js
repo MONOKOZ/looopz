@@ -3259,23 +3259,50 @@ function setupLoopHandles() {
       const now = Date.now();
       const movementDistance = Math.abs(clientX - precisionZoom.lastPosition);
       
-      // Check for pause during drag (minimal movement)
-      if (movementDistance < 3) { // Tight threshold
+      // Check for pause during drag (more generous threshold for intentional use)
+      if (movementDistance < 5) { // Slightly more generous threshold
           if (!precisionZoom.pauseStartTime) {
               precisionZoom.pauseStartTime = now;
-              console.log(`🎯 Pause detected - starting timer`);
+              console.log(`🎯 Pause detected - starting 0.75s timer`);
+              
+              // Immediate visual feedback - scale up the handle slightly
+              if (dragTarget) {
+                  dragTarget.style.transform = 'translateX(-50%) translateY(-50%) scale(1.1)';
+                  dragTarget.style.boxShadow = '0 0 15px rgba(29, 185, 84, 0.8)';
+              }
           }
           
-          // Activate precision zoom after 1 second of pause
+          // Show progress feedback during pause
           const pauseDuration = now - precisionZoom.pauseStartTime;
-          if (pauseDuration > 1000 && !precisionZoom.active && duration > 0) {
+          const progress = Math.min(pauseDuration / 750, 1);
+          
+          // Update handle glow intensity based on progress
+          if (dragTarget && progress < 1) {
+              const glowIntensity = 0.8 + (progress * 0.4); // 0.8 to 1.2
+              dragTarget.style.boxShadow = `0 0 ${15 + progress * 10}px rgba(29, 185, 84, ${glowIntensity})`;
+          }
+          
+          // Activate precision zoom after 0.75 seconds of pause
+          if (pauseDuration > 750 && !precisionZoom.active && duration > 0) {
               console.log(`🎯 Activating precision zoom after ${pauseDuration}ms pause`);
               showPrecisionZoom(precisionZoom.handleType);
+              
+              // Strong activation feedback
+              if (dragTarget) {
+                  dragTarget.style.transform = 'translateX(-50%) translateY(-50%) scale(1.2)';
+                  dragTarget.style.boxShadow = '0 0 25px rgba(29, 185, 84, 1)';
+              }
           }
       } else {
-          // Movement detected - reset pause tracking
+          // Movement detected - reset pause tracking and visual feedback
           if (precisionZoom.pauseStartTime) {
               console.log(`🎯 Movement detected - resetting pause timer`);
+              
+              // Reset handle visual feedback
+              if (dragTarget) {
+                  dragTarget.style.transform = 'translateX(-50%) translateY(-50%) scale(1)';
+                  dragTarget.style.boxShadow = '0 2px 12px rgba(0, 0, 0, 0.4)';
+              }
           }
           precisionZoom.lastPosition = clientX;
           precisionZoom.lastMoveTime = now;
@@ -3332,10 +3359,17 @@ function setupLoopHandles() {
           const popup = dragTarget.querySelector('.time-popup');
           if (popup) setTimeout(() => popup.classList.remove('show'), 500);
           
+          // Reset visual feedback
+          dragTarget.style.transform = 'translateX(-50%) translateY(-50%) scale(1)';
+          dragTarget.style.boxShadow = '0 2px 12px rgba(0, 0, 0, 0.4)';
+          
           // Clean up precision zoom
           if (precisionZoom.active) {
               setTimeout(() => hidePrecisionZoom(), 100);
           }
+          
+          // Reset precision zoom pause tracking
+          precisionZoom.pauseStartTime = null;
           
           // Smart Loop Assist: Auto-snap disabled for smooth dragging
           // Auto-snapping is now manual-only to maintain precise linear movement
@@ -3387,9 +3421,12 @@ function createPrecisionOverlay() {
     overlay.className = 'precision-zoom-overlay';
     overlay.innerHTML = `
         <div style="padding: 16px; background: rgba(29, 185, 84, 0.95); border-radius: 12px; border: 2px solid #1DB954;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                 <h3 style="margin: 0; font-size: 14px;">🎯 PRECISION MODE</h3>
                 <span style="font-family: monospace; font-size: 12px; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;">±${precisionZoom.zoomRange}s</span>
+            </div>
+            <div style="font-size: 11px; color: rgba(0,0,0,0.7); margin-bottom: 12px; text-align: center;">
+                Mouse movement now controls milliseconds within this window
             </div>
             <div style="background: rgba(0,0,0,0.2); height: 8px; border-radius: 4px; margin-bottom: 8px; position: relative;">
                 <div id="precision-progress-bar" style="background: white; height: 100%; border-radius: 4px; width: 50%; transition: width 0.1s ease;"></div>
@@ -3447,7 +3484,7 @@ function showPrecisionZoom(handleType) {
     
     overlay.classList.add('active');
     
-    showStatus(`🎯 Precision mode: ${precisionZoom.zoomRange}s window for millisecond accuracy!`);
+    showStatus(`🎯 PRECISION MODE ACTIVE! Dragging now controls ±${precisionZoom.zoomRange}s window with millisecond accuracy`);
 }
 
 function updatePrecisionVisuals() {
