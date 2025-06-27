@@ -1689,21 +1689,7 @@ function updateSmartAssistUI(score) {
     els.smartAssistScore.textContent = `Score: ${score.toFixed(1)}/10`;
 }
 
-/**
- * Update time popup colors based on score
- */
-function updateTimePopupColors(popup, score) {
-    if (!popup) return;
-
-    // Remove existing score classes
-    for (let i = 0; i <= 10; i++) {
-        popup.classList.remove(`smart-score-${i}`);
-    }
-    
-    // Add new score class
-    const scoreClass = `smart-score-${Math.round(score)}`;
-    popup.classList.add(scoreClass);
-}
+// Time popup colors removed - using unified simple styling
 
 /**
  * Trigger haptic feedback for high scores
@@ -3239,6 +3225,15 @@ function setupLoopHandles() {
       if (popup) popup.classList.add('show');
       if (e.preventDefault) e.preventDefault();
       if (e.stopPropagation) e.stopPropagation();
+      
+      // Initialize precision zoom tracking
+      const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
+      precisionZoom.lastPosition = clientX;
+      precisionZoom.lastMoveTime = Date.now();
+      precisionZoom.handleType = target === els.loopStartHandle ? 'start' : 'end';
+      precisionZoom.pauseStartTime = null;
+      
+      console.log(`🎯 Drag started for ${precisionZoom.handleType} handle`);
   }
 
   function updateDrag(e) {
@@ -3249,6 +3244,33 @@ function setupLoopHandles() {
       const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
       const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
       const newTime = percent * duration;
+      
+      // Precision zoom pause detection
+      const now = Date.now();
+      const movementDistance = Math.abs(clientX - precisionZoom.lastPosition);
+      
+      // Check for pause during drag (minimal movement)
+      if (movementDistance < 3) { // Tight threshold
+          if (!precisionZoom.pauseStartTime) {
+              precisionZoom.pauseStartTime = now;
+              console.log(`🎯 Pause detected - starting timer`);
+          }
+          
+          // Activate precision zoom after 1 second of pause
+          const pauseDuration = now - precisionZoom.pauseStartTime;
+          if (pauseDuration > 1000 && !precisionZoom.active && duration > 0) {
+              console.log(`🎯 Activating precision zoom after ${pauseDuration}ms pause`);
+              showPrecisionZoom(precisionZoom.handleType);
+          }
+      } else {
+          // Movement detected - reset pause tracking
+          if (precisionZoom.pauseStartTime) {
+              console.log(`🎯 Movement detected - resetting pause timer`);
+          }
+          precisionZoom.lastPosition = clientX;
+          precisionZoom.lastMoveTime = now;
+          precisionZoom.pauseStartTime = null;
+      }
 
       if (dragTarget === els.loopStartHandle) {
           const maxStart = Math.max(0, loopEnd - 0.1);
@@ -3261,6 +3283,15 @@ function setupLoopHandles() {
       }
 
       updateLoopVisuals();
+      
+      // Update precision zoom display if active
+      if (precisionZoom.active && precisionZoom.overlay) {
+          const timeSpan = precisionZoom.overlay.querySelector('#precision-current-time');
+          if (timeSpan) {
+              const currentTime = precisionZoom.handleType === 'start' ? loopStart : loopEnd;
+              timeSpan.textContent = formatTime(currentTime);
+          }
+      }
 
       // Smart Loop Assist: Calculate and display real-time scores
       if (smartLoopAssistEnabled && !isAnalyzingLoop) {
@@ -3278,9 +3309,7 @@ function setupLoopHandles() {
                   // Update UI with score
                   updateSmartAssistUI(score);
                   
-                  // Update time popup colors based on score
-                  updateTimePopupColors(els.startPopup, score);
-                  updateTimePopupColors(els.endPopup, score);
+                  // Time popups now have unified simple styling
                   
                   // Trigger haptic feedback based on score zones (like locking points)
                   triggerZoneHapticFeedback(score, currentDragTarget, currentIsDragging);
@@ -3296,6 +3325,11 @@ function setupLoopHandles() {
           dragTarget.classList.remove('dragging');
           const popup = dragTarget.querySelector('.time-popup');
           if (popup) setTimeout(() => popup.classList.remove('show'), 500);
+          
+          // Clean up precision zoom
+          if (precisionZoom.active) {
+              setTimeout(() => hidePrecisionZoom(), 100);
+          }
           
           // Smart Loop Assist: Auto-snap disabled for smooth dragging
           // Auto-snapping is now manual-only to maintain precise linear movement
@@ -3323,350 +3357,96 @@ function setupLoopHandles() {
 }
 
 // ===============================================
-// PRECISION ZOOM LOOP HANDLES - Clean UI Implementation
+// PRECISION ZOOM LOOP HANDLES - Simplified Implementation
 // ===============================================
 
-function setupPrecisionZoomLoopHandles() {
-    // Precision zoom state
-    let precisionZoom = {
-        active: false,
-        overlay: null,
-        handleType: null,
-        holdTimer: null,
-        zoomRange: 5, // seconds
-        startTime: null,
-        endTime: null,
-        lastPosition: 0,
-        lastMoveTime: 0,
-        pauseStartTime: null
-    };
+// Global precision zoom state
+let precisionZoom = {
+    active: false,
+    overlay: null,
+    handleType: null,
+    lastPosition: 0,
+    lastMoveTime: 0,
+    pauseStartTime: null,
+    zoomRange: 5
+};
 
-    // Create precision zoom overlay
-    function createPrecisionOverlay() {
-        if (precisionZoom.overlay) return precisionZoom.overlay;
-        
-        const overlay = document.createElement('div');
-        overlay.className = 'precision-zoom-overlay';
-        overlay.innerHTML = `
-            <div class="precision-zoom-header">
-                <div class="precision-title">
-                    🎯 Precision Mode
-                </div>
-                <div class="precision-range" id="precision-range-display"></div>
-            </div>
-            <div class="precision-zoom-bar">
-                <div class="precision-background">
-                    <div class="precision-progress" id="precision-progress"></div>
-                    <div class="precision-markers" id="precision-markers"></div>
-                    <div class="precision-current-handle" id="precision-current-handle"></div>
-                </div>
-            </div>
-            <div class="precision-time-labels">
-                <div class="precision-start-label" id="precision-start-label"></div>
-                <div class="precision-end-label" id="precision-end-label"></div>
-            </div>
-            <div class="precision-hint">Precision mode active - drag within ±5 second range</div>
-        `;
-        
-        document.body.appendChild(overlay);
-        precisionZoom.overlay = overlay;
-        return overlay;
-    }
+// Global precision zoom functions
+function createPrecisionOverlay() {
+    if (precisionZoom.overlay) return precisionZoom.overlay;
+    
+    const overlay = document.createElement('div');
+    overlay.className = 'precision-zoom-overlay';
+    overlay.innerHTML = `
+        <div style="padding: 20px; text-align: center; background: rgba(29, 185, 84, 0.9); border-radius: 12px;">
+            <h2>🎯 PRECISION ZOOM ACTIVE</h2>
+            <p>Handle: <span id="precision-handle-type">${precisionZoom.handleType}</span></p>
+            <p>Time: <span id="precision-current-time">--</span></p>
+            <p>Range: ±${precisionZoom.zoomRange}s precision window</p>
+        </div>
+    `;
+    
+    document.body.appendChild(overlay);
+    precisionZoom.overlay = overlay;
+    return overlay;
+}
 
-    // Position overlay above progress bar
-    function positionOverlay() {
-        if (!precisionZoom.overlay || !els.progressContainer) return;
-        
+function showPrecisionZoom(handleType) {
+    if (precisionZoom.active) return;
+    
+    console.log(`🎯 SHOWING PRECISION ZOOM for ${handleType} - duration:${duration}s`);
+    
+    precisionZoom.active = true;
+    precisionZoom.handleType = handleType;
+    
+    const overlay = createPrecisionOverlay();
+    
+    // Position above progress bar
+    if (els.progressContainer) {
         const progressRect = els.progressContainer.getBoundingClientRect();
-        const overlay = precisionZoom.overlay;
-        
         overlay.style.position = 'fixed';
         overlay.style.left = `${progressRect.left}px`;
-        overlay.style.top = `${progressRect.top - 140}px`;
+        overlay.style.top = `${progressRect.top - 120}px`;
         overlay.style.width = `${progressRect.width}px`;
-        overlay.style.minWidth = 'auto';
+        overlay.style.zIndex = '1000';
     }
-
-    // Update precision zoom display
-    function updatePrecisionDisplay() {
-        if (!precisionZoom.active || !precisionZoom.overlay) {
-            console.log(`🎯 UPDATE FAILED - active: ${precisionZoom.active}, overlay: ${!!precisionZoom.overlay}`);
-            return;
-        }
-        
-        const currentHandle = precisionZoom.handleType === 'start' ? loopStart : loopEnd;
-        const zoomCenter = currentHandle;
-        const zoomStart = Math.max(0, zoomCenter - precisionZoom.zoomRange / 2);
-        const zoomEnd = Math.min(duration, zoomCenter + precisionZoom.zoomRange / 2);
-        
-        console.log(`🎯 UPDATING DISPLAY: handle=${currentHandle}s, zoom=${zoomStart}s-${zoomEnd}s, duration=${duration}s`);
-        
-        // Update range display
-        const rangeDisplay = precisionZoom.overlay.querySelector('#precision-range-display');
-        if (rangeDisplay) {
-            const rangeText = `${formatTime(zoomStart, false)} - ${formatTime(zoomEnd, false)}`;
-            rangeDisplay.textContent = rangeText;
-            console.log(`🎯 Range display: ${rangeText}`);
-        } else {
-            console.log(`🎯 ERROR: Range display element not found`);
-        }
-        
-        // Update progress bar
-        const progressBar = precisionZoom.overlay.querySelector('#precision-progress');
-        if (progressBar) {
-            const progressWidth = ((currentHandle - zoomStart) / (zoomEnd - zoomStart)) * 100;
-            progressBar.style.width = `${Math.max(0, Math.min(100, progressWidth))}%`;
-            console.log(`🎯 Progress bar width: ${progressWidth}%`);
-        } else {
-            console.log(`🎯 ERROR: Progress bar element not found`);
-        }
-        
-        // Update handle position
-        const handle = precisionZoom.overlay.querySelector('#precision-current-handle');
-        if (handle) {
-            const handlePos = ((currentHandle - zoomStart) / (zoomEnd - zoomStart)) * 100;
-            handle.style.left = `${Math.max(0, Math.min(100, handlePos))}%`;
-            handle.className = `precision-current-handle ${precisionZoom.handleType}`;
-            console.log(`🎯 Handle position: ${handlePos}%`);
-        } else {
-            console.log(`🎯 ERROR: Handle element not found`);
-        }
-        
-        // Update time labels
-        const startLabel = precisionZoom.overlay.querySelector('#precision-start-label');
-        const endLabel = precisionZoom.overlay.querySelector('#precision-end-label');
-        if (startLabel && endLabel) {
-            startLabel.textContent = formatTime(loopStart);
-            endLabel.textContent = formatTime(loopEnd);
-            console.log(`🎯 Time labels: ${formatTime(loopStart)} - ${formatTime(loopEnd)}`);
-        } else {
-            console.log(`🎯 ERROR: Time label elements not found`);
-        }
-        
-        // Update markers
-        updatePrecisionMarkers(zoomStart, zoomEnd);
+    
+    // Update content
+    const handleSpan = overlay.querySelector('#precision-handle-type');
+    const timeSpan = overlay.querySelector('#precision-current-time');
+    if (handleSpan) handleSpan.textContent = handleType;
+    if (timeSpan) {
+        const currentTime = handleType === 'start' ? loopStart : loopEnd;
+        timeSpan.textContent = formatTime(currentTime);
     }
+    
+    overlay.classList.add('active');
+    
+    showStatus('🎯 Precision mode activated! Continue dragging for millisecond accuracy.');
+}
 
-    // Create time markers in precision view
-    function updatePrecisionMarkers(zoomStart, zoomEnd) {
-        const markersContainer = precisionZoom.overlay?.querySelector('#precision-markers');
-        if (!markersContainer) return;
-        
-        markersContainer.innerHTML = '';
-        
-        const zoomDuration = zoomEnd - zoomStart;
-        const majorInterval = zoomDuration <= 2 ? 0.1 : (zoomDuration <= 5 ? 0.25 : 0.5);
-        const minorInterval = majorInterval / 5;
-        
-        // Add markers
-        for (let time = Math.ceil(zoomStart / minorInterval) * minorInterval; time <= zoomEnd; time += minorInterval) {
-            const marker = document.createElement('div');
-            const position = ((time - zoomStart) / zoomDuration) * 100;
-            
-            const isMajor = Math.abs(time % majorInterval) < 0.001;
-            marker.className = `precision-marker ${isMajor ? 'major' : ''}`;
-            marker.style.left = `${position}%`;
-            
-            if (isMajor) {
-                const label = document.createElement('span');
-                label.textContent = formatTime(time, false);
-                marker.appendChild(label);
+function hidePrecisionZoom() {
+    if (!precisionZoom.active) return;
+    
+    precisionZoom.active = false;
+    
+    if (precisionZoom.overlay) {
+        precisionZoom.overlay.classList.remove('active');
+        setTimeout(() => {
+            if (precisionZoom.overlay) {
+                precisionZoom.overlay.remove();
+                precisionZoom.overlay = null;
             }
-            
-            markersContainer.appendChild(marker);
-        }
+        }, 300);
     }
+    
+    showStatus('🎯 Precision mode deactivated');
+    console.log('🎯 Precision zoom deactivated');
+}
 
-    // Show precision zoom
-    function showPrecisionZoom(handleType) {
-        if (precisionZoom.active) return;
-        
-        // Extra safety checks
-        if (!isDragging || !dragTarget || duration <= 0) {
-            console.log(`🎯 PRECISION ZOOM BLOCKED - isDragging:${isDragging}, dragTarget:${!!dragTarget}, duration:${duration}`);
-            return;
-        }
-        
-        console.log(`🎯 SHOWING PRECISION ZOOM for ${handleType} - duration:${duration}s, loopStart:${loopStart}s, loopEnd:${loopEnd}s`);
-        
-        precisionZoom.active = true;
-        precisionZoom.handleType = handleType;
-        
-        const overlay = createPrecisionOverlay();
-        positionOverlay();
-        
-        // Add visual enhancements
-        els.progressContainer?.classList.add('precision-active');
-        
-        // Force immediate display for debugging
-        overlay.classList.add('active');
-        
-        // Fill with test content BEFORE showing
-        const rangeDisplay = overlay.querySelector('#precision-range-display');
-        if (rangeDisplay) rangeDisplay.textContent = 'TEST RANGE';
-        
-        const startLabel = overlay.querySelector('#precision-start-label');
-        if (startLabel) startLabel.textContent = 'START TIME';
-        
-        const endLabel = overlay.querySelector('#precision-end-label');
-        if (endLabel) endLabel.textContent = 'END TIME';
-        
-        updatePrecisionDisplay();
-        
-        // Make it super obvious for testing
-        overlay.style.backgroundColor = 'rgba(255, 0, 0, 0.9)';
-        overlay.style.color = 'white';
-        overlay.style.fontSize = '16px';
-        overlay.style.border = '3px solid yellow';
-        overlay.innerHTML = `
-            <div style="padding: 20px; text-align: center;">
-                <h2>🎯 PRECISION ZOOM ACTIVE!</h2>
-                <p>Handle: ${handleType}</p>
-                <p>Duration: ${duration}s</p>
-                <p>Loop: ${formatTime(loopStart)} - ${formatTime(loopEnd)}</p>
-            </div>
-        `;
-        
-        showStatus('🎯 PRECISION ZOOM ACTIVE - RED BOX SHOULD BE VISIBLE!');
-    }
-
-    // Hide precision zoom
-    function hidePrecisionZoom() {
-        if (!precisionZoom.active) return;
-        
-        precisionZoom.active = false;
-        
-        // Remove visual enhancements
-        els.progressContainer?.classList.remove('precision-active');
-        
-        if (precisionZoom.overlay) {
-            precisionZoom.overlay.classList.remove('active');
-            precisionZoom.overlay.classList.add('removing');
-            
-            setTimeout(() => {
-                if (precisionZoom.overlay) {
-                    precisionZoom.overlay.remove();
-                    precisionZoom.overlay = null;
-                }
-            }, 300);
-        }
-        
-        showStatus('🎯 Precision mode deactivated');
-        console.log('🎯 Precision zoom deactivated');
-    }
-
-    // Enhanced drag start - just store initial position
-    function enhancedStartDrag(e, target) {
-        // Prevent iOS text magnifier/selection
-        if (e.preventDefault) e.preventDefault();
-        if (e.stopPropagation) e.stopPropagation();
-        
-        // Clear any existing timers
-        if (precisionZoom.holdTimer) {
-            clearTimeout(precisionZoom.holdTimer);
-            precisionZoom.holdTimer = null;
-        }
-        
-        // Store initial drag position for pause detection
-        const rect = els.progressContainer.getBoundingClientRect();
-        const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
-        
-        precisionZoom.lastPosition = clientX;
-        precisionZoom.lastMoveTime = Date.now();
-        precisionZoom.handleType = target === els.loopStartHandle ? 'start' : 'end';
-        precisionZoom.pauseStartTime = null;
-        
-        console.log(`🎯 Drag started for ${precisionZoom.handleType} handle`);
-    }
-
-    // Enhanced drag update with pause detection during dragging
-    function enhancedUpdateDrag(e) {
-        if (!isDragging || !dragTarget) return;
-        
-        // Prevent iOS magnifier during drag
-        if (e.preventDefault) e.preventDefault();
-        if (e.stopPropagation) e.stopPropagation();
-        
-        const now = Date.now();
-        const rect = els.progressContainer.getBoundingClientRect();
-        const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
-        
-        // Calculate movement distance from last recorded position
-        const movementDistance = Math.abs(clientX - precisionZoom.lastPosition);
-        
-        // Check if we're in a "pause" state (minimal movement)
-        if (movementDistance < 2) { // Very tight threshold for pause detection
-            // Start tracking pause if not already started
-            if (!precisionZoom.pauseStartTime) {
-                precisionZoom.pauseStartTime = now;
-                console.log(`🎯 Pause detected - starting timer`);
-            }
-            
-            // Check if we've been paused long enough
-            const pauseDuration = now - precisionZoom.pauseStartTime;
-            if (pauseDuration > 1000 && !precisionZoom.active && duration > 0) { // Also check duration exists
-                console.log(`🎯 Activating precision zoom after ${pauseDuration}ms pause`);
-                showPrecisionZoom(precisionZoom.handleType);
-            }
-        } else {
-            // Significant movement detected - reset pause tracking
-            if (precisionZoom.pauseStartTime) {
-                console.log(`🎯 Movement detected - resetting pause timer`);
-            }
-            precisionZoom.lastPosition = clientX;
-            precisionZoom.lastMoveTime = now;
-            precisionZoom.pauseStartTime = null;
-        }
-        
-        // Update precision display if zoom is active
-        if (precisionZoom.active) {
-            updatePrecisionDisplay();
-        }
-    }
-
-    // Enhanced drag stop with precision cleanup
-    function enhancedStopDrag(e) {
-        // Clear hold timer
-        if (precisionZoom.holdTimer) {
-            clearTimeout(precisionZoom.holdTimer);
-            precisionZoom.holdTimer = null;
-        }
-        
-        // Hide precision zoom
-        if (precisionZoom.active) {
-            setTimeout(() => hidePrecisionZoom(), 100);
-        }
-    }
-
-    // Integrate with existing drag system
-    const originalStartDrag = window.startDrag;
-    const originalUpdateDrag = window.updateDrag; 
-    const originalStopDrag = window.stopDrag;
-
-    // Enhance existing functions
-    window.startDrag = function(e, target) {
-        if (originalStartDrag) originalStartDrag(e, target);
-        enhancedStartDrag(e, target);
-    };
-
-    window.updateDrag = function(e) {
-        if (originalUpdateDrag) originalUpdateDrag(e);
-        enhancedUpdateDrag(e);
-    };
-
-    window.stopDrag = function(e) {
-        enhancedStopDrag(e);
-        if (originalStopDrag) originalStopDrag(e);
-    };
-
-    // Handle window resize for overlay positioning
-    window.addEventListener('resize', () => {
-        if (precisionZoom.active) {
-            positionOverlay();
-        }
-    });
-
-    console.log('✅ Precision Zoom Loop Handles initialized');
+function setupPrecisionZoomLoopHandles() {
+    // Simple initialization - precision zoom is now integrated directly into setupLoopHandles()
+    console.log('✅ Precision Zoom initialized - integrated with main drag handlers');
 }
 
 // Loops Management
@@ -6537,6 +6317,27 @@ window.testAI = function() {
     } else {
         console.log('❌ AI system not ready');
         initializeEssentia();
+    }
+};
+
+// Test function to verify precision zoom
+window.testPrecisionZoom = function() {
+    console.log('Testing Precision Zoom System...');
+    console.log('Precision zoom state:', precisionZoom);
+    console.log('Duration set:', duration);
+    console.log('Loop handles exist:', !!els.loopStartHandle, !!els.loopEndHandle);
+    
+    if (duration > 0) {
+        console.log('✅ Testing precision zoom activation...');
+        precisionZoom.handleType = 'start';
+        showPrecisionZoom('start');
+        
+        setTimeout(() => {
+            console.log('✅ Testing precision zoom deactivation...');
+            hidePrecisionZoom();
+        }, 3000);
+    } else {
+        console.log('❌ No track loaded - precision zoom requires active track');
     }
 };
 
