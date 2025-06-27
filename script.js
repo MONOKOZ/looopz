@@ -3263,47 +3263,61 @@ function setupLoopHandles() {
       // Calculate speed in pixels per second
       const speed = timeDelta > 0 ? (movementDistance / timeDelta) * 1000 : 0;
       
-      // Progressive visual feedback as speed decreases
-      if (!precisionZoom.active && dragTarget) {
-          if (speed < 100) { // Approaching precision threshold
-              const glowIntensity = 1 - (speed / 100); // 0 to 1 as speed decreases
-              dragTarget.style.boxShadow = `0 0 ${10 + glowIntensity * 15}px rgba(29, 185, 84, ${0.3 + glowIntensity * 0.5})`;
-          } else {
-              // Normal speed - reset glow
-              dragTarget.style.boxShadow = '0 2px 12px rgba(0, 0, 0, 0.4)';
-          }
+      // Gradual precision levels based on speed
+      let precisionLevel = 0; // 0 = normal, 1 = medium, 2 = high precision
+      let windowSize = duration; // Default to full duration
+      
+      if (speed < 120) {
+          precisionLevel = 1;
+          windowSize = duration * 0.1; // 10% of song duration
+      }
+      if (speed < 60) {
+          precisionLevel = 2; 
+          windowSize = 10; // 10 seconds
+      }
+      if (speed < 20) {
+          precisionLevel = 3;
+          windowSize = 2; // 2 seconds - finest precision
       }
       
-      // When user slows down to near-zero speed, activate precision
-      if (speed < 30 && !precisionZoom.active && timeDelta > 150 && duration > 0) { // Less than 30 px/s
-          console.log(`🎯 Precision speed reached: ${speed.toFixed(1)} px/s - activating precision mode`);
-          precisionZoom.active = true;
-          
-          // Calculate precision window
-          const currentTime = precisionZoom.handleType === 'start' ? loopStart : loopEnd;
-          precisionZoom.windowStart = Math.max(0, currentTime - precisionZoom.zoomRange / 2);
-          precisionZoom.windowEnd = Math.min(duration, currentTime + precisionZoom.zoomRange / 2);
-          
-          // Subtle visual feedback
-          if (dragTarget) {
-              dragTarget.style.transform = 'translateX(-50%) translateY(-50%) scale(1.1)';
-              dragTarget.style.boxShadow = '0 0 20px rgba(29, 185, 84, 0.8)';
+      // Update precision state and window
+      if (precisionLevel > 0 && duration > 0) {
+          if (!precisionZoom.active || precisionZoom.precisionLevel !== precisionLevel) {
+              precisionZoom.active = true;
+              precisionZoom.precisionLevel = precisionLevel;
+              
+              // Calculate window around current position
+              const currentTime = precisionZoom.handleType === 'start' ? loopStart : loopEnd;
+              precisionZoom.windowStart = Math.max(0, currentTime - windowSize / 2);
+              precisionZoom.windowEnd = Math.min(duration, currentTime + windowSize / 2);
+              
+              console.log(`🎯 Precision level ${precisionLevel}: ${speed.toFixed(1)} px/s, window: ${windowSize}s`);
           }
           
-          showStatus(`🎯 Precision mode active`);
-      }
-      
-      // Exit precision mode if user speeds up significantly
-      if (precisionZoom.active && speed > 150) { // Fast movement exits precision
-          console.log(`🎯 Fast movement detected: ${speed.toFixed(1)} px/s - exiting precision mode`);
-          precisionZoom.active = false;
-          precisionZoom.windowStart = null;
-          precisionZoom.windowEnd = null;
-          
-          // Reset visual feedback
+          // Visual feedback based on precision level
           if (dragTarget) {
-              dragTarget.style.transform = 'translateX(-50%) translateY(-50%) scale(1)';
-              dragTarget.style.boxShadow = '0 2px 12px rgba(0, 0, 0, 0.4)';
+              const intensity = precisionLevel / 3; // 0.33, 0.66, 1.0
+              const scale = 1 + (intensity * 0.15); // 1.05, 1.1, 1.15
+              const glow = 10 + (intensity * 15); // 15, 20, 25px
+              const alpha = 0.4 + (intensity * 0.4); // 0.4, 0.6, 0.8
+              
+              dragTarget.style.transform = `translateX(-50%) translateY(-50%) scale(${scale})`;
+              dragTarget.style.boxShadow = `0 0 ${glow}px rgba(29, 185, 84, ${alpha})`;
+          }
+      } else {
+          // Exit precision mode
+          if (precisionZoom.active) {
+              console.log(`🎯 Exiting precision mode: ${speed.toFixed(1)} px/s`);
+              precisionZoom.active = false;
+              precisionZoom.precisionLevel = 0;
+              precisionZoom.windowStart = null;
+              precisionZoom.windowEnd = null;
+              
+              // Reset visual feedback
+              if (dragTarget) {
+                  dragTarget.style.transform = 'translateX(-50%) translateY(-50%) scale(1)';
+                  dragTarget.style.boxShadow = '0 2px 12px rgba(0, 0, 0, 0.4)';
+              }
           }
       }
       
@@ -3405,7 +3419,7 @@ let precisionZoom = {
     handleType: null,
     lastPosition: 0,
     lastMoveTime: 0,
-    zoomRange: 5,
+    precisionLevel: 0,
     windowStart: null,
     windowEnd: null
 };
@@ -6296,12 +6310,12 @@ window.testPrecisionMode = function() {
     console.log('Duration:', duration);
     console.log('Loop positions:', `${formatTime(loopStart)} - ${formatTime(loopEnd)}`);
     
-    console.log('\n✨ How it works:');
-    console.log('  • Normal dragging: Mouse controls full song duration');
-    console.log('  • Slow down < 100 px/s: Green glow appears');
-    console.log('  • Slow down < 30 px/s: Mouse controls ±5s window');
-    console.log('  • Speed up > 150 px/s: Returns to normal mode');
-    console.log('  • Same progress bar, same UI - just precision mapping!');
+    console.log('\n✨ Gradual precision levels:');
+    console.log('  • Normal speed (>120 px/s): Full song duration');
+    console.log('  • Medium speed (<120 px/s): 10% of song duration');  
+    console.log('  • Slow speed (<60 px/s): 10 second window');
+    console.log('  • Precise speed (<20 px/s): 2 second window');
+    console.log('  • Visual feedback increases with precision level!');
     
     if (duration > 0) {
         console.log('\n💡 Usage: Drag any handle slowly to feel the precision!');
