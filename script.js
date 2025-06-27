@@ -55,7 +55,7 @@ const CACHE_VERSION = 1;
 let smartLoopAssistEnabled = localStorage.getItem('smart-loop-assist') !== 'false';
 let currentLoopScore = { start: 0, end: 0 };
 let lastHapticFeedback = 0;
-let audioAnalysisCache = new Map(); // Cache for audio analysis results
+// audioAnalysisCache already declared at line 10
 let isAnalyzingLoop = false;
 
 // Search state
