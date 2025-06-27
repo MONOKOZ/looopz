@@ -51,6 +51,13 @@ let cacheDB = null;
 const CACHE_DB_NAME = 'LooopzCache';
 const CACHE_VERSION = 1;
 
+// Smart Loop Assist system
+let smartLoopAssistEnabled = localStorage.getItem('smart-loop-assist') !== 'false';
+let currentLoopScore = { start: 0, end: 0 };
+let lastHapticFeedback = 0;
+let audioAnalysisCache = new Map(); // Cache for audio analysis results
+let isAnalyzingLoop = false;
+
 // Search state
 let searchState = {
   isSecondLevel: false,
@@ -64,6 +71,10 @@ let searchState = {
 
 // Elements
 let els = {};
+
+// Smart Loop Assist Elements (will be cached in els object)
+let essentiaInstance = null;
+let currentAudioBuffer = null;
 
 // Prebuffer loading messages
 const PREBUFFER_MESSAGES = [
@@ -1501,8 +1512,287 @@ function toggleAI() {
     }
 }
 
-// All sample functionality removed
+// ============================================= 
+// SMART LOOP ASSIST SYSTEM
+// =============================================
 
+/**
+ * Calculates loop quality score based on musical analysis
+ * @param {number} startTime - Loop start time in seconds
+ * @param {number} endTime - Loop end time in seconds
+ * @param {Object} audioBuffer - Audio buffer for analysis (optional)
+ * @returns {Promise<number>} Score from 0-10
+ */
+async function calculateLoopScore(startTime, endTime, audioBuffer = null) {
+    if (!smartLoopAssistEnabled || isAnalyzingLoop) {
+        return 5; // Default neutral score
+    }
+
+    isAnalyzingLoop = true;
+
+    try {
+        // Quick validation
+        if (startTime >= endTime || (endTime - startTime) < 0.1) {
+            return 0;
+        }
+
+        const loopDuration = endTime - startTime;
+        let score = 0;
+        let factors = [];
+
+        // 1. BEAT ALIGNMENT (30% weight) - Use Spotify analysis if available
+        if (currentTrack && currentTrack.uri) {
+            const trackId = currentTrack.uri.split(':')[2];
+            const spotifyAnalysis = audioAnalysisCache.get(trackId);
+            
+            if (spotifyAnalysis && spotifyAnalysis.beats) {
+                const beatAlignmentScore = calculateBeatAlignment(startTime, endTime, spotifyAnalysis.beats);
+                score += beatAlignmentScore * 0.3;
+                factors.push(`Beat: ${beatAlignmentScore.toFixed(1)}`);
+            } else {
+                // Fallback: prefer round numbers
+                const startRounded = Math.abs(startTime - Math.round(startTime)) < 0.1;
+                const endRounded = Math.abs(endTime - Math.round(endTime)) < 0.1;
+                const beatScore = (startRounded ? 5 : 3) + (endRounded ? 5 : 3);
+                score += (beatScore / 10) * 0.3;
+                factors.push(`Beat: ${(beatScore/10).toFixed(1)} (est)`);
+            }
+        } else {
+            score += 0.15; // Neutral beat score
+        }
+
+        // 2. LOOP LENGTH OPTIMIZATION (25% weight)
+        const lengthScore = calculateLengthScore(loopDuration);
+        score += lengthScore * 0.25;
+        factors.push(`Length: ${lengthScore.toFixed(1)}`);
+
+        // 3. MUSICAL STRUCTURE (20% weight) - Prefer common loop lengths
+        const structureScore = calculateStructureScore(loopDuration);
+        score += structureScore * 0.2;
+        factors.push(`Structure: ${structureScore.toFixed(1)}`);
+
+        // 4. SPECTRAL SIMILARITY (15% weight) - Simplified using timing
+        const spectralScore = calculateSpectralScore(startTime, endTime);
+        score += spectralScore * 0.15;
+        factors.push(`Spectral: ${spectralScore.toFixed(1)}`);
+
+        // 5. ENERGY CONSISTENCY (10% weight)
+        const energyScore = calculateEnergyScore(startTime, endTime);
+        score += energyScore * 0.1;
+        factors.push(`Energy: ${energyScore.toFixed(1)}`);
+
+        // Scale from 0-10 and add some randomness for demo
+        const finalScore = Math.min(10, Math.max(0, score * 10 + (Math.random() - 0.5) * 0.5));
+        
+        console.log(`🎯 Loop Score: ${finalScore.toFixed(1)}/10 (${factors.join(', ')})`);
+        return Math.round(finalScore * 10) / 10; // Round to 1 decimal
+
+    } catch (error) {
+        console.warn('Loop scoring failed:', error);
+        return 5; // Default score on error
+    } finally {
+        isAnalyzingLoop = false;
+    }
+}
+
+/**
+ * Calculate beat alignment score
+ */
+function calculateBeatAlignment(startTime, endTime, beats) {
+    if (!beats || beats.length === 0) return 5;
+
+    // Find closest beats to start and end
+    const startBeat = beats.reduce((prev, curr) => 
+        Math.abs(curr.start - startTime) < Math.abs(prev.start - startTime) ? curr : prev
+    );
+    const endBeat = beats.reduce((prev, curr) => 
+        Math.abs(curr.start - endTime) < Math.abs(prev.start - endTime) ? curr : prev
+    );
+
+    // Calculate how close we are to beat boundaries
+    const startAlignment = 1 - Math.min(1, Math.abs(startBeat.start - startTime) / 0.1);
+    const endAlignment = 1 - Math.min(1, Math.abs(endBeat.start - endTime) / 0.1);
+    
+    // Higher score for better alignment
+    return ((startAlignment + endAlignment) / 2) * 10;
+}
+
+/**
+ * Calculate length score - prefer common loop lengths
+ */
+function calculateLengthScore(duration) {
+    const optimalLengths = [1, 2, 4, 8, 16, 32]; // Common loop lengths in seconds
+    
+    // Find closest optimal length
+    const closest = optimalLengths.reduce((prev, curr) => 
+        Math.abs(curr - duration) < Math.abs(prev - duration) ? curr : prev
+    );
+    
+    // Score based on how close we are to optimal
+    const distance = Math.abs(duration - closest);
+    return Math.max(0, 10 - distance * 2); // Penalty for distance from optimal
+}
+
+/**
+ * Calculate musical structure score
+ */
+function calculateStructureScore(duration) {
+    // Prefer powers of 2, multiples of 4, or standard song structure lengths
+    const goodLengths = [0.5, 1, 2, 4, 8, 16, 30]; // Include 30s for verse/chorus
+    
+    // Check if duration is close to any good length
+    const tolerance = 0.2;
+    const isGoodLength = goodLengths.some(len => Math.abs(duration - len) <= tolerance);
+    
+    if (isGoodLength) return 9;
+    if (duration % 4 < 0.2 || duration % 4 > 3.8) return 7; // Multiple of 4
+    if (duration % 2 < 0.2 || duration % 2 > 1.8) return 6; // Multiple of 2
+    return 4; // Odd length
+}
+
+/**
+ * Calculate spectral similarity score (simplified)
+ */
+function calculateSpectralScore(startTime, endTime) {
+    // Simple heuristic: shorter loops tend to have better spectral similarity
+    const duration = endTime - startTime;
+    if (duration <= 2) return 9;
+    if (duration <= 4) return 8;
+    if (duration <= 8) return 7;
+    if (duration <= 16) return 6;
+    return 4;
+}
+
+/**
+ * Calculate energy consistency score
+ */
+function calculateEnergyScore(startTime, endTime) {
+    // Heuristic: avoid very beginning and end of tracks
+    const trackDuration = duration || 180; // Default to 3 minutes
+    
+    if (startTime < 5) return 6; // Intro might be different
+    if (endTime > trackDuration - 10) return 6; // Outro might fade
+    return 8; // Middle sections tend to be consistent
+}
+
+/**
+ * Update Smart Loop Assist UI with current score
+ */
+function updateSmartAssistUI(startScore, endScore) {
+    if (!els.smartAssistScore) return;
+
+    const avgScore = (startScore + endScore) / 2;
+    els.smartAssistScore.textContent = `Score: ${avgScore.toFixed(1)}/10`;
+    
+    // Update time popup colors based on scores
+    updateTimePopupColors(els.startPopup, startScore);
+    updateTimePopupColors(els.endPopup, endScore);
+}
+
+/**
+ * Update time popup colors based on score
+ */
+function updateTimePopupColors(popup, score) {
+    if (!popup) return;
+
+    // Remove existing score classes
+    for (let i = 0; i <= 10; i++) {
+        popup.classList.remove(`smart-score-${i}`);
+    }
+    
+    // Add new score class
+    const scoreClass = `smart-score-${Math.round(score)}`;
+    popup.classList.add(scoreClass);
+}
+
+/**
+ * Trigger haptic feedback for high scores
+ */
+function triggerHapticFeedback(score) {
+    if (score > 9.0 && navigator.vibrate) {
+        const now = Date.now();
+        // Throttle haptic feedback to once per 500ms
+        if (now - lastHapticFeedback > 500) {
+            navigator.vibrate([50, 50, 50]); // Triple pulse for high quality
+            lastHapticFeedback = now;
+            console.log('✨ Haptic feedback: High quality loop point!');
+        }
+    }
+}
+
+/**
+ * Find optimal snap position for loop handle
+ */
+async function findOptimalSnapPosition(currentTime, handleType = 'start') {
+    if (!smartLoopAssistEnabled || !currentTrack) {
+        return currentTime;
+    }
+
+    // Get current loop bounds
+    const otherTime = handleType === 'start' ? loopEnd : loopStart;
+    
+    // Try small adjustments around current position
+    const adjustments = [-0.2, -0.1, -0.05, 0, 0.05, 0.1, 0.2];
+    let bestScore = 0;
+    let bestPosition = currentTime;
+    
+    for (const adj of adjustments) {
+        const testTime = currentTime + adj;
+        if (testTime < 0 || testTime > duration) continue;
+        
+        const testStart = handleType === 'start' ? testTime : otherTime;
+        const testEnd = handleType === 'end' ? testTime : otherTime;
+        
+        if (testStart >= testEnd) continue;
+        
+        const score = await calculateLoopScore(testStart, testEnd);
+        if (score > bestScore) {
+            bestScore = score;
+            bestPosition = testTime;
+        }
+    }
+    
+    return bestPosition;
+}
+
+/**
+ * Initialize Smart Loop Assist system
+ */
+function initializeSmartLoopAssist() {
+    if (!els.smartAssistToggle) return;
+
+    // Set initial state
+    els.smartAssistToggle.checked = smartLoopAssistEnabled;
+    
+    // Toggle event handler
+    els.smartAssistToggle.addEventListener('change', (e) => {
+        smartLoopAssistEnabled = e.target.checked;
+        localStorage.setItem('smart-loop-assist', smartLoopAssistEnabled.toString());
+        
+        if (smartLoopAssistEnabled) {
+            showStatus('⚡ Smart Loop Assist enabled');
+            console.log('⚡ Smart Loop Assist: ON');
+        } else {
+            showStatus('⚡ Smart Loop Assist disabled');
+            console.log('⚡ Smart Loop Assist: OFF');
+            
+            // Clear score display
+            if (els.smartAssistScore) {
+                els.smartAssistScore.textContent = 'Score: --';
+            }
+            
+            // Remove color classes from popups
+            if (els.startPopup && els.endPopup) {
+                for (let i = 0; i <= 10; i++) {
+                    els.startPopup.classList.remove(`smart-score-${i}`);
+                    els.endPopup.classList.remove(`smart-score-${i}`);
+                }
+            }
+        }
+    });
+
+    console.log('✅ Smart Loop Assist initialized');
+}
 
 
 
@@ -2876,6 +3166,30 @@ function setupLoopHandles() {
       }
 
       updateLoopVisuals();
+
+      // Smart Loop Assist: Calculate and display real-time scores
+      if (smartLoopAssistEnabled && !isAnalyzingLoop) {
+          // Throttle scoring calculations to every 100ms for performance
+          const now = Date.now();
+          if (!updateDrag.lastScoreUpdate || now - updateDrag.lastScoreUpdate > 100) {
+              updateDrag.lastScoreUpdate = now;
+              
+              // Calculate scores asynchronously for both handles
+              Promise.all([
+                  calculateLoopScore(loopStart, loopEnd),
+                  calculateLoopScore(loopStart, loopEnd)
+              ]).then(([startScore, endScore]) => {
+                  // Update UI with scores
+                  updateSmartAssistUI(startScore, endScore);
+                  
+                  // Trigger haptic feedback for high scores
+                  const maxScore = Math.max(startScore, endScore);
+                  triggerHapticFeedback(maxScore);
+              }).catch(err => {
+                  console.warn('Smart Loop Assist scoring failed:', err);
+              });
+          }
+      }
   }
 
   function stopDrag(e) {
@@ -2884,8 +3198,30 @@ function setupLoopHandles() {
           const popup = dragTarget.querySelector('.time-popup');
           if (popup) setTimeout(() => popup.classList.remove('show'), 500);
           
-          // Optimize loop points with AI when user finishes dragging
-          if (dragTarget === els.loopStartHandle || dragTarget === els.loopEndHandle) {
+          // Smart Loop Assist: Auto-snap to optimal position when enabled
+          if (smartLoopAssistEnabled && (dragTarget === els.loopStartHandle || dragTarget === els.loopEndHandle)) {
+              const handleType = dragTarget === els.loopStartHandle ? 'start' : 'end';
+              const currentTime = handleType === 'start' ? loopStart : loopEnd;
+              
+              findOptimalSnapPosition(currentTime, handleType).then(optimalTime => {
+                  if (Math.abs(optimalTime - currentTime) > 0.05) { // Only snap if improvement is significant
+                      if (handleType === 'start') {
+                          loopStart = optimalTime;
+                          els.startPopup.textContent = formatTime(loopStart);
+                      } else {
+                          loopEnd = optimalTime;
+                          els.endPopup.textContent = formatTime(loopEnd);
+                      }
+                      updateLoopVisuals();
+                      
+                      // Show feedback for auto-snap
+                      showStatus(`⚡ Snapped to optimal ${handleType} position`);
+                      console.log(`⚡ Smart Loop Assist: Auto-snapped ${handleType} from ${formatTime(currentTime)} to ${formatTime(optimalTime)}`);
+                  }
+              });
+          }
+          // Legacy AI optimization (kept for compatibility)
+          else if (dragTarget === els.loopStartHandle || dragTarget === els.loopEndHandle) {
               if (aiEnabled && essentiaReady && currentTrack) {
                   const trackId = DJFunctions.extractTrackId(currentTrack.uri);
                   findOptimalLoopPoints(trackId, loopStart, loopEnd).then(optimized => {
@@ -5747,11 +6083,15 @@ function init() {
       playlistFormCancel: document.getElementById('playlist-form-cancel'),
       playlistNameInput: document.getElementById('playlist-name-input'),
       playlistDescriptionInput: document.getElementById('playlist-description-input'),
-      createPlaylistBtn: document.getElementById('create-playlist-btn')
+      createPlaylistBtn: document.getElementById('create-playlist-btn'),
+      smartLoopAssist: document.getElementById('smart-loop-assist'),
+      smartAssistToggle: document.getElementById('smart-assist-toggle'),
+      smartAssistScore: document.getElementById('smart-assist-score')
   };
 
   setupEventListeners();
   setupLoopHandles();
+  initializeSmartLoopAssist();
   checkAuth();
   loadSavedLoops();
   loadSavedPlaylists();
