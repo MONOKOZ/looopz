@@ -1529,13 +1529,19 @@ class PlaylistTransitionEngine {
 
             if (!fromTrackId || !toTrackId) return;
 
-            // Get audio analysis and features for both tracks
-            const [fromFeatures, toFeatures, fromAnalysis, toAnalysis] = await Promise.all([
-                getAudioFeatures(fromTrackId),
-                getAudioFeatures(toTrackId),
-                getAudioAnalysis(fromTrackId),
-                getAudioAnalysis(toTrackId)
-            ]);
+            // Get audio analysis and features for both tracks (with error handling)
+            let fromFeatures, toFeatures, fromAnalysis, toAnalysis;
+            try {
+                [fromFeatures, toFeatures, fromAnalysis, toAnalysis] = await Promise.all([
+                    getAudioFeatures(fromTrackId).catch(() => null),
+                    getAudioFeatures(toTrackId).catch(() => null),
+                    getAudioAnalysis(fromTrackId).catch(() => null),
+                    getAudioAnalysis(toTrackId).catch(() => null)
+                ]);
+            } catch (error) {
+                console.log('📊 [SMART TRANSITION] API calls failed, using basic transition');
+                fromFeatures = toFeatures = fromAnalysis = toAnalysis = null;
+            }
 
             if (fromFeatures && toFeatures) {
                 // Calculate transition parameters
@@ -1891,6 +1897,16 @@ class PlaylistTransitionEngine {
             // Set up loop parameters if this is a loop item
             if (item.type === 'loop') {
                 this.setupLoopItem(item);
+            }
+            
+            // CRITICAL FIX: Resume playback after loading new track
+            if (isPlaylistMode && !isPlaying) {
+                console.log('▶️ [PLAYLIST RESUME] Auto-resuming playback for playlist transition');
+                setTimeout(async () => {
+                    if (!isPlaying) {
+                        await togglePlayPause();
+                    }
+                }, 100); // Small delay to ensure track is fully loaded
             }
 
             // Notify UI of track change
@@ -3433,14 +3449,14 @@ function renderPlaylistsList() {
   }
 
   els.playlistsList.innerHTML = savedPlaylists.map((playlist) => `
-      <div class="playlist-card ${playlist.prebuffered ? 'prebuffered' : ''}" data-playlist-id="${playlist.id}">
+      <div class="playlist-card" data-playlist-id="${playlist.id}">
           <div class="playlist-header">
               <div class="playlist-icon">
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-music"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
               </div>
               <div class="playlist-details">
-                  <div class="playlist-name">${playlist.name}${playlist.prebuffered ? ' ⚡' : ''}</div>
-                  <div class="playlist-description">${playlist.description || `${playlist.items.length} items`}${playlist.prebuffered ? ' • Prebuffered' : ''}</div>
+                  <div class="playlist-name">${playlist.name}</div>
+                  <div class="playlist-description">${playlist.description || `${playlist.items.length} items`}</div>
               </div>
           </div>
 
@@ -3468,13 +3484,8 @@ function renderPlaylistsList() {
           <div class="playlist-actions">
               <button class="playlist-action-btn play-playlist-btn" data-playlist-id="${playlist.id}">
                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-play"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                ${playlist.prebuffered ? 'Play ⚡' : 'Play'}
+                Play
               </button>
-              ${!playlist.prebuffered && prebufferEnabled && playlist.items.length > 0 && playlist.items.length <= 100 ? `
-              <button class="playlist-action-btn prebuffer-playlist-btn" data-playlist-id="${playlist.id}" title="Prebuffer for seamless playback">
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-zap"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
-                Prebuffer
-              </button>` : ''}
               <button class="playlist-action-btn edit-playlist-btn" data-playlist-id="${playlist.id}">Edit</button>
               <button class="playlist-action-btn share-playlist-btn" data-playlist-id="${playlist.id}">Share</button>
               <button class="playlist-action-btn danger delete-playlist-btn" data-playlist-id="${playlist.id}">Delete</button>
@@ -4517,35 +4528,11 @@ function shouldPrebufferPlaylist(playlist) {
   return true;
 }
 
-// Enhanced playlist play function with prebuffering
+// Enhanced playlist play function with prebuffering (temporarily disabled)
 async function playPlaylistWithPrebuffer(playlistId, startIndex = 0) {
-  const playlist = savedPlaylists.find(p => p.id === playlistId);
-  if (!playlist || playlist.items.length === 0) {
-    showStatus('Playlist is empty');
-    return;
-  }
-  
-  // Check if we should prebuffer
-  if (shouldPrebufferPlaylist(playlist)) {
-    const shouldPrebuffer = confirm(
-      `🚀 Want to prebuffer "${playlist.name}" for the ultimate listening experience?\n\n` +
-      `• Zero-latency transitions\n` +
-      `• Instant loop repetition\n` +
-      `• Cached forever (one-time operation)\n` +
-      `• Takes 30sec-3min depending on playlist size\n\n` +
-      `Click OK to prebuffer, or Cancel to play normally.`
-    );
-    
-    if (shouldPrebuffer) {
-      const success = await prebufferPlaylist(playlist);
-      if (!success) {
-        // Fall back to normal playback
-        return playPlaylist(playlistId, startIndex);
-      }
-    }
-  }
-  
-  // Play the playlist (now potentially with cached data)
+  // Prebuffering temporarily disabled due to Spotify API limitations
+  // Fall back to normal playback
+  console.log('🔄 Prebuffering disabled - using normal playback');
   return playPlaylist(playlistId, startIndex);
 }
 
@@ -5344,15 +5331,11 @@ function setupEventListeners() {
           else if (target.matches('.play-playlist-btn')) {
               e.preventDefault();
               const playlistId = target.dataset.playlistId;
-              await playPlaylistWithPrebuffer(playlistId);
+              await playPlaylist(playlistId);
           }
           else if (target.matches('.prebuffer-playlist-btn')) {
               e.preventDefault();
-              const playlistId = target.dataset.playlistId;
-              const playlist = savedPlaylists.find(p => p.id === playlistId);
-              if (playlist) {
-                  await prebufferPlaylist(playlist);
-              }
+              showStatus('⚠️ Prebuffering temporarily disabled due to API limitations');
           }
           else if (target.matches('.play-playlist-track-btn')) {
               e.preventDefault();
