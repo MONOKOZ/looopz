@@ -1214,54 +1214,49 @@ async function initializeEssentia() {
             return null;
         }
         
+        // Debug available objects more thoroughly
         console.log('🔍 Available objects:', {
             EssentiaWASM: typeof EssentiaWASM,
             Essentia: typeof Essentia,
-            EssentiaWASM_keys: EssentiaWASM ? Object.keys(EssentiaWASM) : 'undefined'
+            EssentiaWASM_keys: EssentiaWASM ? Object.getOwnPropertyNames(EssentiaWASM) : 'undefined',
+            EssentiaWASM_proto: EssentiaWASM ? Object.getOwnPropertyNames(EssentiaWASM.prototype || {}) : 'undefined'
         });
         
-        // Try different initialization approaches
-        let essentia = null;
+        // Wait for WASM to be ready
+        if (typeof EssentiaWASM === 'function') {
+            console.log('🔍 Waiting for EssentiaWASM to be ready...');
+            const wasmModule = await EssentiaWASM();
+            console.log('🔍 WASM module loaded:', Object.keys(wasmModule));
+            
+            // Try to initialize with the loaded WASM module
+            if (typeof Essentia === 'function') {
+                try {
+                    essentiaInstance = new Essentia(wasmModule);
+                    essentiaReady = true;
+                    console.log('✅ Essentia.js ready for audio analysis');
+                    showStatus('🤖 AI analysis ready');
+                    return essentiaInstance;
+                } catch (e) {
+                    console.log('📊 WASM initialization failed:', e.message);
+                }
+            }
+        }
         
-        // Approach 1: Direct Essentia constructor
+        // Fallback: Try without WASM initialization
         if (typeof Essentia === 'function') {
             try {
-                essentia = new Essentia(EssentiaWASM);
-                console.log('✅ Essentia initialized with direct constructor');
+                essentiaInstance = new Essentia();
+                essentiaReady = true;
+                console.log('✅ Essentia.js ready (no WASM)');
+                showStatus('🤖 AI analysis ready (basic)');
+                return essentiaInstance;
             } catch (e) {
-                console.log('📊 Approach 1 failed:', e.message);
+                console.log('📊 Basic initialization failed:', e.message);
             }
         }
         
-        // Approach 2: EssentiaWASM.EssentiaJS constructor
-        if (!essentia && EssentiaWASM && EssentiaWASM.EssentiaJS) {
-            try {
-                essentia = new EssentiaWASM.EssentiaJS();
-                console.log('✅ Essentia initialized with EssentiaWASM.EssentiaJS');
-            } catch (e) {
-                console.log('📊 Approach 2 failed:', e.message);
-            }
-        }
-        
-        // Approach 3: Factory function
-        if (!essentia && EssentiaWASM && EssentiaWASM.Essentia) {
-            try {
-                essentia = EssentiaWASM.Essentia();
-                console.log('✅ Essentia initialized with factory function');
-            } catch (e) {
-                console.log('📊 Approach 3 failed:', e.message);
-            }
-        }
-        
-        if (essentia) {
-            essentiaInstance = essentia;
-            essentiaReady = true;
-            console.log('✅ Essentia.js ready for audio analysis');
-            showStatus('🤖 AI analysis ready');
-            return essentiaInstance;
-        } else {
-            throw new Error('All initialization approaches failed');
-        }
+        // If we get here, initialization failed
+        throw new Error('All Essentia.js initialization approaches failed');
         
     } catch (error) {
         console.warn('⚠️ Essentia.js initialization failed:', error);
