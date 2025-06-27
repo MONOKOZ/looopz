@@ -1717,97 +1717,109 @@
         });
     </script>
 <script>
-// Fix the Connect button
-document.addEventListener('DOMContentLoaded', function() {
-    // Wait a bit for script.js to load
-    setTimeout(() => {
-        // Ensure constants are available
-        window.SPOTIFY_CLIENT_ID = window.SPOTIFY_CLIENT_ID || '46637d8f5adb41c0a4be34e0df0c1597';
-        window.SPOTIFY_REDIRECT_URI = window.location.origin + window.location.pathname;
-        window.SPOTIFY_SCOPES = window.SPOTIFY_SCOPES || 'streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state';
+// Override ALL redirect-related code before anything loads
+window.ORIGINAL_REDIRECT_URI = 'https://looopz.vercel.app/';
+window.TESTING_REDIRECT_URI = 'https://looopz.vercel.app/test7.html'; // CORRECT FILENAME!
 
-        // Attach click handler to Connect button
-        const connectBtn = document.getElementById('connect-btn');
-        if (connectBtn) {
-            connectBtn.addEventListener('click', async () => {
-                console.log('🔐 Connect button clicked!');
-                
-                // If the original connectToSpotify function exists, use it
-                if (typeof window.connectToSpotify === 'function') {
-                    window.connectToSpotify();
-                } else if (typeof window.getSpotifyAuthUrl === 'function') {
-                    // Otherwise, do it manually
-                    const authUrl = await window.getSpotifyAuthUrl();
-                    window.location.href = authUrl;
-                } else {
-                    // Fallback: construct auth URL manually
-                    const codeVerifier = generateCodeVerifier();
-                    const codeChallenge = await generateCodeChallenge(codeVerifier);
-                    localStorage.setItem('code_verifier', codeVerifier);
-                    
-                    const authUrl = `https://accounts.spotify.com/authorize?` +
-                        `client_id=${window.SPOTIFY_CLIENT_ID}` +
-                        `&response_type=code` +
-                        `&redirect_uri=${encodeURIComponent(window.SPOTIFY_REDIRECT_URI)}` +
-                        `&scope=${encodeURIComponent(window.SPOTIFY_SCOPES)}` +
-                        `&code_challenge_method=S256` +
-                        `&code_challenge=${codeChallenge}` +
-                        `&show_dialog=true`;
-                    
-                    console.log('🔗 Redirecting to:', authUrl);
-                    window.location.href = authUrl;
-                }
-            });
-            
-            console.log('✅ Connect button handler attached');
-        } else {
-            console.error('❌ Connect button not found!');
-        }
+// Override the connect button and OAuth flow
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('🔧 Testing page OAuth fix loading...');
+    console.log('📍 Testing redirect URI:', window.TESTING_REDIRECT_URI);
+    
+    // Fix the Connect button to use testing redirect URI
+    const connectBtn = document.getElementById('connect-btn');
+    if (connectBtn) {
+        // Remove any existing listeners
+        connectBtn.replaceWith(connectBtn.cloneNode(true));
+        const newConnectBtn = document.getElementById('connect-btn');
         
-        // Also ensure the testing panel buttons work
-        console.log('🧪 Testing environment ready');
-        console.log('Client ID:', window.SPOTIFY_CLIENT_ID);
-        console.log('Redirect URI:', window.SPOTIFY_REDIRECT_URI);
-    }, 1000);
-});
-</script>
-
-<script>
-// Handle OAuth callback on testing page
-document.addEventListener('DOMContentLoaded', function() {
-    // Check if we have a code in the URL (OAuth callback)
+        newConnectBtn.addEventListener('click', async function(e) {
+            e.preventDefault();
+            e.stopPropagation();
+            
+            console.log('🔐 Test7 page connect clicked!');
+            
+            // Generate PKCE values
+            const codeVerifier = generateCodeVerifier();
+            const codeChallenge = await generateCodeChallenge(codeVerifier);
+            localStorage.setItem('code_verifier', codeVerifier);
+            
+            // Build auth URL with TEST7.HTML redirect URI
+            const authUrl = 'https://accounts.spotify.com/authorize?' + 
+                'client_id=46637d8f5adb41c0a4be34e0df0c1597' +
+                '&response_type=code' +
+                '&redirect_uri=' + encodeURIComponent('https://looopz.vercel.app/test7.html') +
+                '&scope=' + encodeURIComponent('streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state') +
+                '&code_challenge_method=S256' +
+                '&code_challenge=' + codeChallenge +
+                '&show_dialog=true';
+            
+            console.log('🔗 Redirecting to Spotify with test7.html as redirect URI');
+            window.location.href = authUrl;
+        });
+    }
+    
+    // Handle OAuth callback
     const urlParams = new URLSearchParams(window.location.search);
     const code = urlParams.get('code');
     
     if (code) {
-        console.log('🔐 OAuth callback detected on testing page!');
+        console.log('📝 OAuth callback on test7.html!');
         
-        // Exchange the code for a token
-        if (typeof window.exchangeCodeForToken === 'function') {
-            console.log('📝 Exchanging code for token...');
-            window.exchangeCodeForToken(code).then(() => {
-                console.log('✅ Token exchange complete!');
-                // Stay on testing page - don't redirect
+        // Exchange code for token with TEST7.HTML redirect URI
+        const codeVerifier = localStorage.getItem('code_verifier');
+        if (!codeVerifier) {
+            console.error('❌ Code verifier not found');
+            return;
+        }
+        
+        fetch('https://accounts.spotify.com/api/token', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                grant_type: 'authorization_code',
+                code: code,
+                redirect_uri: 'https://looopz.vercel.app/test7.html', // MUST MATCH!
+                client_id: '46637d8f5adb41c0a4be34e0df0c1597',
+                code_verifier: codeVerifier,
+            }),
+        })
+        .then(response => response.json())
+        .then(data => {
+            if (data.access_token) {
+                console.log('✅ Got token on test7.html!');
+                
+                // Store tokens
+                window.spotifyAccessToken = data.access_token;
+                localStorage.setItem('spotify_access_token', data.access_token);
+                if (data.refresh_token) {
+                    localStorage.setItem('spotify_refresh_token', data.refresh_token);
+                }
+                localStorage.removeItem('code_verifier');
+                
+                // Clean URL
                 window.history.replaceState({}, document.title, window.location.pathname);
                 
-                // Hide login screen and show main content
-                const loginScreen = document.getElementById('login-screen');
-                const searchSection = document.getElementById('search-section');
-                
-                if (loginScreen) loginScreen.classList.add('hidden');
-                if (searchSection) searchSection.classList.remove('hidden');
-                
-                // Update connection status
-                const connectionStatus = document.getElementById('connection-status');
-                if (connectionStatus) {
-                    connectionStatus.style.display = 'flex';
+                // Initialize player
+                if (typeof initializeSpotifyPlayer === 'function') {
+                    initializeSpotifyPlayer();
                 }
                 
-                console.log('🧪 Ready for testing!');
-            }).catch(error => {
-                console.error('❌ Token exchange failed:', error);
-            });
-        }
+                // Show main interface
+                document.getElementById('login-screen').classList.add('hidden');
+                document.getElementById('search-section').classList.remove('hidden');
+                document.getElementById('connection-status').style.display = 'flex';
+                
+                console.log('🧪 Test7 environment ready!');
+            } else {
+                console.error('❌ Token exchange failed:', data);
+                alert('Token exchange failed! Check console for details.');
+            }
+        })
+        .catch(error => {
+            console.error('❌ Token exchange error:', error);
+            alert('Token exchange error! Check console.');
+        });
     }
 });
 </script>
