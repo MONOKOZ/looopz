@@ -1725,12 +1725,33 @@ function triggerHapticFeedback(score) {
  * Designed to avoid conflicts with iOS text selection magnifier
  */
 function triggerZoneHapticFeedback(score) {
-    // Skip haptic feedback if not available or not actively dragging
-    if (!navigator.vibrate || !isDragging || !dragTarget) return;
+    // Debug logging to see what's happening
+    console.log(`🔍 Haptic debug: score=${score}, vibrate=${!!navigator.vibrate}, isDragging=${isDragging}, dragTarget=${dragTarget?.id}`);
     
-    // Check if dragging loop handles (they have IDs that contain 'loop' and 'handle')
-    const isLoopHandle = dragTarget.id && (dragTarget.id.includes('loop') && dragTarget.id.includes('handle'));
-    if (!isLoopHandle) return;
+    // Skip haptic feedback if not available or not actively dragging
+    if (!navigator.vibrate) {
+        console.log('❌ navigator.vibrate not available');
+        return;
+    }
+    
+    if (!isDragging) {
+        console.log('❌ Not currently dragging');
+        return;
+    }
+    
+    if (!dragTarget) {
+        console.log('❌ No drag target');
+        return;
+    }
+    
+    // Check if dragging loop handles (multiple detection methods)
+    const isLoopHandle = dragTarget.id && (dragTarget.id.includes('loop') && dragTarget.id.includes('handle')) || 
+                        dragTarget.classList.contains('loop-handle');
+    console.log(`🔍 Is loop handle: ${isLoopHandle}, dragTarget.id: ${dragTarget.id}, classes: ${dragTarget.className}`);
+    if (!isLoopHandle) {
+        console.log('❌ Not a loop handle');
+        return;
+    }
     
     const now = Date.now();
     
@@ -1749,7 +1770,10 @@ function triggerZoneHapticFeedback(score) {
             if (!triggerZoneHapticFeedback[zone.lastFeedback] || 
                 now - triggerZoneHapticFeedback[zone.lastFeedback] > 400) {
                 
-                navigator.vibrate(zone.pattern);
+                console.log(`🔥 TRIGGERING VIBRATION: pattern=${zone.pattern}, zone=${zone.threshold}+`);
+                const vibrateResult = navigator.vibrate(zone.pattern);
+                console.log(`🔥 Vibrate result: ${vibrateResult}`);
+                
                 triggerZoneHapticFeedback[zone.lastFeedback] = now;
                 
                 // Reset lower zone timers
@@ -1761,6 +1785,8 @@ function triggerZoneHapticFeedback(score) {
                 
                 console.log(`🎯 Zone haptic feedback: Score ${score.toFixed(1)} (zone ${zone.threshold}+)`);
                 break;
+            } else {
+                console.log(`⏳ Haptic cooldown active for zone ${zone.threshold}+ (${400 - (now - triggerZoneHapticFeedback[zone.lastFeedback])}ms remaining)`);
             }
         }
     }
