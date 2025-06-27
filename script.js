@@ -1755,12 +1755,12 @@ function triggerZoneHapticFeedback(score, dragTarget = null, isDragging = false)
     
     const now = Date.now();
     
-    // More sensitive zones with shorter cooldowns for better responsiveness
+    // More sensitive zones with stronger vibrations for better iOS feedback
     const zones = [
-        { threshold: 8.0, pattern: [60], lastFeedback: 'zone80' },      // Strong pulse for very good
-        { threshold: 6.5, pattern: [40], lastFeedback: 'zone65' },     // Medium pulse for good  
-        { threshold: 5.0, pattern: [25], lastFeedback: 'zone50' },     // Light pulse for okay
-        { threshold: 3.0, pattern: [15], lastFeedback: 'zone30' }      // Very light for poor
+        { threshold: 8.0, pattern: [100, 50, 100], lastFeedback: 'zone80' },      // Double strong pulse for very good
+        { threshold: 6.5, pattern: [80, 30, 80], lastFeedback: 'zone65' },       // Double medium pulse for good  
+        { threshold: 5.0, pattern: [60], lastFeedback: 'zone50' },               // Single medium pulse for okay
+        { threshold: 3.0, pattern: [40], lastFeedback: 'zone30' }                // Single light pulse for poor
     ];
     
     // Find the highest zone we've crossed
@@ -1770,7 +1770,7 @@ function triggerZoneHapticFeedback(score, dragTarget = null, isDragging = false)
             if (!triggerZoneHapticFeedback[zone.lastFeedback] || 
                 now - triggerZoneHapticFeedback[zone.lastFeedback] > 400) {
                 
-                console.log(`🔥 TRIGGERING VIBRATION: pattern=${zone.pattern}, zone=${zone.threshold}+`);
+                console.log(`🔥 TRIGGERING VIBRATION: pattern=[${zone.pattern.join(',')}], zone=${zone.threshold}+`);
                 const vibrateResult = navigator.vibrate(zone.pattern);
                 console.log(`🔥 Vibrate result: ${vibrateResult}`);
                 
