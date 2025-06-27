@@ -3218,22 +3218,45 @@ function setupLoopHandles() {
   let dragTarget = null;
 
   function startDrag(e, target) {
-      isDragging = true;
-      dragTarget = target;
-      target.classList.add('dragging');
-      const popup = target.querySelector('.time-popup');
-      if (popup) popup.classList.add('show');
+      // Double-tap detection for precision mode
+      const now = Date.now();
+      const timeSinceLastTap = now - precisionZoom.lastTapTime;
+      
+      if (timeSinceLastTap < 300 && precisionZoom.handleType === (target === els.loopStartHandle ? 'start' : 'end')) {
+          // Double-tap detected!
+          precisionZoom.tapCount = 0;
+          console.log(`🎯 Double-tap detected on ${precisionZoom.handleType} handle`);
+          
+          // Start drag in precision mode
+          isDragging = true;
+          dragTarget = target;
+          target.classList.add('dragging');
+          
+          // Immediately activate precision zoom
+          showPrecisionZoom(precisionZoom.handleType);
+          
+          // Visual feedback
+          target.style.transform = 'translateX(-50%) translateY(-50%) scale(1.2)';
+          target.style.boxShadow = '0 0 25px rgba(29, 185, 84, 1)';
+      } else {
+          // Single tap - normal drag
+          precisionZoom.lastTapTime = now;
+          precisionZoom.handleType = target === els.loopStartHandle ? 'start' : 'end';
+          
+          isDragging = true;
+          dragTarget = target;
+          target.classList.add('dragging');
+          const popup = target.querySelector('.time-popup');
+          if (popup) popup.classList.add('show');
+      }
+      
       if (e.preventDefault) e.preventDefault();
       if (e.stopPropagation) e.stopPropagation();
       
-      // Initialize precision zoom tracking
+      // Initialize tracking
       const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
       precisionZoom.lastPosition = clientX;
       precisionZoom.lastMoveTime = Date.now();
-      precisionZoom.handleType = target === els.loopStartHandle ? 'start' : 'end';
-      precisionZoom.pauseStartTime = null;
-      
-      console.log(`🎯 Drag started for ${precisionZoom.handleType} handle`);
   }
 
   function updateDrag(e) {
@@ -3255,59 +3278,7 @@ function setupLoopHandles() {
           newTime = percent * duration;
       }
       
-      // Precision zoom pause detection
-      const now = Date.now();
-      const movementDistance = Math.abs(clientX - precisionZoom.lastPosition);
-      
-      // Check for pause during drag (more generous threshold for intentional use)
-      if (movementDistance < 5) { // Slightly more generous threshold
-          if (!precisionZoom.pauseStartTime) {
-              precisionZoom.pauseStartTime = now;
-              console.log(`🎯 Pause detected - starting 0.75s timer`);
-              
-              // Immediate visual feedback - scale up the handle slightly
-              if (dragTarget) {
-                  dragTarget.style.transform = 'translateX(-50%) translateY(-50%) scale(1.1)';
-                  dragTarget.style.boxShadow = '0 0 15px rgba(29, 185, 84, 0.8)';
-              }
-          }
-          
-          // Show progress feedback during pause
-          const pauseDuration = now - precisionZoom.pauseStartTime;
-          const progress = Math.min(pauseDuration / 750, 1);
-          
-          // Update handle glow intensity based on progress
-          if (dragTarget && progress < 1) {
-              const glowIntensity = 0.8 + (progress * 0.4); // 0.8 to 1.2
-              dragTarget.style.boxShadow = `0 0 ${15 + progress * 10}px rgba(29, 185, 84, ${glowIntensity})`;
-          }
-          
-          // Activate precision zoom after 0.75 seconds of pause
-          if (pauseDuration > 750 && !precisionZoom.active && duration > 0) {
-              console.log(`🎯 Activating precision zoom after ${pauseDuration}ms pause`);
-              showPrecisionZoom(precisionZoom.handleType);
-              
-              // Strong activation feedback
-              if (dragTarget) {
-                  dragTarget.style.transform = 'translateX(-50%) translateY(-50%) scale(1.2)';
-                  dragTarget.style.boxShadow = '0 0 25px rgba(29, 185, 84, 1)';
-              }
-          }
-      } else {
-          // Movement detected - reset pause tracking and visual feedback
-          if (precisionZoom.pauseStartTime) {
-              console.log(`🎯 Movement detected - resetting pause timer`);
-              
-              // Reset handle visual feedback
-              if (dragTarget) {
-                  dragTarget.style.transform = 'translateX(-50%) translateY(-50%) scale(1)';
-                  dragTarget.style.boxShadow = '0 2px 12px rgba(0, 0, 0, 0.4)';
-              }
-          }
-          precisionZoom.lastPosition = clientX;
-          precisionZoom.lastMoveTime = now;
-          precisionZoom.pauseStartTime = null;
-      }
+      // No more pause detection - using double-tap instead!
 
       if (dragTarget === els.loopStartHandle) {
           const maxStart = Math.max(0, loopEnd - 0.1);
@@ -3368,8 +3339,6 @@ function setupLoopHandles() {
               setTimeout(() => hidePrecisionZoom(), 100);
           }
           
-          // Reset precision zoom pause tracking
-          precisionZoom.pauseStartTime = null;
           
           // Smart Loop Assist: Auto-snap disabled for smooth dragging
           // Auto-snapping is now manual-only to maintain precise linear movement
@@ -3410,7 +3379,9 @@ let precisionZoom = {
     pauseStartTime: null,
     zoomRange: 5,
     windowStart: null,
-    windowEnd: null
+    windowEnd: null,
+    lastTapTime: 0,
+    tapCount: 0
 };
 
 // Global precision zoom functions
@@ -3426,7 +3397,7 @@ function createPrecisionOverlay() {
                 <span style="font-family: monospace; font-size: 12px; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;">±${precisionZoom.zoomRange}s</span>
             </div>
             <div style="font-size: 11px; color: rgba(0,0,0,0.7); margin-bottom: 12px; text-align: center;">
-                Mouse movement now controls milliseconds within this window
+                Precision active: drag for millisecond accuracy
             </div>
             <div style="background: rgba(0,0,0,0.2); height: 8px; border-radius: 4px; margin-bottom: 8px; position: relative;">
                 <div id="precision-progress-bar" style="background: white; height: 100%; border-radius: 4px; width: 50%; transition: width 0.1s ease;"></div>
@@ -3484,7 +3455,7 @@ function showPrecisionZoom(handleType) {
     
     overlay.classList.add('active');
     
-    showStatus(`🎯 PRECISION MODE ACTIVE! Dragging now controls ±${precisionZoom.zoomRange}s window with millisecond accuracy`);
+    showStatus(`🎯 Precision mode: ${precisionZoom.zoomRange}s window • Millisecond accuracy enabled`);
 }
 
 function updatePrecisionVisuals() {
@@ -6411,14 +6382,14 @@ window.testAI = function() {
 
 // Test function to verify precision zoom
 window.testPrecisionZoom = function() {
-    console.log('Testing Precision Zoom System...');
-    console.log('Precision zoom state:', precisionZoom);
-    console.log('Duration set:', duration);
-    console.log('Loop start/end:', loopStart, loopEnd);
-    console.log('Loop handles exist:', !!els.loopStartHandle, !!els.loopEndHandle);
+    console.log('🎯 Precision Zoom System (Double-Tap Mode)');
+    console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+    console.log('State:', precisionZoom);
+    console.log('Duration:', duration);
+    console.log('Loop positions:', `${formatTime(loopStart)} - ${formatTime(loopEnd)}`);
     
     if (duration > 0) {
-        console.log('✅ Testing precision zoom activation...');
+        console.log('\n✅ Testing precision zoom activation...');
         precisionZoom.handleType = 'start';
         showPrecisionZoom('start');
         
@@ -6438,8 +6409,10 @@ window.testPrecisionZoom = function() {
             console.log('✅ Testing precision zoom deactivation...');
             hidePrecisionZoom();
         }, 4000);
+        
+        console.log('\n💡 To use: Double-tap any loop handle, then drag for precision!');
     } else {
-        console.log('❌ No track loaded - precision zoom requires active track');
+        console.log('\n❌ No track loaded - precision zoom requires active track');
         console.log('💡 Load a track first, then run testPrecisionZoom()');
     }
 };
