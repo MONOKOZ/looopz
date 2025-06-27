@@ -1547,7 +1547,7 @@ async function calculateLoopScore(startTime, endTime, audioBuffer = null) {
             
             if (spotifyAnalysis && spotifyAnalysis.beats) {
                 const beatAlignmentScore = calculateBeatAlignment(startTime, endTime, spotifyAnalysis.beats);
-                score += beatAlignmentScore * 0.3;
+                score += (beatAlignmentScore / 10) * 0.3; // Normalize from 0-10 to 0-1
                 factors.push(`Beat: ${beatAlignmentScore.toFixed(1)}`);
             } else {
                 // Fallback: prefer round numbers
@@ -1563,28 +1563,33 @@ async function calculateLoopScore(startTime, endTime, audioBuffer = null) {
 
         // 2. LOOP LENGTH OPTIMIZATION (25% weight)
         const lengthScore = calculateLengthScore(loopDuration);
-        score += lengthScore * 0.25;
+        score += (lengthScore / 10) * 0.25; // Normalize from 0-10 to 0-1
         factors.push(`Length: ${lengthScore.toFixed(1)}`);
 
         // 3. MUSICAL STRUCTURE (20% weight) - Prefer common loop lengths
         const structureScore = calculateStructureScore(loopDuration);
-        score += structureScore * 0.2;
+        score += (structureScore / 10) * 0.2; // Normalize from 0-10 to 0-1
         factors.push(`Structure: ${structureScore.toFixed(1)}`);
 
         // 4. SPECTRAL SIMILARITY (15% weight) - Simplified using timing
         const spectralScore = calculateSpectralScore(startTime, endTime);
-        score += spectralScore * 0.15;
+        score += (spectralScore / 10) * 0.15; // Normalize from 0-10 to 0-1
         factors.push(`Spectral: ${spectralScore.toFixed(1)}`);
 
         // 5. ENERGY CONSISTENCY (10% weight)
         const energyScore = calculateEnergyScore(startTime, endTime);
-        score += energyScore * 0.1;
+        score += (energyScore / 10) * 0.1; // Normalize from 0-10 to 0-1
         factors.push(`Energy: ${energyScore.toFixed(1)}`);
 
-        // Scale from 0-10 and add some randomness for demo
-        const finalScore = Math.min(10, Math.max(0, score * 10 + (Math.random() - 0.5) * 0.5));
+        // Score is now properly in 0-1 range from weighted factors, scale to 0-10
+        const finalScore = Math.min(10, Math.max(0, score * 10));
         
-        console.log(`🎯 Loop Score: ${finalScore.toFixed(1)}/10 (${factors.join(', ')})`);
+        // Only log when score changes significantly
+        if (!calculateLoopScore.lastScore || Math.abs(calculateLoopScore.lastScore - finalScore) > 0.5) {
+            console.log(`🎯 Loop Score: ${finalScore.toFixed(1)}/10 (${factors.join(', ')})`);
+            calculateLoopScore.lastScore = finalScore;
+        }
+        
         return Math.round(finalScore * 10) / 10; // Round to 1 decimal
 
     } catch (error) {
@@ -1678,15 +1683,10 @@ function calculateEnergyScore(startTime, endTime) {
 /**
  * Update Smart Loop Assist UI with current score
  */
-function updateSmartAssistUI(startScore, endScore) {
+function updateSmartAssistUI(score) {
     if (!els.smartAssistScore) return;
 
-    const avgScore = (startScore + endScore) / 2;
-    els.smartAssistScore.textContent = `Score: ${avgScore.toFixed(1)}/10`;
-    
-    // Update time popup colors based on scores
-    updateTimePopupColors(els.startPopup, startScore);
-    updateTimePopupColors(els.endPopup, endScore);
+    els.smartAssistScore.textContent = `Score: ${score.toFixed(1)}/10`;
 }
 
 /**
@@ -1721,6 +1721,46 @@ function triggerHapticFeedback(score) {
 }
 
 /**
+ * Trigger zone-based haptic feedback like "locking points" during dragging
+ */
+function triggerZoneHapticFeedback(score) {
+    if (!navigator.vibrate) return;
+    
+    const now = Date.now();
+    
+    // Create "locking points" at different score thresholds
+    const zones = [
+        { threshold: 9.5, pattern: [40, 30, 40], lastFeedback: 'zone95' },
+        { threshold: 8.5, pattern: [30, 20, 30], lastFeedback: 'zone85' },
+        { threshold: 7.5, pattern: [25, 15, 25], lastFeedback: 'zone75' },
+        { threshold: 6.5, pattern: [20, 10, 20], lastFeedback: 'zone65' }
+    ];
+    
+    // Find the highest zone we've crossed
+    for (const zone of zones) {
+        if (score >= zone.threshold) {
+            // Check if we haven't provided feedback for this zone recently
+            if (!triggerZoneHapticFeedback[zone.lastFeedback] || 
+                now - triggerZoneHapticFeedback[zone.lastFeedback] > 300) {
+                
+                navigator.vibrate(zone.pattern);
+                triggerZoneHapticFeedback[zone.lastFeedback] = now;
+                
+                // Reset lower zone timers to allow feedback when crossing back up
+                zones.forEach(z => {
+                    if (z.threshold < zone.threshold) {
+                        triggerZoneHapticFeedback[z.lastFeedback] = 0;
+                    }
+                });
+                
+                console.log(`🎯 Zone haptic feedback: Score ${score.toFixed(1)} (zone ${zone.threshold}+)`);
+                break;
+            }
+        }
+    }
+}
+
+/**
  * Find optimal snap position for loop handle
  */
 async function findOptimalSnapPosition(currentTime, handleType = 'start') {
@@ -1731,8 +1771,12 @@ async function findOptimalSnapPosition(currentTime, handleType = 'start') {
     // Get current loop bounds
     const otherTime = handleType === 'start' ? loopEnd : loopStart;
     
-    // Try small adjustments around current position
-    const adjustments = [-0.2, -0.1, -0.05, 0, 0.05, 0.1, 0.2];
+    // Try wider range of adjustments for better beat alignment
+    const adjustments = [
+        -2.0, -1.5, -1.0, -0.5, -0.25, -0.1, -0.05, 
+        0, 
+        0.05, 0.1, 0.25, 0.5, 1.0, 1.5, 2.0
+    ];
     let bestScore = 0;
     let bestPosition = currentTime;
     
@@ -2629,7 +2673,10 @@ function startProgressUpdates() {
                           await checkLoopEnd();
                       }
                   } else {
-                      console.warn(`🔄 Invalid position jump: ${lastKnownPosition}s → ${newTime}s`);
+                      // Reduce spam by only logging significant jumps occasionally
+                      if (Math.abs(newTime - lastKnownPosition) > 30 && Math.random() < 0.1) {
+                          console.warn(`🔄 Invalid position jump: ${lastKnownPosition}s → ${newTime}s`);
+                      }
                   }
                   
               } else if (state) {
@@ -2691,8 +2738,8 @@ function stopProgressUpdates() {
 
 // FIX 9: Unified loop end handling function with seamless transition preparation
 async function checkLoopEnd() {
-  // Reduced debug logging for playlist loops (only log every 10th check)
-  if (isPlaylistMode && loopEnabled && Math.random() < 0.1) {
+  // Minimal debug logging for playlist loops (only log rarely)
+  if (isPlaylistMode && loopEnabled && Math.random() < 0.01) {
       console.log(`🔍 Checking playlist loop: time=${currentTime.toFixed(3)}s, end=${loopEnd.toFixed(3)}s, threshold=${LOOP_END_THRESHOLD}s, loopCount=${loopCount}/${loopTarget}`);
   }
 
@@ -2708,7 +2755,10 @@ async function checkLoopEnd() {
   if (currentTime >= loopEnd - LOOP_END_THRESHOLD && loopCount < loopTarget) {
       const timeSinceLoopStart = Date.now() - loopStartTime;
       if (timeSinceLoopStart > 800) {
-          console.log(`🎯 Loop endpoint detected at ${currentTime.toFixed(3)}s!`);
+          // Only log occasionally to reduce spam
+          if (Math.random() < 0.2) {
+              console.log(`🎯 Loop endpoint detected at ${currentTime.toFixed(3)}s!`);
+          }
           await handleLoopEnd();
       }
   }
@@ -3174,17 +3224,17 @@ function setupLoopHandles() {
           if (!updateDrag.lastScoreUpdate || now - updateDrag.lastScoreUpdate > 100) {
               updateDrag.lastScoreUpdate = now;
               
-              // Calculate scores asynchronously for both handles
-              Promise.all([
-                  calculateLoopScore(loopStart, loopEnd),
-                  calculateLoopScore(loopStart, loopEnd)
-              ]).then(([startScore, endScore]) => {
-                  // Update UI with scores
-                  updateSmartAssistUI(startScore, endScore);
+              // Calculate current loop score
+              calculateLoopScore(loopStart, loopEnd).then(score => {
+                  // Update UI with score
+                  updateSmartAssistUI(score);
                   
-                  // Trigger haptic feedback for high scores
-                  const maxScore = Math.max(startScore, endScore);
-                  triggerHapticFeedback(maxScore);
+                  // Update time popup colors based on score
+                  updateTimePopupColors(els.startPopup, score);
+                  updateTimePopupColors(els.endPopup, score);
+                  
+                  // Trigger haptic feedback based on score zones (like locking points)
+                  triggerZoneHapticFeedback(score);
               }).catch(err => {
                   console.warn('Smart Loop Assist scoring failed:', err);
               });
