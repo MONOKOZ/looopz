@@ -3218,56 +3218,22 @@ function setupLoopHandles() {
   let dragTarget = null;
 
   function startDrag(e, target) {
-      // Double-tap detection for precision mode
-      const now = Date.now();
-      const timeSinceLastTap = now - precisionZoom.lastTapTime;
-      const currentHandleType = target === els.loopStartHandle ? 'start' : 'end';
-      
-      console.log(`🎯 Tap detected: time since last=${timeSinceLastTap}ms, same handle=${precisionZoom.handleType === currentHandleType}`);
-      
-      if (timeSinceLastTap < 300 && precisionZoom.handleType === currentHandleType) {
-          // Double-tap detected!
-          precisionZoom.tapCount = 0;
-          console.log(`🎯 DOUBLE-TAP ACTIVATED on ${currentHandleType} handle!`);
-          
-          // Start drag in precision mode
-          isDragging = true;
-          dragTarget = target;
-          target.classList.add('dragging');
-          
-          // Immediately activate precision zoom
-          showPrecisionZoom(currentHandleType);
-          
-          // Visual feedback
-          target.style.transform = 'translateX(-50%) translateY(-50%) scale(1.2)';
-          target.style.boxShadow = '0 0 25px rgba(29, 185, 84, 1)';
-          
-          // Show time popup in precision mode
-          const popup = target.querySelector('.time-popup');
-          if (popup) {
-              popup.classList.add('show');
-              popup.style.background = 'rgba(29, 185, 84, 0.95)';
-          }
-      } else {
-          // Single tap - normal drag
-          console.log(`🎯 Single tap - normal drag mode`);
-          precisionZoom.lastTapTime = now;
-          precisionZoom.handleType = currentHandleType;
-          
-          isDragging = true;
-          dragTarget = target;
-          target.classList.add('dragging');
-          const popup = target.querySelector('.time-popup');
-          if (popup) popup.classList.add('show');
-      }
+      isDragging = true;
+      dragTarget = target;
+      target.classList.add('dragging');
+      const popup = target.querySelector('.time-popup');
+      if (popup) popup.classList.add('show');
       
       if (e.preventDefault) e.preventDefault();
       if (e.stopPropagation) e.stopPropagation();
       
-      // Initialize tracking
+      // Initialize tracking for speed-based precision detection
       const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
       precisionZoom.lastPosition = clientX;
       precisionZoom.lastMoveTime = Date.now();
+      precisionZoom.handleType = target === els.loopStartHandle ? 'start' : 'end';
+      
+      console.log(`🎯 Drag started on ${precisionZoom.handleType} handle - speed detection active`);
   }
 
   function updateDrag(e) {
@@ -3289,7 +3255,61 @@ function setupLoopHandles() {
           newTime = percent * duration;
       }
       
-      // No more pause detection - using double-tap instead!
+      // Speed-based precision detection
+      const now = Date.now();
+      const timeDelta = now - precisionZoom.lastMoveTime;
+      const movementDistance = Math.abs(clientX - precisionZoom.lastPosition);
+      
+      // Calculate speed in pixels per second
+      const speed = timeDelta > 0 ? (movementDistance / timeDelta) * 1000 : 0;
+      
+      // Progressive visual feedback as speed decreases
+      if (!precisionZoom.active && dragTarget) {
+          if (speed < 100) { // Approaching precision threshold
+              const glowIntensity = 1 - (speed / 100); // 0 to 1 as speed decreases
+              dragTarget.style.boxShadow = `0 0 ${10 + glowIntensity * 15}px rgba(29, 185, 84, ${0.3 + glowIntensity * 0.5})`;
+          } else {
+              // Normal speed - reset glow
+              dragTarget.style.boxShadow = '0 2px 12px rgba(0, 0, 0, 0.4)';
+          }
+      }
+      
+      // When user slows down to near-zero speed, activate precision
+      if (speed < 30 && !precisionZoom.active && timeDelta > 150 && duration > 0) { // Less than 30 px/s
+          console.log(`🎯 Precision speed reached: ${speed.toFixed(1)} px/s - activating precision mode`);
+          precisionZoom.active = true;
+          
+          // Calculate precision window
+          const currentTime = precisionZoom.handleType === 'start' ? loopStart : loopEnd;
+          precisionZoom.windowStart = Math.max(0, currentTime - precisionZoom.zoomRange / 2);
+          precisionZoom.windowEnd = Math.min(duration, currentTime + precisionZoom.zoomRange / 2);
+          
+          // Subtle visual feedback
+          if (dragTarget) {
+              dragTarget.style.transform = 'translateX(-50%) translateY(-50%) scale(1.1)';
+              dragTarget.style.boxShadow = '0 0 20px rgba(29, 185, 84, 0.8)';
+          }
+          
+          showStatus(`🎯 Precision mode active`);
+      }
+      
+      // Exit precision mode if user speeds up significantly
+      if (precisionZoom.active && speed > 150) { // Fast movement exits precision
+          console.log(`🎯 Fast movement detected: ${speed.toFixed(1)} px/s - exiting precision mode`);
+          precisionZoom.active = false;
+          precisionZoom.windowStart = null;
+          precisionZoom.windowEnd = null;
+          
+          // Reset visual feedback
+          if (dragTarget) {
+              dragTarget.style.transform = 'translateX(-50%) translateY(-50%) scale(1)';
+              dragTarget.style.boxShadow = '0 2px 12px rgba(0, 0, 0, 0.4)';
+          }
+      }
+      
+      // Update tracking for next calculation
+      precisionZoom.lastPosition = clientX;
+      precisionZoom.lastMoveTime = now;
 
       if (dragTarget === els.loopStartHandle) {
           const maxStart = Math.max(0, loopEnd - 0.1);
@@ -3303,10 +3323,7 @@ function setupLoopHandles() {
 
       updateLoopVisuals();
       
-      // Update precision zoom display if active
-      if (precisionZoom.active) {
-          updatePrecisionVisuals();
-      }
+      // No overlay needed - precision is built into the existing progress bar mapping!
 
       // Smart Loop Assist: Calculate and display real-time scores
       if (smartLoopAssistEnabled && !isAnalyzingLoop) {
@@ -3347,7 +3364,9 @@ function setupLoopHandles() {
           
           // Clean up precision zoom
           if (precisionZoom.active) {
-              setTimeout(() => hidePrecisionZoom(), 100);
+              precisionZoom.active = false;
+              precisionZoom.windowStart = null;
+              precisionZoom.windowEnd = null;
           }
           
           
@@ -3380,140 +3399,18 @@ function setupLoopHandles() {
 // PRECISION ZOOM LOOP HANDLES - Simplified Implementation
 // ===============================================
 
-// Global precision zoom state
+// Global precision mode state
 let precisionZoom = {
     active: false,
-    overlay: null,
     handleType: null,
     lastPosition: 0,
     lastMoveTime: 0,
-    pauseStartTime: null,
     zoomRange: 5,
     windowStart: null,
-    windowEnd: null,
-    lastTapTime: 0,
-    tapCount: 0
+    windowEnd: null
 };
 
-// Global precision zoom functions
-function createPrecisionOverlay() {
-    if (precisionZoom.overlay) return precisionZoom.overlay;
-    
-    const overlay = document.createElement('div');
-    overlay.className = 'precision-zoom-overlay';
-    overlay.innerHTML = `
-        <div style="padding: 16px; background: rgba(29, 185, 84, 0.95); border-radius: 12px; border: 2px solid #1DB954;">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
-                <h3 style="margin: 0; font-size: 14px;">🎯 PRECISION MODE</h3>
-                <span style="font-family: monospace; font-size: 12px; background: rgba(0,0,0,0.3); padding: 2px 6px; border-radius: 4px;">±${precisionZoom.zoomRange}s</span>
-            </div>
-            <div style="font-size: 11px; color: rgba(0,0,0,0.7); margin-bottom: 12px; text-align: center;">
-                Precision active: drag for millisecond accuracy
-            </div>
-            <div style="background: rgba(0,0,0,0.2); height: 8px; border-radius: 4px; margin-bottom: 8px; position: relative;">
-                <div id="precision-progress-bar" style="background: white; height: 100%; border-radius: 4px; width: 50%; transition: width 0.1s ease;"></div>
-                <div id="precision-handle-dot" style="position: absolute; top: -2px; width: 12px; height: 12px; background: white; border: 2px solid #1DB954; border-radius: 50%; transform: translateX(-50%); left: 50%;"></div>
-            </div>
-            <div style="display: flex; justify-content: space-between; font-family: monospace; font-size: 11px;">
-                <span id="precision-window-start">--</span>
-                <span id="precision-current-time" style="font-weight: bold; color: white;">--</span>
-                <span id="precision-window-end">--</span>
-            </div>
-        </div>
-    `;
-    
-    document.body.appendChild(overlay);
-    precisionZoom.overlay = overlay;
-    return overlay;
-}
-
-function showPrecisionZoom(handleType) {
-    if (precisionZoom.active) return;
-    
-    console.log(`🎯 SHOWING PRECISION ZOOM for ${handleType} - duration:${duration}s`);
-    
-    precisionZoom.active = true;
-    precisionZoom.handleType = handleType;
-    
-    // Calculate precision window around current handle position
-    const currentTime = handleType === 'start' ? loopStart : loopEnd;
-    precisionZoom.windowStart = Math.max(0, currentTime - precisionZoom.zoomRange / 2);
-    precisionZoom.windowEnd = Math.min(duration, currentTime + precisionZoom.zoomRange / 2);
-    
-    const overlay = createPrecisionOverlay();
-    
-    // Position above progress bar
-    if (els.progressContainer) {
-        const progressRect = els.progressContainer.getBoundingClientRect();
-        overlay.style.position = 'fixed';
-        overlay.style.left = `${progressRect.left}px`;
-        overlay.style.top = `${progressRect.top - 120}px`;
-        overlay.style.width = `${progressRect.width}px`;
-        overlay.style.zIndex = '1000';
-    }
-    
-    // Update precision window display
-    const windowStartSpan = overlay.querySelector('#precision-window-start');
-    const windowEndSpan = overlay.querySelector('#precision-window-end');
-    const currentTimeSpan = overlay.querySelector('#precision-current-time');
-    
-    if (windowStartSpan) windowStartSpan.textContent = formatTime(precisionZoom.windowStart);
-    if (windowEndSpan) windowEndSpan.textContent = formatTime(precisionZoom.windowEnd);
-    if (currentTimeSpan) currentTimeSpan.textContent = formatTime(currentTime);
-    
-    // Update progress bar and handle position
-    updatePrecisionVisuals();
-    
-    overlay.classList.add('active');
-    
-    showStatus(`🎯 Precision mode: ${precisionZoom.zoomRange}s window • Millisecond accuracy enabled`);
-}
-
-function updatePrecisionVisuals() {
-    if (!precisionZoom.active || !precisionZoom.overlay) return;
-    
-    const currentTime = precisionZoom.handleType === 'start' ? loopStart : loopEnd;
-    const windowDuration = precisionZoom.windowEnd - precisionZoom.windowStart;
-    const position = (currentTime - precisionZoom.windowStart) / windowDuration;
-    
-    // Update progress bar width and handle position
-    const progressBar = precisionZoom.overlay.querySelector('#precision-progress-bar');
-    const handleDot = precisionZoom.overlay.querySelector('#precision-handle-dot');
-    const currentTimeSpan = precisionZoom.overlay.querySelector('#precision-current-time');
-    
-    if (progressBar) {
-        progressBar.style.width = `${Math.max(0, Math.min(100, position * 100))}%`;
-    }
-    
-    if (handleDot) {
-        handleDot.style.left = `${Math.max(0, Math.min(100, position * 100))}%`;
-    }
-    
-    if (currentTimeSpan) {
-        currentTimeSpan.textContent = formatTime(currentTime);
-    }
-}
-
-function hidePrecisionZoom() {
-    if (!precisionZoom.active) return;
-    
-    precisionZoom.active = false;
-    precisionZoom.windowStart = null;
-    precisionZoom.windowEnd = null;
-    
-    if (precisionZoom.overlay) {
-        precisionZoom.overlay.classList.remove('active');
-        setTimeout(() => {
-            if (precisionZoom.overlay) {
-                precisionZoom.overlay.remove();
-                precisionZoom.overlay = null;
-            }
-        }, 300);
-    }
-    
-    showStatus('🎯 Precision mode deactivated');
-    console.log('🎯 Precision zoom deactivated');
-}
+// Clean precision mode - no overlays, just natural precision control
 
 function setupPrecisionZoomLoopHandles() {
     // Simple initialization - precision zoom is now integrated directly into setupLoopHandles()
@@ -6391,40 +6288,27 @@ window.testAI = function() {
     }
 };
 
-// Test function to verify precision zoom
-window.testPrecisionZoom = function() {
-    console.log('🎯 Precision Zoom System (Double-Tap Mode)');
+// Test function to verify precision mode
+window.testPrecisionMode = function() {
+    console.log('🎯 Natural Precision Mode (Speed-Based)');
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     console.log('State:', precisionZoom);
     console.log('Duration:', duration);
     console.log('Loop positions:', `${formatTime(loopStart)} - ${formatTime(loopEnd)}`);
     
+    console.log('\n✨ How it works:');
+    console.log('  • Normal dragging: Mouse controls full song duration');
+    console.log('  • Slow down < 100 px/s: Green glow appears');
+    console.log('  • Slow down < 30 px/s: Mouse controls ±5s window');
+    console.log('  • Speed up > 150 px/s: Returns to normal mode');
+    console.log('  • Same progress bar, same UI - just precision mapping!');
+    
     if (duration > 0) {
-        console.log('\n✅ Testing precision zoom activation...');
-        precisionZoom.handleType = 'start';
-        showPrecisionZoom('start');
-        
-        // Simulate some position changes
-        setTimeout(() => {
-            console.log('✅ Simulating precision movements...');
-            loopStart += 0.05; // Move 50ms
-            updatePrecisionVisuals();
-        }, 1000);
-        
-        setTimeout(() => {
-            loopStart += 0.1; // Move another 100ms
-            updatePrecisionVisuals();
-        }, 2000);
-        
-        setTimeout(() => {
-            console.log('✅ Testing precision zoom deactivation...');
-            hidePrecisionZoom();
-        }, 4000);
-        
-        console.log('\n💡 To use: Double-tap any loop handle, then drag for precision!');
+        console.log('\n💡 Usage: Drag any handle slowly to feel the precision!');
+        console.log('🎯 Watch the time badge - it updates with millisecond precision');
     } else {
-        console.log('\n❌ No track loaded - precision zoom requires active track');
-        console.log('💡 Load a track first, then run testPrecisionZoom()');
+        console.log('\n❌ No track loaded - precision mode requires active track');
+        console.log('💡 Load a track first, then try dragging slowly');
     }
 };
 
