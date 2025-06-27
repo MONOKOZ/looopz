@@ -927,9 +927,9 @@ body {
    transform: translateX(-50%) translateY(-50%);
 }
 
-/* Double-tap hint on hover */
+/* Speed-based precision hint on hover */
 .loop-handle::after {
-   content: '💡 Double-tap for precision';
+   content: '💡 Drag slowly for precision';
    position: absolute;
    top: -45px;
    left: 50%;
