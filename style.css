@@ -2578,3 +2578,380 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
    0%, 100% { transform: translateY(0px); }
    50% { transform: translateY(-6px); }
 }
+
+/* ===============================================
+   PRECISION ZOOM UI - Clean No AI Implementation
+   =============================================== */
+
+.precision-zoom-overlay {
+    position: fixed;
+    background: rgba(0, 0, 0, 0.95);
+    backdrop-filter: blur(20px);
+    border: 2px solid var(--primary);
+    border-radius: 16px;
+    padding: 20px;
+    opacity: 0;
+    transform: translateY(-10px);
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.5);
+    pointer-events: none; /* Don't interfere with dragging */
+    min-width: 400px;
+    z-index: 1000;
+}
+
+.precision-zoom-overlay.active {
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.precision-zoom-overlay::before {
+    content: '';
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 0;
+    height: 0;
+    border-left: 8px solid transparent;
+    border-right: 8px solid transparent;
+    border-top: 8px solid var(--primary);
+}
+
+/* Header */
+.precision-zoom-header {
+    text-align: center;
+    margin-bottom: 16px;
+}
+
+.precision-title {
+    font-size: 16px;
+    font-weight: 700;
+    color: var(--primary);
+    margin-bottom: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+.precision-range {
+    font-size: 12px;
+    color: var(--text-secondary);
+    font-family: monospace;
+    background: rgba(255, 255, 255, 0.05);
+    padding: 4px 8px;
+    border-radius: 6px;
+    display: inline-block;
+}
+
+/* Main zoom bar */
+.precision-zoom-bar {
+    margin-bottom: 12px;
+}
+
+.precision-background {
+    position: relative;
+    height: 24px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    margin-bottom: 8px;
+    overflow: visible;
+}
+
+.precision-progress {
+    position: absolute;
+    top: 0;
+    height: 100%;
+    background: var(--gradient);
+    border-radius: 12px;
+    transition: all 0.1s ease;
+    min-width: 2px;
+    opacity: 0.8;
+}
+
+.precision-markers {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    pointer-events: none;
+}
+
+.precision-marker {
+    position: absolute;
+    top: -6px;
+    bottom: -6px;
+    width: 1px;
+    background: rgba(255, 255, 255, 0.3);
+    transform: translateX(-50%);
+}
+
+.precision-marker.major {
+    width: 2px;
+    background: rgba(255, 255, 255, 0.6);
+    top: -10px;
+    bottom: -10px;
+}
+
+.precision-marker.major span {
+    position: absolute;
+    top: -22px;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 9px;
+    color: var(--text-secondary);
+    font-family: monospace;
+    white-space: nowrap;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* Current handle indicator */
+.precision-current-handle {
+    position: absolute;
+    top: 50%;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    transform: translate(-50%, -50%);
+    border: 2px solid white;
+    z-index: 10;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+    transition: all 0.1s ease;
+}
+
+.precision-current-handle.start {
+    background: var(--primary);
+    animation: precision-pulse-start 1.5s ease-in-out infinite;
+}
+
+.precision-current-handle.end {
+    background: var(--secondary);
+    animation: precision-pulse-end 1.5s ease-in-out infinite;
+}
+
+@keyframes precision-pulse-start {
+    0%, 100% {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 0 0 0 rgba(29, 185, 84, 0.7);
+    }
+    50% {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 0 0 6px rgba(29, 185, 84, 0);
+    }
+}
+
+@keyframes precision-pulse-end {
+    0%, 100% {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 0 0 0 rgba(153, 69, 219, 0.7);
+    }
+    50% {
+        box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4), 0 0 0 6px rgba(153, 69, 219, 0);
+    }
+}
+
+/* Time labels */
+.precision-time-labels {
+    display: flex;
+    justify-content: space-between;
+    font-family: monospace;
+    font-size: 10px;
+    color: var(--text-secondary);
+    margin-bottom: 12px;
+}
+
+.precision-start-label,
+.precision-end-label {
+    background: rgba(255, 255, 255, 0.05);
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Hint text */
+.precision-hint {
+    text-align: center;
+    font-size: 11px;
+    color: var(--primary);
+    font-weight: 500;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    background: rgba(29, 185, 84, 0.1);
+    padding: 6px 12px;
+    border-radius: 8px;
+    border: 1px solid rgba(29, 185, 84, 0.3);
+    animation: hint-glow 2s ease-in-out infinite;
+}
+
+@keyframes hint-glow {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.85;
+        transform: scale(1.02);
+    }
+}
+
+/* Enhanced loop handles during precision mode */
+.loop-handle.dragging {
+    width: 32px;
+    height: 32px;
+    z-index: 1001; /* Above precision overlay */
+    animation: precision-drag-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes precision-drag-pulse {
+    0%, 100% {
+        box-shadow: 0 2px 12px rgba(0, 0, 0, 0.4);
+        transform: translateX(-50%) translateY(-50%) scale(1);
+    }
+    50% {
+        box-shadow: 0 4px 20px rgba(0, 0, 0, 0.6);
+        transform: translateX(-50%) translateY(-50%) scale(1.05);
+    }
+}
+
+/* Enhanced time popup during precision dragging */
+.loop-handle.dragging .time-popup {
+    background: rgba(0, 0, 0, 0.95);
+    backdrop-filter: blur(10px);
+    border: 2px solid var(--primary);
+    font-size: 14px;
+    padding: 8px 12px;
+    border-radius: 8px;
+    transform: translateX(-50%) scale(1.1);
+    box-shadow: 0 4px 16px rgba(0, 0, 0, 0.5);
+    font-family: monospace;
+    font-weight: 600;
+    color: var(--primary);
+}
+
+/* Progress container enhancements during precision mode */
+.progress-container.precision-active {
+    z-index: 999;
+    box-shadow: 0 0 20px rgba(29, 185, 84, 0.3);
+    border: 1px solid rgba(29, 185, 84, 0.5);
+    background: rgba(29, 185, 84, 0.05);
+}
+
+/* Mobile responsive adjustments */
+@media (max-width: 768px) {
+    .precision-zoom-overlay {
+        padding: 16px;
+        border-radius: 12px;
+        min-width: 300px;
+        left: 10px !important;
+        right: 10px !important;
+        width: calc(100vw - 20px) !important;
+    }
+    
+    .precision-background {
+        height: 20px;
+    }
+    
+    .precision-current-handle {
+        width: 16px;
+        height: 16px;
+    }
+    
+    .precision-time-labels {
+        font-size: 9px;
+    }
+    
+    .precision-hint {
+        font-size: 10px;
+        padding: 4px 8px;
+    }
+    
+    .precision-marker.major span {
+        font-size: 8px;
+        top: -20px;
+    }
+    
+    .precision-title {
+        font-size: 14px;
+    }
+    
+    .precision-range {
+        font-size: 11px;
+    }
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+    .precision-zoom-overlay {
+        transition: opacity 0.2s ease;
+    }
+    
+    .precision-current-handle.start,
+    .precision-current-handle.end {
+        animation: none;
+    }
+    
+    .precision-hint {
+        animation: none;
+    }
+    
+    .loop-handle.dragging {
+        animation: none;
+    }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+    .precision-zoom-overlay {
+        border: 3px solid var(--primary);
+        background: rgba(0, 0, 0, 0.98);
+    }
+    
+    .precision-background {
+        background: rgba(255, 255, 255, 0.2);
+        border: 1px solid rgba(255, 255, 255, 0.5);
+    }
+    
+    .precision-marker {
+        background: rgba(255, 255, 255, 0.8);
+    }
+    
+    .precision-marker.major {
+        background: white;
+    }
+    
+    .precision-current-handle {
+        border: 3px solid white;
+    }
+}
+
+/* Smooth entry/exit animations */
+@keyframes precisionSlideIn {
+    from {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+}
+
+@keyframes precisionSlideOut {
+    from {
+        opacity: 1;
+        transform: translateY(0) scale(1);
+    }
+    to {
+        opacity: 0;
+        transform: translateY(-20px) scale(0.95);
+    }
+}
+
+.precision-zoom-overlay.active {
+    animation: precisionSlideIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.precision-zoom-overlay.removing {
+    animation: precisionSlideOut 0.3s ease-out;
+}
