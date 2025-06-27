@@ -1481,7 +1481,7 @@ class PlaylistTransitionEngine {
         this.transitionInProgress = false;
         
         // Smart transition state - keeping for API compatibility
-        this.smartTransitionsEnabled = true;
+        this.smartTransitionsEnabled = false; // Disabled due to API limitations
         this.isTransitioning = false;
         this.currentTransitionData = null;
         this.crossfadeInProgress = false;
@@ -1873,10 +1873,8 @@ class PlaylistTransitionEngine {
             // Reset seamless transition state for new track
             transitionPrepared = false;
 
-            // Calculate smart transition if coming from previous item
-            if (itemIndex > 0 && this.smartTransitionsEnabled) {
-                await this.prepareSmartTransition(itemIndex - 1, itemIndex);
-            }
+            // Smart transitions disabled to prevent API failures
+            console.log('🎵 [TRANSITION] Using basic transition to avoid API calls');
 
             // Load track into Spotify
             const startPosition = item.type === 'loop' ? item.start * 1000 : 0;
@@ -1907,6 +1905,14 @@ class PlaylistTransitionEngine {
                         await togglePlayPause();
                     }
                 }, 100); // Small delay to ensure track is fully loaded
+                
+                // Backup resume after 2 seconds if still not playing
+                setTimeout(async () => {
+                    if (isPlaylistMode && !isPlaying) {
+                        console.log('🔄 [BACKUP RESUME] Force resuming stuck playback');
+                        await togglePlayPause();
+                    }
+                }, 2000);
             }
 
             // Notify UI of track change
@@ -1957,6 +1963,15 @@ class PlaylistTransitionEngine {
             if (this.currentItemIndex >= this.currentPlaylist.items.length) {
                 // Playlist complete
                 console.log('🏁 Playlist finished');
+                
+                // Clean up playlist state
+                isPlaylistMode = false;
+                this.currentPlaylist = null;
+                this.currentItemIndex = 0;
+                
+                // Show completion message
+                showStatus('✨ Playlist completed!');
+                
                 if (this.onPlaylistComplete) this.onPlaylistComplete();
                 return;
             }
