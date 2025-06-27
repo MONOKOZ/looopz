@@ -927,32 +927,28 @@ body {
    transform: translateX(-50%) translateY(-50%);
 }
 
-/* Speed-based precision hint on hover */
+/* Subtle precision hint on hover */
 .loop-handle::after {
-   content: '💡 Drag slowly for precision';
+   content: 'slow = precise';
    position: absolute;
-   top: -45px;
+   top: -18px;
    left: 50%;
    transform: translateX(-50%);
-   background: rgba(0, 0, 0, 0.95);
-   color: var(--primary);
-   padding: 8px 12px;
-   border-radius: 8px;
-   font-size: 12px;
-   font-weight: 600;
+   background: rgba(0, 0, 0, 0.7);
+   color: rgba(255, 255, 255, 0.6);
+   padding: 2px 6px;
+   border-radius: 3px;
+   font-size: 9px;
+   font-weight: 400;
    white-space: nowrap;
    opacity: 0;
    pointer-events: none;
-   transition: all 0.3s ease;
-   border: 2px solid var(--primary);
-   backdrop-filter: blur(10px);
+   transition: opacity 0.2s ease;
    z-index: 1000;
-   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
 }
 
 .loop-handle:hover::after {
    opacity: 1;
-   transform: translateX(-50%) translateY(-3px);
 }
 
 .time-popup {
