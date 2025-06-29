@@ -498,9 +498,15 @@ function updateLoopVisuals() {
   // Use fallback duration if Spotify duration not available yet
   const effectiveDuration = duration > 0 ? duration : 240;
   
-  // If no loop points are set, use defaults
-  if (loopStart === undefined || loopEnd === undefined) {
+  console.log('🔍 updateLoopVisuals called - loopStart:', loopStart, 'loopEnd:', loopEnd, 'duration:', duration, 'effectiveDuration:', effectiveDuration);
+  
+  // Only set defaults if values are truly uninitialized (null or undefined, but not 0)
+  if (loopStart === null || loopStart === undefined) {
+    console.log('⚠️ loopStart was null/undefined, setting to 0');
     loopStart = 0;
+  }
+  if (loopEnd === null || loopEnd === undefined) {
+    console.log('⚠️ loopEnd was null/undefined, setting to default');
     loopEnd = Math.min(30, effectiveDuration);
   }
 
@@ -4793,6 +4799,7 @@ function loadPlaylistItem(playlistId, itemIndex) {
       };
 
       // Set loop state but don't update visuals yet (wait for Spotify duration)
+      console.log('🎵 Setting loop state from playlist item - start:', item.start, 'end:', item.end, 'target:', item.playCount);
       appState.set('loop.start', item.start);
       appState.set('loop.end', item.end);
       appState.set('loop.target', item.playCount);
@@ -4805,6 +4812,7 @@ function loadPlaylistItem(playlistId, itemIndex) {
       loadTrackSafely(trackData, item.start * 1000, true).then(() => {
           // Update visuals after track loads with correct Spotify duration
           setTimeout(() => {
+              console.log('🎵 About to update loop visuals - start:', loopStart, 'end:', loopEnd, 'duration:', duration);
               updateLoopVisuals();
               console.log('🎵 Loop visuals updated with Spotify duration:', duration);
           }, 500); // Small delay to ensure duration is set
