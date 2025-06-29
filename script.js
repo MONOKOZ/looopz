@@ -12,18 +12,217 @@ const trackFeaturesCache = new Map();
 
 // Transition sample configuration - REMOVED (no longer needed)
 
-// State
-let spotifyPlayer = null, spotifyDeviceId = null, spotifyAccessToken = null;
-let isConnected = false, isPlaying = false, currentTrack = null;
-let currentTime = 0, duration = 0, loopStart = 0, loopEnd = 30;
-let loopEnabled = false, loopCount = 0, loopTarget = 1, loopStartTime = 0;
-let updateTimer = null, savedLoops = [], isLooping = false, isDragging = false;
-let currentView = 'login', currentSearchResults = [], currentEditingLoopId = null;
-let currentContextMenuTrackIndex = null;
+// ===============================================
+// UNIFIED STATE MANAGEMENT SYSTEM
+// ===============================================
 
-// Request management to prevent race conditions
-let currentTrackOperation = null;
-let operationCounter = 0;
+class AppState {
+    constructor() {
+        this.state = {
+            // Connection & Authentication
+            spotify: {
+                player: null,
+                deviceId: null,
+                accessToken: null,
+                isConnected: false
+            },
+            
+            // Current Playback
+            playback: {
+                currentTrack: null,
+                isPlaying: false,
+                currentTime: 0,
+                duration: 0,
+                lastSeekTime: 0
+            },
+            
+            // Loop Control
+            loop: {
+                enabled: false,
+                start: 0,
+                end: 30,
+                count: 0,
+                target: 1,
+                startTime: 0,
+                isLooping: false,
+                isDragging: false
+            },
+            
+            // Playlist Mode
+            playlist: {
+                isActive: false,
+                current: null,
+                currentIndex: 0,
+                engine: null,
+                viewMode: 'overview',
+                editingId: null,
+                pendingItem: null
+            },
+            
+            // UI State
+            ui: {
+                currentView: 'login',
+                searchResults: [],
+                editingLoopId: null,
+                contextMenuTrackIndex: null
+            },
+            
+            // Timers & Operations
+            operations: {
+                updateTimer: null,
+                currentTrackOperation: null,
+                operationCounter: 0
+            }
+        };
+        
+        this.listeners = new Map();
+        this.initialized = false;
+    }
+    
+    // Subscribe to state changes
+    subscribe(key, callback) {
+        if (!this.listeners.has(key)) {
+            this.listeners.set(key, new Set());
+        }
+        this.listeners.get(key).add(callback);
+        
+        // Return unsubscribe function
+        return () => {
+            const callbacks = this.listeners.get(key);
+            if (callbacks) callbacks.delete(callback);
+        };
+    }
+    
+    // Get state value by path (e.g., 'playback.currentTrack')
+    get(path) {
+        return path.split('.').reduce((obj, key) => obj?.[key], this.state);
+    }
+    
+    // Set state value and notify listeners
+    set(path, value) {
+        const keys = path.split('.');
+        const lastKey = keys.pop();
+        const target = keys.reduce((obj, key) => obj[key], this.state);
+        
+        const oldValue = target[lastKey];
+        if (oldValue === value) return; // No change
+        
+        target[lastKey] = value;
+        
+        // Notify specific listeners
+        this.notifyListeners(path, value, oldValue);
+        
+        // Notify parent path listeners
+        let currentPath = '';
+        for (const key of keys) {
+            currentPath = currentPath ? `${currentPath}.${key}` : key;
+            this.notifyListeners(currentPath, this.get(currentPath), null);
+        }
+        
+        console.log(`🔄 State changed: ${path} = ${value}`);
+    }
+    
+    // Update multiple values atomically
+    update(updates) {
+        Object.entries(updates).forEach(([path, value]) => {
+            const keys = path.split('.');\n            const lastKey = keys.pop();\n            const target = keys.reduce((obj, key) => obj[key], this.state);\n            target[lastKey] = value;
+        });
+    }
+    
+    // Reset specific section
+    reset(section) {
+        const defaults = this.getDefaults();
+        if (defaults[section]) {
+            this.state[section] = { ...defaults[section] };
+            this.notifyListeners(section, this.state[section], null);
+        }
+    }
+    
+    notifyListeners(path, newValue, oldValue) {
+        const callbacks = this.listeners.get(path);
+        if (callbacks) {
+            callbacks.forEach(callback => {
+                try {
+                    callback(newValue, oldValue, path);
+                } catch (error) {
+                    console.error(`State listener error for ${path}:`, error);
+                }
+            });
+        }
+    }
+    
+    getDefaults() {
+        return {
+            spotify: { player: null, deviceId: null, accessToken: null, isConnected: false },
+            playback: { currentTrack: null, isPlaying: false, currentTime: 0, duration: 0, lastSeekTime: 0 },
+            loop: { enabled: false, start: 0, end: 30, count: 0, target: 1, startTime: 0, isLooping: false, isDragging: false },
+            playlist: { isActive: false, current: null, currentIndex: 0, engine: null, viewMode: 'overview', editingId: null, pendingItem: null },
+            ui: { currentView: 'login', searchResults: [], editingLoopId: null, contextMenuTrackIndex: null },
+            operations: { updateTimer: null, currentTrackOperation: null, operationCounter: 0 }
+        };
+    }
+    
+    // Debug helper
+    debug() {
+        console.log('🔍 Current State:', JSON.parse(JSON.stringify(this.state)));
+    }
+}
+
+// Global state instance
+const appState = new AppState();
+
+// Initialize state synchronization system
+function initializeStateSync() {
+    // Spotify state sync
+    appState.subscribe('spotify.player', (value) => spotifyPlayer = value);
+    appState.subscribe('spotify.deviceId', (value) => spotifyDeviceId = value);
+    appState.subscribe('spotify.accessToken', (value) => spotifyAccessToken = value);
+    appState.subscribe('spotify.isConnected', (value) => isConnected = value);
+    
+    // Playback state sync
+    appState.subscribe('playback.currentTrack', (value) => currentTrack = value);
+    appState.subscribe('playback.isPlaying', (value) => isPlaying = value);
+    appState.subscribe('playback.currentTime', (value) => currentTime = value);
+    appState.subscribe('playback.duration', (value) => duration = value);
+    
+    // Loop state sync
+    appState.subscribe('loop.enabled', (value) => loopEnabled = value);
+    appState.subscribe('loop.start', (value) => loopStart = value);
+    appState.subscribe('loop.end', (value) => loopEnd = value);
+    appState.subscribe('loop.count', (value) => loopCount = value);
+    appState.subscribe('loop.target', (value) => loopTarget = value);
+    appState.subscribe('loop.startTime', (value) => loopStartTime = value);
+    appState.subscribe('loop.isLooping', (value) => isLooping = value);
+    appState.subscribe('loop.isDragging', (value) => isDragging = value);
+    
+    // Playlist state sync
+    appState.subscribe('playlist.isActive', (value) => isPlaylistMode = value);
+    appState.subscribe('playlist.current', (value) => currentPlaylist = value);
+    appState.subscribe('playlist.currentIndex', (value) => currentPlaylistIndex = value);
+    appState.subscribe('playlist.engine', (value) => playlistEngine = value);
+    appState.subscribe('playlist.viewMode', (value) => playlistViewMode = value);
+    appState.subscribe('playlist.editingId', (value) => currentEditingPlaylistId = value);
+    appState.subscribe('playlist.pendingItem', (value) => pendingPlaylistItem = value);
+    
+    // UI state sync
+    appState.subscribe('ui.currentView', (value) => currentView = value);
+    appState.subscribe('ui.searchResults', (value) => currentSearchResults = value);
+    appState.subscribe('ui.editingLoopId', (value) => currentEditingLoopId = value);
+    appState.subscribe('ui.contextMenuTrackIndex', (value) => currentContextMenuTrackIndex = value);
+    
+    // Operations state sync
+    appState.subscribe('operations.updateTimer', (value) => updateTimer = value);
+    appState.subscribe('operations.currentTrackOperation', (value) => currentTrackOperation = value);
+    appState.subscribe('operations.operationCounter', (value) => operationCounter = value);\n    \n    // Critical state change handlers to prevent race conditions\n    setupCriticalStateHandlers();
+}
+
+// Legacy variable declarations for backward compatibility
+let spotifyPlayer, spotifyDeviceId, spotifyAccessToken, isConnected, isPlaying, currentTrack;
+let currentTime, duration, loopStart, loopEnd, loopEnabled, loopCount, loopTarget, loopStartTime;
+let updateTimer, isLooping, isDragging, currentView, currentSearchResults, currentEditingLoopId;
+let currentContextMenuTrackIndex, isPlaylistMode, currentPlaylist, currentPlaylistIndex;
+let playlistEngine, playlistViewMode, currentEditingPlaylistId, pendingPlaylistItem;
+let currentTrackOperation, operationCounter;
 
 // UNIFIED LOOP SYSTEM - Fixed timing and state management
 let lastSeekTime = 0; // For debouncing seeks
@@ -137,8 +336,9 @@ async function loadTrackSafely(trackData, startPositionMs = 0, preserveLoopPoint
   }
   
   // Create new operation with unique ID
-  const operationId = ++operationCounter;
-  currentTrackOperation = { id: operationId, cancelled: false };
+  const operationId = appState.get('operations.operationCounter') + 1;
+  appState.set('operations.operationCounter', operationId);
+  appState.set('operations.currentTrackOperation', { id: operationId, cancelled: false });
   
   console.log(`🎵 [SAFE LOAD ${operationId}] Loading: ${trackData.name}`);
   
@@ -158,7 +358,7 @@ async function loadTrackSafely(trackData, startPositionMs = 0, preserveLoopPoint
     }
     
     // Clear stale track info immediately
-    currentTrack = null;
+    appState.set('playback.currentTrack', null);
     
     // Load track
     await loadTrackIntoSpotify(trackData, startPositionMs);
@@ -170,14 +370,14 @@ async function loadTrackSafely(trackData, startPositionMs = 0, preserveLoopPoint
     }
     
     // Update current track info
-    currentTrack = trackData;
+    appState.set('playback.currentTrack', trackData);
     
     // Restore loop points if requested
     if (preservedLoop) {
-      loopStart = preservedLoop.start;
-      loopEnd = preservedLoop.end;
-      loopTarget = preservedLoop.target;
-      loopEnabled = preservedLoop.enabled;
+      appState.set('loop.start', preservedLoop.start);
+      appState.set('loop.end', preservedLoop.end);
+      appState.set('loop.target', preservedLoop.target);
+      appState.set('loop.enabled', preservedLoop.enabled);
       console.log(`🔄 [SAFE LOAD ${operationId}] Restored loop points: ${formatTime(loopStart)} - ${formatTime(loopEnd)}`);
     } else {
       // Reset loop state for new track
@@ -200,7 +400,7 @@ async function loadTrackSafely(trackData, startPositionMs = 0, preserveLoopPoint
   } finally {
     // Clear operation if it's still ours
     if (currentTrackOperation && currentTrackOperation.id === operationId) {
-      currentTrackOperation = null;
+      appState.set('operations.currentTrackOperation', null);
     }
   }
 }
@@ -209,12 +409,12 @@ async function loadTrackSafely(trackData, startPositionMs = 0, preserveLoopPoint
  * Reset loop state to defaults
  */
 function resetLoopState() {
-  loopStart = 0;
-  loopEnd = 30;
-  loopTarget = 1;
-  loopCount = 0;
-  loopEnabled = false;
-  loopStartTime = Date.now();
+  appState.set('loop.start', 0);
+  appState.set('loop.end', 30);
+  appState.set('loop.target', 1);
+  appState.set('loop.count', 0);
+  appState.set('loop.enabled', false);
+  appState.set('loop.startTime', Date.now());
 }
 
 function updateProgress() {
@@ -305,7 +505,7 @@ if (loopEnabled) {
 
 // Context Menu Functions - IMPROVED
 function showTrackContextMenu(trackIndex, buttonElement) {
-  currentContextMenuTrackIndex = trackIndex;
+  appState.set('ui.contextMenuTrackIndex', trackIndex);
   const menu = els.contextMenu;
   const overlay = els.contextMenuOverlay;
 
@@ -329,7 +529,7 @@ function hideTrackContextMenu() {
 
   menu.classList.remove('show');
   overlay.classList.remove('show');
-  currentContextMenuTrackIndex = null;
+  appState.set('ui.contextMenuTrackIndex', null);
 }
 
 function getCurrentContextTrack() {
@@ -355,7 +555,7 @@ async function handleAddToPlaylist() {
   hideTrackContextMenu();
 
   // Create a pending playlist item for this track
-  pendingPlaylistItem = {
+  appState.set('playlist.pendingItem', {
       type: 'track',
       uri: track.uri,
       name: track.name,
@@ -485,7 +685,7 @@ async function exchangeCodeForToken(code) {
 
   const data = await response.json();
   if (data.access_token) {
-      spotifyAccessToken = data.access_token;
+      appState.set('spotify.accessToken', data.access_token);
       localStorage.setItem('spotify_access_token', data.access_token);
       if (data.refresh_token) localStorage.setItem('spotify_refresh_token', data.refresh_token);
       localStorage.removeItem('code_verifier');
@@ -500,8 +700,8 @@ async function exchangeCodeForToken(code) {
 function disconnectSpotify() {
   localStorage.removeItem('spotify_access_token');
   localStorage.removeItem('spotify_refresh_token');
-  spotifyAccessToken = null;
-  isConnected = false;
+  appState.set('spotify.accessToken', null);
+  appState.set('spotify.isConnected', false);
   if (spotifyPlayer) spotifyPlayer.disconnect();
   updateConnectionStatus();
   updateMiniPlayer(null);
@@ -553,18 +753,18 @@ async function loadTrackIntoSpotify(track, startPositionMs = 0) {
               if (state && state.track_window?.current_track) {
                   console.log('✅ SDK synced with track:', state.track_window.current_track.name);
                   synced = true;
-                  isPlaying = !state.paused;
-                  currentTime = state.position / 1000;
-                  duration = state.track_window.current_track.duration_ms / 1000;
+                  appState.set('playback.isPlaying', !state.paused);
+                  appState.set('playback.currentTime', state.position / 1000);
+                  appState.set('playback.duration', state.track_window.current_track.duration_ms / 1000);
 
                   // Update current track info
-                  currentTrack = {
+                  appState.set('playback.currentTrack', {
                       uri: track.uri,
                       name: track.name,
                       artist: track.artist,
                       duration: duration,
                       image: track.image
-                  };
+                  });
 
                   // Update UI
                   els.currentTrack.textContent = track.name;
@@ -618,7 +818,7 @@ async function togglePlayPause() {
               console.log('▶ SDK resume success');
           }
 
-          isPlaying = !isPlaying;
+          appState.set('playback.isPlaying', !isPlaying);
           updatePlayPauseButton();
           updateMiniPlayer(currentTrack);
 
@@ -648,7 +848,7 @@ async function togglePlayPause() {
           });
       }
 
-      isPlaying = !isPlaying;
+      appState.set('playback.isPlaying', !isPlaying);
       updatePlayPauseButton();
       updateMiniPlayer(isPlaying ? currentTrack : null);
 
@@ -680,8 +880,8 @@ async function playFromPosition(positionMs = 0) {
               await spotifyPlayer.resume();
           }
 
-          isPlaying = true;
-          currentTime = positionMs / 1000;
+          appState.set('playback.isPlaying', true);
+          appState.set('playback.currentTime', positionMs / 1000);
           updatePlayPauseButton();
           updateMiniPlayer(currentTrack);
           updateProgress();
@@ -707,8 +907,8 @@ async function playFromPosition(positionMs = 0) {
           });
       }
 
-      isPlaying = true;
-      currentTime = positionMs / 1000;
+      appState.set('playback.isPlaying', true);
+      appState.set('playback.currentTime', positionMs / 1000);
       updatePlayPauseButton();
       updateMiniPlayer(currentTrack);
       updateProgress();
@@ -733,7 +933,7 @@ async function seekToPosition(positionMs) {
   try {
       if (spotifyPlayer) {
           await spotifyPlayer.seek(positionMs);
-          currentTime = positionMs / 1000;
+          appState.set('playback.currentTime', positionMs / 1000);
           updateProgress();
           return;
       }
@@ -746,7 +946,7 @@ async function seekToPosition(positionMs) {
           method: 'PUT',
           headers: { 'Authorization': `Bearer ${spotifyAccessToken}` }
       });
-      currentTime = positionMs / 1000;
+      appState.set('playback.currentTime', positionMs / 1000);
       updateProgress();
   } catch (apiError) {
       showStatus('Seek failed');
@@ -5141,7 +5341,7 @@ function showAddToPlaylistPopup() {
 
 function hideAddToPlaylistPopup() {
   els.addToPlaylistPopup.classList.add('hidden');
-  pendingPlaylistItem = null;
+  appState.set('playlist.pendingItem', null);
 }
 
 // Create Playlist Form
@@ -5167,7 +5367,7 @@ function showCreatePlaylistForm(fromAddToPlaylist = false) {
       if (fromAddToPlaylist && pendingPlaylistItem) {
           addItemToPlaylist(playlist.id, pendingPlaylistItem);
           hideAddToPlaylistPopup();
-          pendingPlaylistItem = null;
+          appState.set('playlist.pendingItem', null);
       }
   };
 }
@@ -5209,7 +5409,7 @@ async function addCurrentToPlaylist() {
 
   // Create pending item based on current state
   if (loopEnabled) {
-      pendingPlaylistItem = {
+      appState.set('playlist.pendingItem', {
           type: 'loop',
           trackUri: currentTrack.uri,
           name: currentTrack.name,
@@ -5219,9 +5419,9 @@ async function addCurrentToPlaylist() {
           start: loopStart,
           end: loopEnd,
           playCount: loopTarget
-      };
+      });
   } else {
-      pendingPlaylistItem = {
+      appState.set('playlist.pendingItem', {
           type: 'track',
           uri: currentTrack.uri,
           name: currentTrack.name,
@@ -5229,7 +5429,7 @@ async function addCurrentToPlaylist() {
           duration: currentTrack.duration,
           image: currentTrack.image,
           playCount: 1
-      };
+      });
   }
 
   showAddToPlaylistPopup();
@@ -5240,7 +5440,7 @@ function addLoopToPlaylist(loopId) {
   const loop = savedLoops.find(l => l.id === loopId);
   if (!loop) return;
 
-  pendingPlaylistItem = {
+  appState.set('playlist.pendingItem', {
       type: 'loop',
       trackUri: loop.track.uri,
       name: loop.track.name,
@@ -5648,12 +5848,7 @@ function setupEventListeners() {
 
   els.navPlayer.addEventListener('click', (e) => {
       e.preventDefault();
-      if (currentTrack) {
-          showView('player');
-      } else {
-          showStatus('Please select a track first');
-          isConnected ? showView('search') : showView('login');
-      }
+      showView('player');
   });
 
   els.navLibrary.addEventListener('click', (e) => {
@@ -5994,7 +6189,7 @@ function setupEventListeners() {
               if (pendingPlaylistItem) {
                   addItemToPlaylist(playlistId, pendingPlaylistItem);
                   hideAddToPlaylistPopup();
-                  pendingPlaylistItem = null;
+                  appState.set('playlist.pendingItem', null);
               }
           }
 
@@ -6027,8 +6222,8 @@ function setupEventListeners() {
 
   // Other specific event listeners
   els.loopToggle.addEventListener('change', function() {
-      loopEnabled = this.checked;
-      loopCount = 0;
+      appState.set('loop.enabled', this.checked);
+      appState.set('loop.count', 0);
       els.startLoopBtn.disabled = !loopEnabled;
       updateLoopVisuals(); // FIX 6: This will show/hide handles
       showStatus(loopEnabled ? `Loop enabled: ${loopTarget} time(s)` : 'Loop disabled');
@@ -6046,7 +6241,7 @@ function setupEventListeners() {
   els.precisionStart.addEventListener('change', function() {
       const newStart = parseTimeInput(this.value);
       if (newStart >= 0 && newStart < loopEnd && newStart <= duration) {
-          loopStart = newStart;
+          appState.set('loop.start', newStart);
           updateLoopVisuals();
       } else {
           this.value = formatTime(loopStart);
@@ -6056,7 +6251,7 @@ function setupEventListeners() {
   els.precisionEnd.addEventListener('change', function() {
       const newEnd = parseTimeInput(this.value);
       if (newEnd > loopStart && newEnd <= duration) {
-          loopEnd = newEnd;
+          appState.set('loop.end', newEnd);
           updateLoopVisuals();
       } else {
           this.value = formatTime(loopEnd);
@@ -6070,9 +6265,9 @@ function setupEventListeners() {
           const targetType = e.target.dataset.target;
           const amount = parseFloat(e.target.dataset.amount);
           if (targetType === 'start') {
-              loopStart = Math.max(0, Math.min(loopStart + amount, loopEnd - 0.1));
+              appState.set('loop.start', Math.max(0, Math.min(loopStart + amount, loopEnd - 0.1)));
           } else {
-              loopEnd = Math.max(loopStart + 0.1, Math.min(loopEnd + amount, duration));
+              appState.set('loop.end', Math.max(loopStart + 0.1, Math.min(loopEnd + amount, duration)));
           }
           updateLoopVisuals();
       }
@@ -6264,6 +6459,9 @@ function init() {
       smartAssistScore: document.getElementById('smart-assist-score')
   };
 
+  // Initialize state synchronization system early
+  initializeStateSync();
+
   setupEventListeners();
   setupLoopHandles();
   setupPrecisionZoomLoopHandles();
@@ -6321,4 +6519,129 @@ window.testPrecisionMode = function() {
     }
 };
 
-document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', init) : init();
+// State change handlers for critical transitions
+function setupCriticalStateHandlers() {
+    // Track loading state management
+    appState.subscribe('playback.currentTrack', (newTrack, oldTrack) => {
+        if (newTrack && newTrack !== oldTrack) {
+            console.log('🎵 Track changed:', newTrack.name);
+            // Update UI immediately
+            if (els.currentTrack) els.currentTrack.textContent = newTrack.name;
+            if (els.currentArtist) els.currentArtist.textContent = newTrack.artist;
+            updateMiniPlayer(newTrack);
+            // Cancel any pending operations for previous track
+            cancelPendingOperations();
+        }
+    });
+    
+    // Loop state coordination
+    appState.subscribe('loop.enabled', (enabled) => {
+        if (els.startLoopBtn) els.startLoopBtn.disabled = !enabled;
+        if (els.loopToggle) els.loopToggle.checked = enabled;
+        updateLoopVisuals();
+        showStatus(enabled ? `Loop enabled: ${appState.get('loop.target')} time(s)` : 'Loop disabled');
+    });
+    
+    // Playback state coordination
+    appState.subscribe('playback.isPlaying', (playing) => {
+        updatePlayPauseButton();
+        if (playing) {
+            startProgressUpdates();
+        } else {
+            stopProgressUpdates();
+        }
+    });
+    
+    // Playlist mode transitions
+    appState.subscribe('playlist.isActive', (isActive, wasActive) => {
+        if (isActive !== wasActive) {
+            console.log('🎶 Playlist mode:', isActive ? 'activated' : 'deactivated');
+            // Safely transition between modes
+            if (isActive) {
+                // Entering playlist mode
+                stopProgressUpdates();
+                resetLoopState();
+            } else {
+                // Exiting playlist mode
+                appState.set('playlist.current', null);
+                appState.set('playlist.currentIndex', 0);
+                if (playlistEngine) {
+                    playlistEngine.stop();
+                    appState.set('playlist.engine', null);
+                }
+            }
+        }
+    });
+    
+    // Operation cancellation handling
+    appState.subscribe('operations.currentTrackOperation', (operation, oldOperation) => {
+        if (oldOperation && oldOperation !== operation) {
+            // Mark old operation as cancelled
+            if (oldOperation.id) {
+                oldOperation.cancelled = true;
+                console.log(`🚫 Operation ${oldOperation.id} cancelled by new operation`);
+            }
+        }
+    });
+}
+
+// Helper function to cancel pending operations
+function cancelPendingOperations() {
+    const currentOp = appState.get('operations.currentTrackOperation');
+    if (currentOp) {
+        currentOp.cancelled = true;
+        console.log('🚫 Cancelled pending track operation');
+    }
+}
+
+// Test function for state synchronization
+window.testStateSync = function() {
+    console.log('🧪 Testing Unified State Management System');
+    console.log('═══════════════════════════════════════════');
+    
+    // Test 1: Basic state setting and retrieval
+    console.log('\n📊 Test 1: Basic State Operations');
+    appState.set('playback.currentTime', 42.5);
+    console.log('Set playback.currentTime to 42.5');
+    console.log('Retrieved value:', appState.get('playback.currentTime'));
+    console.log('Legacy variable:', currentTime);
+    
+    // Test 2: Atomic updates
+    console.log('\n🔄 Test 2: Atomic State Updates');
+    appState.update({
+        'playback.currentTrack': { name: 'Test Track', artist: 'Test Artist' },
+        'playback.duration': 180,
+        'loop.enabled': true,
+        'loop.start': 10,
+        'loop.end': 20
+    });
+    console.log('Applied atomic update with 5 changes');
+    console.log('Current track:', appState.get('playback.currentTrack')?.name);
+    console.log('Duration:', appState.get('playback.duration'));
+    console.log('Loop enabled:', appState.get('loop.enabled'));
+    
+    // Test 3: State change handlers
+    console.log('\n🎯 Test 3: State Change Handlers');
+    let changeCount = 0;
+    const unsubscribe = appState.subscribe('playback.isPlaying', (value) => {
+        changeCount++;
+        console.log(`Handler triggered ${changeCount}: isPlaying = ${value}`);
+    });
+    
+    appState.set('playback.isPlaying', true);
+    appState.set('playback.isPlaying', false);
+    unsubscribe();
+    
+    // Test 4: Legacy synchronization
+    console.log('\n🔗 Test 4: Legacy Variable Sync');
+    console.log('Before - appState loop.start:', appState.get('loop.start'));
+    console.log('Before - legacy loopStart:', loopStart);
+    
+    appState.set('loop.start', 15.2);
+    
+    console.log('After - appState loop.start:', appState.get('loop.start'));
+    console.log('After - legacy loopStart:', loopStart);
+    
+    console.log('\n✅ State synchronization test complete!');
+    console.log('Check console for any errors or warnings.');
+};\n\ndocument.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', init) : init();
