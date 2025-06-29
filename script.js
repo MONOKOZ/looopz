@@ -306,6 +306,11 @@ const PREBUFFER_MESSAGES = [
 
 // Utils
 function formatTime(seconds, showMs = true) {
+  // Validate input and provide default
+  if (typeof seconds !== 'number' || isNaN(seconds) || seconds < 0) {
+    return showMs ? '0:00.000' : '0:00';
+  }
+  
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
   if (showMs) {
@@ -403,7 +408,7 @@ async function loadTrackSafely(trackData, startPositionMs = 0, preserveLoopPoint
     return true;
     
   } catch (error) {
-    if (currentTrackOperation.cancelled || currentTrackOperation.id !== operationId) {
+    if (currentTrackOperation && (currentTrackOperation.cancelled || currentTrackOperation.id !== operationId)) {
       console.log(`🚫 [SAFE LOAD ${operationId}] Cancelled during error`);
       return false;
     }
@@ -755,6 +760,21 @@ async function loadTrackIntoSpotify(track, startPositionMs = 0) {
       });
 
       if (!response.ok) {
+          if (response.status === 400) {
+              console.warn('🔄 Device conflict detected, attempting to reconnect player...');
+              // Device might be inactive or conflicted, try to reconnect
+              if (spotifyPlayer) {
+                  try {
+                      await spotifyPlayer.disconnect();
+                      await new Promise(resolve => setTimeout(resolve, 1000));
+                      await spotifyPlayer.connect();
+                      showStatus('🔄 Reconnected to Spotify');
+                      throw new Error('Device reconnected - please retry');
+                  } catch (reconnectError) {
+                      console.error('Failed to reconnect:', reconnectError);
+                  }
+              }
+          }
           throw new Error(`Load failed: ${response.status}`);
       }
 
@@ -2899,8 +2919,10 @@ function startProgressUpdates() {
               if (state && state.position !== undefined) {
                   const newTime = state.position / 1000;
                   
-                  // Validate position makes sense (no crazy jumps backwards)
-                  if (Math.abs(newTime - lastKnownPosition) < 10 || newTime > lastKnownPosition) {
+                  // Validate position makes sense (allow reasonable jumps and forward progress)
+                  const timeDiff = Math.abs(newTime - lastKnownPosition);
+                  const forwardProgress = newTime >= lastKnownPosition - 0.5; // Allow small backwards drift
+                  if (timeDiff < 15 || forwardProgress) {
                       currentTime = newTime;
                       lastKnownPosition = newTime;
                       lastProgressUpdate = Date.now();
@@ -2912,6 +2934,13 @@ function startProgressUpdates() {
                       if (isPlaying !== actuallyPlaying) {
                           isPlaying = actuallyPlaying;
                           updatePlayPauseButton();
+                      }
+                      
+                      // Check for stuck isLooping state (timeout after 5 seconds)
+                      if (isLooping && loopStartTime && (Date.now() - loopStartTime > 5000)) {
+                          console.warn('🔄 Detected stuck isLooping state, resetting...');
+                          appState.set('loop.isLooping', false);
+                          appState.set('loop.startTime', Date.now());
                       }
                       
                       // Only check loop end if playing and not in loop operation
@@ -2932,7 +2961,20 @@ function startProgressUpdates() {
                   consecutiveFailures++;
                   
                   // Recovery logic
-                  if (consecutiveFailures === 20) { // 1 second of failures
+                  if (consecutiveFailures === 10) { // 0.5 second of failures - force sync
+                      console.warn('🔄 Progress desync detected, forcing sync...');
+                      // Force position sync from Spotify state
+                      if (spotifyPlayer) {
+                          spotifyPlayer.getCurrentState().then(state => {
+                              if (state && state.position !== undefined) {
+                                  currentTime = state.position / 1000;
+                                  lastKnownPosition = currentTime;
+                                  updateProgress();
+                                  consecutiveFailures = 0;
+                              }
+                          }).catch(e => console.warn('Force sync failed:', e));
+                      }
+                  } else if (consecutiveFailures === 20) { // 1 second of failures
                       console.warn('🔄 Progress sync lost, attempting recovery...');
                       showStatus('🔄 Reconnecting...');
                   } else if (consecutiveFailures > 60) { // 3 seconds of total failure
