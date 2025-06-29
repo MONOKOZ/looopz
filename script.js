@@ -575,7 +575,7 @@ async function handleAddToPlaylist() {
       duration: track.duration_ms / 1000,
       image: track.album.images[0]?.url || '',
       playCount: 1
-  };
+  });
 
   showAddToPlaylistPopup();
 }
