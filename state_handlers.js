@@ -62,6 +62,29 @@ function setupCriticalStateHandlers() {
             }
         }
     });
+    
+    // Storage persistence handlers
+    appState.subscribe('storage.savedLoops', (loops) => {
+        if (loops && Array.isArray(loops)) {
+            try {
+                localStorage.setItem('looopz_saved_loops', JSON.stringify(loops));
+                updateLoopCountBadge();
+            } catch (error) {
+                console.warn('Failed to save loops to localStorage:', error);
+            }
+        }
+    });
+    
+    appState.subscribe('storage.savedPlaylists', (playlists) => {
+        if (playlists && Array.isArray(playlists)) {
+            try {
+                localStorage.setItem('looopz_saved_playlists', JSON.stringify(playlists));
+                updatePlaylistCountBadge();
+            } catch (error) {
+                console.warn('Failed to save playlists to localStorage:', error);
+            }
+        }
+    });
 }
 
 // Helper function to cancel pending operations
