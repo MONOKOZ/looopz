@@ -72,6 +72,12 @@ class AppState {
                 updateTimer: null,
                 currentTrackOperation: null,
                 operationCounter: 0
+            },
+            
+            // Storage state
+            storage: {
+                savedLoops: [],
+                savedPlaylists: []
             }
         };
         
@@ -213,7 +219,14 @@ function initializeStateSync() {
     // Operations state sync
     appState.subscribe('operations.updateTimer', (value) => updateTimer = value);
     appState.subscribe('operations.currentTrackOperation', (value) => currentTrackOperation = value);
-    appState.subscribe('operations.operationCounter', (value) => operationCounter = value);\n    \n    // Critical state change handlers to prevent race conditions\n    setupCriticalStateHandlers();
+    appState.subscribe('operations.operationCounter', (value) => operationCounter = value);
+    
+    // Storage state sync
+    appState.subscribe('storage.savedLoops', (value) => savedLoops = value || []);
+    appState.subscribe('storage.savedPlaylists', (value) => savedPlaylists = value || []);
+    
+    // Critical state change handlers to prevent race conditions
+    setupCriticalStateHandlers();
 }
 
 // Legacy variable declarations for backward compatibility
@@ -3638,10 +3651,11 @@ function loadSavedLoops() {
       }
 
       const saved = localStorage.getItem('looopz_saved_loops');
-      savedLoops = saved ? JSON.parse(saved) : [];
+      const loops = saved ? JSON.parse(saved) : [];
+      appState.set('storage.savedLoops', loops);
       updateLoopCountBadge();
   } catch (error) {
-      savedLoops = [];
+      appState.set('storage.savedLoops', []);
   }
 }
 
@@ -3997,10 +4011,11 @@ function clearAllLoops() {
 function loadSavedPlaylists() {
   try {
       const saved = localStorage.getItem('looopz_saved_playlists');
-      savedPlaylists = saved ? JSON.parse(saved) : [];
+      const playlists = saved ? JSON.parse(saved) : [];
+      appState.set('storage.savedPlaylists', playlists);
       updatePlaylistCountBadge();
   } catch (error) {
-      savedPlaylists = [];
+      appState.set('storage.savedPlaylists', []);
   }
 }
 
@@ -5711,7 +5726,7 @@ function checkAuth() {
 
   if (storedToken) {
       console.log('🔐 Found stored token, validating...');
-      spotifyAccessToken = storedToken;
+      appState.set('spotify.accessToken', storedToken);
       validateToken(storedToken);
       return;
   }
@@ -5795,7 +5810,7 @@ async function refreshSpotifyToken() {
           const data = await response.json();
           
           // Update tokens
-          spotifyAccessToken = data.access_token;
+          appState.set('spotify.accessToken', data.access_token);
           localStorage.setItem('spotify_access_token', data.access_token);
           
           // Update refresh token if provided
