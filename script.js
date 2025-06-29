@@ -182,6 +182,9 @@ window.onSpotifyWebPlaybackSDKReady = window.onSpotifyWebPlaybackSDKReady || fun
     console.log('⚠️ Spotify SDK ready but player not initialized yet');
 };
 
+// Debug: Make sure the script is loading
+console.log('🚀 LOOOPZ script loaded successfully');
+
 // Initialize state synchronization system
 function initializeStateSync() {
     // Spotify state sync
@@ -5464,7 +5467,7 @@ function addLoopToPlaylist(loopId) {
       start: loop.loop.start,
       end: loop.loop.end,
       playCount: loop.loop.repeat
-  };
+  });
 
   showAddToPlaylistPopup();
 }
@@ -6595,15 +6598,6 @@ function setupCriticalStateHandlers() {
     });
 }
 
-// Helper function to cancel pending operations
-function cancelPendingOperations() {
-    const currentOp = appState.get('operations.currentTrackOperation');
-    if (currentOp) {
-        currentOp.cancelled = true;
-        console.log('🚫 Cancelled pending track operation');
-    }
-}
-
 // Test function for state synchronization
 // Diagnostic function for troubleshooting
 window.diagnoseStorage = function() {
@@ -6652,7 +6646,9 @@ window.diagnoseStorage = function() {
     }
     
     console.log('\n💡 If issues persist, try: localStorage.clear() and reconnect');
-};\n\nwindow.testStateSync = function() {
+};
+
+window.testStateSync = function() {
     console.log('🧪 Testing Unified State Management System');
     console.log('═══════════════════════════════════════════');
     
@@ -6701,4 +6697,6 @@ window.diagnoseStorage = function() {
     
     console.log('\n✅ State synchronization test complete!');
     console.log('Check console for any errors or warnings.');
-};\n\ndocument.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', init) : init();
+};
+
+document.readyState === 'loading' ? document.addEventListener('DOMContentLoaded', init) : init();
