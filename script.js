@@ -197,7 +197,13 @@ function initializeStateSync() {
     appState.subscribe('playback.currentTrack', (value) => currentTrack = value);
     appState.subscribe('playback.isPlaying', (value) => isPlaying = value);
     appState.subscribe('playback.currentTime', (value) => currentTime = value);
-    appState.subscribe('playback.duration', (value) => duration = value);
+    appState.subscribe('playback.duration', (value) => {
+        duration = value;
+        // Re-update loop visuals when Spotify provides actual duration
+        if (value > 0 && loopEnabled) {
+            setTimeout(() => updateLoopVisuals(), 100);
+        }
+    });
     
     // Loop state sync
     appState.subscribe('loop.enabled', (value) => loopEnabled = value);
@@ -489,17 +495,24 @@ function updateRepeatDisplay() {
 }
 
 function updateLoopVisuals() {
-  if (!duration || duration <= 0) return;
-
-  if (loopStart < 0) loopStart = 0;
-  if (loopEnd > duration) loopEnd = duration;
-  if (loopStart >= loopEnd) {
-      loopStart = 0;
-      loopEnd = Math.min(30, duration);
+  // Use fallback duration if Spotify duration not available yet
+  const effectiveDuration = duration > 0 ? duration : 240;
+  
+  // If no loop points are set, use defaults
+  if (loopStart === undefined || loopEnd === undefined) {
+    loopStart = 0;
+    loopEnd = Math.min(30, effectiveDuration);
   }
 
-  const startPercent = (loopStart / duration) * 100;
-  const endPercent = (loopEnd / duration) * 100;
+  if (loopStart < 0) loopStart = 0;
+  if (loopEnd > effectiveDuration) loopEnd = effectiveDuration;
+  if (loopStart >= loopEnd) {
+      loopStart = 0;
+      loopEnd = Math.min(30, effectiveDuration);
+  }
+
+  const startPercent = (loopStart / effectiveDuration) * 100;
+  const endPercent = (loopEnd / effectiveDuration) * 100;
 
   els.loopStartHandle.style.left = `${startPercent}%`;
   els.loopEndHandle.style.left = `${endPercent}%`;
@@ -3494,7 +3507,10 @@ function setupLoopHandles() {
   }
 
   function updateDrag(e) {
-      if (!isDragging || !dragTarget || !duration) return;
+      if (!isDragging || !dragTarget) return;
+      
+      // Allow dragging even if duration isn't available yet, use fallback
+      const effectiveDuration = duration > 0 ? duration : 240; // 4 minutes fallback
       if (e.preventDefault) e.preventDefault();
 
       const rect = els.progressContainer.getBoundingClientRect();
@@ -3518,7 +3534,7 @@ function setupLoopHandles() {
           console.log(`🎯 PRECISION: movement=${movement}px, sensitivity=${sensitivity.toFixed(4)}s/px, time=${formatTime(newTime)}`);
       } else {
           // Normal mode: Map mouse position to full song duration
-          newTime = percent * duration;
+          newTime = percent * effectiveDuration;
       }
       
       // Speed-based precision detection
@@ -4769,28 +4785,33 @@ function loadPlaylistItem(playlistId, itemIndex) {
   if (item.type === 'loop') {
       // Load as a saved loop
       const trackData = {
-          uri: item.uri,
+          uri: item.trackUri || item.uri, // Fix: use correct URI field
           name: item.name,
           artist: item.artist,
           duration: item.duration,
           image: item.image || ''
       };
 
-      currentTrack = trackData;
-      duration = trackData.duration;
-      els.currentTrack.textContent = item.name;
-      els.currentArtist.textContent = item.artist;
-
-      loopStart = item.start;
-      loopEnd = item.end;
-      loopTarget = item.playCount;
-      loopEnabled = true;
+      // Set loop state but don't update visuals yet (wait for Spotify duration)
+      appState.set('loop.start', item.start);
+      appState.set('loop.end', item.end);
+      appState.set('loop.target', item.playCount);
+      appState.set('loop.enabled', true);
 
       if (els.loopToggle) els.loopToggle.checked = true;
       updateRepeatDisplay();
-      updateLoopVisuals();
 
-      loadTrackSafely(trackData, loopStart * 1000, true);
+      // Load track first, then update visuals with correct duration
+      loadTrackSafely(trackData, item.start * 1000, true).then(() => {
+          // Update visuals after track loads with correct Spotify duration
+          setTimeout(() => {
+              updateLoopVisuals();
+              console.log('🎵 Loop visuals updated with Spotify duration:', duration);
+          }, 500); // Small delay to ensure duration is set
+      }).catch(error => {
+          console.error('Failed to load playlist item:', error);
+          showStatus('❌ Failed to load track');
+      });
       
       showView('player');
       showStatus(`🔄 Loading: ${item.name}`);
