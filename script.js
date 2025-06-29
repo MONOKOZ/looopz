@@ -177,6 +177,11 @@ class AppState {
 // Global state instance
 const appState = new AppState();
 
+// Spotify Web Playback SDK callback - available immediately
+window.onSpotifyWebPlaybackSDKReady = window.onSpotifyWebPlaybackSDKReady || function() {
+    console.log('⚠️ Spotify SDK ready but player not initialized yet');
+};
+
 // Initialize state synchronization system
 function initializeStateSync() {
     // Spotify state sync
@@ -242,16 +247,9 @@ let lastSeekTime = 0; // For debouncing seeks
 const SEEK_DEBOUNCE_MS = 500; // Minimum time between seeks
 const LOOP_END_THRESHOLD = 0.05; // More precise timing (50ms)
 
-// Playlist state
+// Playlist state (variables moved to legacy declarations above)
 let savedPlaylists = [];
 let savedLoops = [];
-let currentPlaylist = null;
-let currentPlaylistIndex = 0;
-let isPlaylistMode = false;
-let currentEditingPlaylistId = null;
-let pendingPlaylistItem = null; // For adding items to playlists
-let playlistEngine = null; // Will hold the playlist engine instance
-let playlistViewMode = 'overview'; // 'overview' or 'tracklist'
 
 // Prebuffering system
 let prebufferCache = new Map(); // Cache for prebuffered audio data
@@ -6399,10 +6397,6 @@ function init() {
   console.log('🚀 Initializing LOOOPZ with Playlist Management...');
 
   // Define the Spotify callback early in case SDK loads before we're ready
-  window.onSpotifyWebPlaybackSDKReady = window.onSpotifyWebPlaybackSDKReady || function() {
-      console.log('⚠️ Spotify SDK ready but player not initialized yet');
-  };
-
   // Cache all elements
   els = {
       loginScreen: document.getElementById('login-screen'),
