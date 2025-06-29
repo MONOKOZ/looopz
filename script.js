@@ -125,7 +125,7 @@ class AppState {
     // Update multiple values atomically
     update(updates) {
         Object.entries(updates).forEach(([path, value]) => {
-            const keys = path.split('.');\n            const lastKey = keys.pop();\n            const target = keys.reduce((obj, key) => obj[key], this.state);\n            target[lastKey] = value;
+            this.set(path, value);
         });
     }
     
@@ -231,6 +231,7 @@ const LOOP_END_THRESHOLD = 0.05; // More precise timing (50ms)
 
 // Playlist state
 let savedPlaylists = [];
+let savedLoops = [];
 let currentPlaylist = null;
 let currentPlaylistIndex = 0;
 let isPlaylistMode = false;
@@ -6595,7 +6596,54 @@ function cancelPendingOperations() {
 }
 
 // Test function for state synchronization
-window.testStateSync = function() {
+// Diagnostic function for troubleshooting
+window.diagnoseStorage = function() {
+    console.log('🔍 LOOOPZ Storage & Auth Diagnostics');
+    console.log('═══════════════════════════════════════');
+    
+    // Check localStorage
+    console.log('\n📦 LocalStorage Check:');
+    const loops = localStorage.getItem('looopz_saved_loops');
+    const playlists = localStorage.getItem('looopz_saved_playlists');
+    const token = localStorage.getItem('spotify_access_token');
+    
+    console.log('- Saved loops:', loops ? JSON.parse(loops).length + ' loops' : 'No loops found');
+    console.log('- Saved playlists:', playlists ? JSON.parse(playlists).length + ' playlists' : 'No playlists found');
+    console.log('- Spotify token:', token ? 'Present (' + token.substring(0, 20) + '...)' : 'Missing');
+    
+    // Check global variables
+    console.log('\n🔧 Global Variables:');
+    console.log('- savedLoops:', typeof savedLoops !== 'undefined' ? savedLoops.length + ' loops' : 'UNDEFINED!');
+    console.log('- savedPlaylists:', typeof savedPlaylists !== 'undefined' ? savedPlaylists.length + ' playlists' : 'UNDEFINED!');
+    console.log('- spotifyAccessToken:', typeof spotifyAccessToken !== 'undefined' ? (spotifyAccessToken ? 'Present' : 'Null') : 'UNDEFINED!');
+    console.log('- isConnected:', typeof isConnected !== 'undefined' ? isConnected : 'UNDEFINED!');
+    
+    // Check state management
+    console.log('\n🎯 State Management:');
+    console.log('- AppState instance:', typeof appState !== 'undefined' ? 'Present' : 'MISSING!');
+    if (typeof appState !== 'undefined') {
+        console.log('- Spotify token in state:', appState.get('spotify.accessToken') ? 'Present' : 'Missing');
+        console.log('- Connected in state:', appState.get('spotify.isConnected'));
+        console.log('- Current view:', appState.get('ui.currentView'));
+    }
+    
+    // Try to reload storage
+    console.log('\n🔄 Attempting to reload storage...');
+    try {
+        if (typeof loadSavedLoops === 'function') {
+            loadSavedLoops();
+            console.log('✅ loadSavedLoops() executed');
+        }
+        if (typeof loadSavedPlaylists === 'function') {
+            loadSavedPlaylists();
+            console.log('✅ loadSavedPlaylists() executed');
+        }
+    } catch (error) {
+        console.error('❌ Error reloading storage:', error);
+    }
+    
+    console.log('\n💡 If issues persist, try: localStorage.clear() and reconnect');
+};\n\nwindow.testStateSync = function() {
     console.log('🧪 Testing Unified State Management System');
     console.log('═══════════════════════════════════════════');
     
