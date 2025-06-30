@@ -443,15 +443,58 @@ async function loadTrackSafely(trackData, startPositionMs = 0, preserveLoopPoint
 }
 
 /**
+ * Unified loop state update function - ensures both global vars and AppState stay in sync
+ */
+function updateLoopState(updates) {
+  if (updates.start !== undefined) {
+    loopStart = updates.start;
+    appState.set('loop.start', updates.start);
+  }
+  if (updates.end !== undefined) {
+    loopEnd = updates.end;
+    appState.set('loop.end', updates.end);
+  }
+  if (updates.target !== undefined) {
+    loopTarget = updates.target;
+    appState.set('loop.target', updates.target);
+  }
+  if (updates.count !== undefined) {
+    loopCount = updates.count;
+    appState.set('loop.count', updates.count);
+  }
+  if (updates.enabled !== undefined) {
+    loopEnabled = updates.enabled;
+    appState.set('loop.enabled', updates.enabled);
+  }
+  if (updates.startTime !== undefined) {
+    loopStartTime = updates.startTime;
+    appState.set('loop.startTime', updates.startTime);
+  }
+  
+  // Update UI if needed
+  if (updates.enabled !== undefined && els.loopToggle) {
+    els.loopToggle.checked = updates.enabled;
+  }
+  if (updates.target !== undefined) {
+    updateRepeatDisplay();
+  }
+  if (updates.start !== undefined || updates.end !== undefined || updates.enabled !== undefined) {
+    updateLoopVisuals();
+  }
+}
+
+/**
  * Reset loop state to defaults
  */
 function resetLoopState() {
-  appState.set('loop.start', 0);
-  appState.set('loop.end', 30);
-  appState.set('loop.target', 1);
-  appState.set('loop.count', 0);
-  appState.set('loop.enabled', false);
-  appState.set('loop.startTime', Date.now());
+  updateLoopState({
+    start: 0,
+    end: 30,
+    target: 1,
+    count: 0,
+    enabled: false,
+    startTime: Date.now()
+  });
 }
 
 function updateProgress() {
@@ -2572,15 +2615,15 @@ class PlaylistTransitionEngine {
                 image: item.image || ''
             };
 
-            const loadSuccess = await loadTrackSafely(trackData, startPosition, false);
+            // Set up loop parameters BEFORE loading track if this is a loop item
+            if (item.type === 'loop') {
+                this.setupLoopItem(item);
+            }
+
+            const loadSuccess = await loadTrackSafely(trackData, startPosition, item.type === 'loop');
             if (!loadSuccess) {
                 console.log('🚫 Playlist item load cancelled or failed');
                 return; // Exit early if load was cancelled
-            }
-
-            // Set up loop parameters if this is a loop item
-            if (item.type === 'loop') {
-                this.setupLoopItem(item);
             }
             
             // CRITICAL FIX: Resume playback after loading new track
@@ -2620,9 +2663,29 @@ class PlaylistTransitionEngine {
      * @param {Object} item - Loop item
      */
     setupLoopItem(item) {
-        // This function is implemented to maintain compatibility with the existing code
-        // The main player handles the loop logic, so we just need to ensure this method exists
+        // Set loop parameters for playlist loop items
         console.log(`🔄 Setting up loop item: ${item.name} (${formatTime(item.start)} - ${formatTime(item.end)})`);
+        
+        // Update BOTH global variables AND AppState immediately
+        loopStart = item.start;
+        loopEnd = item.end;
+        loopTarget = item.playCount || 1;
+        loopEnabled = true;
+        loopCount = 0;
+        loopStartTime = Date.now();
+        
+        // Sync with AppState
+        appState.set('loop.start', item.start);
+        appState.set('loop.end', item.end);
+        appState.set('loop.target', item.playCount || 1);
+        appState.set('loop.enabled', true);
+        appState.set('loop.count', 0);
+        appState.set('loop.startTime', Date.now());
+        
+        // Update UI
+        if (els.loopToggle) els.loopToggle.checked = true;
+        updateRepeatDisplay();
+        updateLoopVisuals();
     }
 
     /**
@@ -3124,8 +3187,7 @@ async function prepareSeamlessTransition() {
 async function handleLoopEnd() {
   try {
       isLooping = true;
-      loopCount++;
-      appState.set('loop.count', loopCount);
+      updateLoopState({ count: loopCount + 1 });
       
       console.log(`🔄 Loop end reached: count=${loopCount}/${loopTarget}, playlistMode=${isPlaylistMode}`);
 
@@ -3189,8 +3251,7 @@ async function handleLoopEnd() {
           
           // Reset loop count for next time (after a delay to show completion)
           setTimeout(() => {
-              loopCount = 0;
-              appState.set('loop.count', 0);
+              updateLoopState({ count: 0 });
               console.log('🔄 Loop count reset to 0 after completion');
           }, 1500);
           
@@ -3632,15 +3693,15 @@ function setupLoopHandles() {
 
       if (dragTarget === els.loopStartHandle) {
           const maxStart = Math.max(0, loopEnd - 0.1);
-          loopStart = Math.max(0, Math.min(newTime, maxStart));
-          els.startPopup.textContent = formatTime(loopStart);
+          const newStart = Math.max(0, Math.min(newTime, maxStart));
+          updateLoopState({ start: newStart });
+          els.startPopup.textContent = formatTime(newStart);
       } else if (dragTarget === els.loopEndHandle) {
           const minEnd = Math.min(duration, loopStart + 0.1);
-          loopEnd = Math.max(minEnd, Math.min(newTime, duration));
-          els.endPopup.textContent = formatTime(loopEnd);
+          const newEnd = Math.max(minEnd, Math.min(newTime, duration));
+          updateLoopState({ end: newEnd });
+          els.endPopup.textContent = formatTime(newEnd);
       }
-
-      updateLoopVisuals();
       
       // No overlay needed - precision is built into the existing progress bar mapping!
 
@@ -3925,10 +3986,21 @@ async function loadSavedLoop(loopId) {
       els.currentTrack.textContent = loop.track.name;
       els.currentArtist.textContent = loop.track.artist;
 
+      // Set loop state BOTH globally and in AppState BEFORE loading track
       loopStart = loop.loop.start;
       loopEnd = loop.loop.end;
       loopTarget = loop.loop.repeat;
       loopEnabled = true;
+      loopCount = 0;
+      loopStartTime = Date.now();
+
+      // Sync with AppState
+      appState.set('loop.start', loop.loop.start);
+      appState.set('loop.end', loop.loop.end);
+      appState.set('loop.target', loop.loop.repeat);
+      appState.set('loop.enabled', true);
+      appState.set('loop.count', 0);
+      appState.set('loop.startTime', Date.now());
 
       if (els.loopToggle) els.loopToggle.checked = true;
       updateRepeatDisplay();
@@ -3939,9 +4011,6 @@ async function loadSavedLoop(loopId) {
           console.log('🚫 Load saved loop cancelled or failed');
           return; // Exit early if load was cancelled
       }
-
-      loopCount = 0;
-      loopStartTime = Date.now();
 
       updateProgress();
       updatePlayPauseButton();
