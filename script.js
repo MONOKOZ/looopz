@@ -4783,10 +4783,15 @@ function removeFromPlaylist(playlistId, itemIndex) {
 }
 
 function loadPlaylistItem(playlistId, itemIndex) {
+  console.log('🎵 loadPlaylistItem called - playlistId:', playlistId, 'itemIndex:', itemIndex);
   const playlist = savedPlaylists.find(p => p.id === playlistId);
-  if (!playlist || !playlist.items[itemIndex]) return;
+  if (!playlist || !playlist.items[itemIndex]) {
+    console.error('❌ Playlist or item not found - playlist:', playlist, 'itemIndex:', itemIndex);
+    return;
+  }
 
   const item = playlist.items[itemIndex];
+  console.log('🎵 Loading playlist item:', item);
   
   if (item.type === 'loop') {
       // Load as a saved loop
@@ -4798,8 +4803,16 @@ function loadPlaylistItem(playlistId, itemIndex) {
           image: item.image || ''
       };
 
-      // Set loop state but don't update visuals yet (wait for Spotify duration)
+      // Set loop state immediately and via state system
       console.log('🎵 Setting loop state from playlist item - start:', item.start, 'end:', item.end, 'target:', item.playCount);
+      
+      // Set directly for immediate availability
+      loopStart = item.start;
+      loopEnd = item.end;
+      loopTarget = item.playCount;
+      loopEnabled = true;
+      
+      // Also set via state system for consistency
       appState.set('loop.start', item.start);
       appState.set('loop.end', item.end);
       appState.set('loop.target', item.playCount);
@@ -4808,17 +4821,24 @@ function loadPlaylistItem(playlistId, itemIndex) {
       if (els.loopToggle) els.loopToggle.checked = true;
       updateRepeatDisplay();
 
-      // Load track first, then update visuals with correct duration
+      // Update visuals immediately with saved values (will auto-correct when duration loads)
+      setTimeout(() => {
+          console.log('🎵 Immediate visual update - start:', loopStart, 'end:', loopEnd);
+          updateLoopVisuals();
+      }, 100);
+
+      // Load track (async)
       loadTrackSafely(trackData, item.start * 1000, true).then(() => {
-          // Update visuals after track loads with correct Spotify duration
+          // Update visuals again after track loads with correct Spotify duration
           setTimeout(() => {
-              console.log('🎵 About to update loop visuals - start:', loopStart, 'end:', loopEnd, 'duration:', duration);
+              console.log('🎵 Post-load visual update - start:', loopStart, 'end:', loopEnd, 'duration:', duration);
               updateLoopVisuals();
-              console.log('🎵 Loop visuals updated with Spotify duration:', duration);
-          }, 500); // Small delay to ensure duration is set
+          }, 500);
       }).catch(error => {
           console.error('Failed to load playlist item:', error);
-          showStatus('❌ Failed to load track');
+          showStatus('❌ Failed to load track - but showing loop region anyway');
+          // Even if track loading fails, show the loop region
+          setTimeout(() => updateLoopVisuals(), 200);
       });
       
       showView('player');
