@@ -3502,14 +3502,21 @@ async function selectTrack(uri, name, artist, durationMs, imageUrl) {
       // Exit playlist mode when loading individual track from search
       if (isPlaylistMode) {
           console.log('🚪 Exiting playlist mode for search track');
-          isPlaylistMode = false;
-          appState.set('playlist.isActive', false);
+          
+          // Stop progress updates first to prevent conflicts
+          stopProgressUpdates();
           
           // Stop playlist engine if active
           if (playlistEngine) {
               playlistEngine.stop();
               appState.set('playlist.engine', null);
           }
+          
+          // Wait a moment for operations to complete
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          isPlaylistMode = false;
+          appState.set('playlist.isActive', false);
       }
 
       // Create track data object
@@ -3997,14 +4004,21 @@ async function loadSavedLoop(loopId) {
       // Exit playlist mode when loading individual library loop
       if (isPlaylistMode) {
           console.log('🚪 Exiting playlist mode for library loop');
-          isPlaylistMode = false;
-          appState.set('playlist.isActive', false);
+          
+          // Stop progress updates first to prevent conflicts
+          stopProgressUpdates();
           
           // Stop playlist engine if active
           if (playlistEngine) {
               playlistEngine.stop();
               appState.set('playlist.engine', null);
           }
+          
+          // Wait a moment for operations to complete
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          isPlaylistMode = false;
+          appState.set('playlist.isActive', false);
       }
 
       loop.playCount = (loop.playCount || 0) + 1;
@@ -4929,17 +4943,26 @@ async function loadPlaylistItem(playlistId, itemIndex) {
   console.log('🎵 Loading individual playlist item:', item);
   
   try {
+      showStatus('🔄 Loading individual playlist item...');
+
       // Exit playlist mode when loading individual playlist item
       if (isPlaylistMode) {
           console.log('🚪 Exiting playlist mode for individual playlist item');
-          isPlaylistMode = false;
-          appState.set('playlist.isActive', false);
+          
+          // Stop progress updates first to prevent conflicts
+          stopProgressUpdates();
           
           // Stop playlist engine if active
           if (playlistEngine) {
               playlistEngine.stop();
               appState.set('playlist.engine', null);
           }
+          
+          // Wait a moment for operations to complete
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          isPlaylistMode = false;
+          appState.set('playlist.isActive', false);
       }
 
       if (item.type === 'loop') {
