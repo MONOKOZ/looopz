@@ -2626,6 +2626,12 @@ class PlaylistTransitionEngine {
                 return; // Exit early if load was cancelled
             }
             
+            // CRITICAL FIX: Start progress updates and UI sync after loading
+            updateProgress();
+            updatePlayPauseButton();
+            updateMiniPlayer(trackData);
+            startProgressUpdates();
+            
             // CRITICAL FIX: Resume playback after loading new track
             if (isPlaylistMode && !isPlaying) {
                 console.log('▶️ [PLAYLIST RESUME] Auto-resuming playback for playlist transition');
@@ -2957,23 +2963,23 @@ function setupPlaylistEngineCallbacks() {
 
       // Update main player UI and let it handle the loops
       if (item.type === 'loop') {
-          loopStart = item.start;
-          loopEnd = item.end;
-          loopTarget = item.playCount || 1;
-          loopEnabled = true;
-          loopCount = 0; // Reset loop count
-          loopStartTime = Date.now(); // Reset loop timer
-          els.loopToggle.checked = true;
-          updateRepeatDisplay();
-          updateLoopVisuals();
+          // Use unified state management instead of direct variable assignment
+          updateLoopState({
+              start: item.start,
+              end: item.end,
+              target: item.playCount || 1,
+              enabled: true,
+              count: 0,
+              startTime: Date.now()
+          });
 
           console.log(`📢 Main player loop enabled: ${formatTime(loopStart)} - ${formatTime(loopEnd)} (${loopTarget}×)`);
       } else {
-          // Full track - disable looping
-          loopEnabled = false;
-          loopCount = 0;
-          els.loopToggle.checked = false;
-          updateLoopVisuals(); // This will hide handles
+          // Full track - disable looping using unified state management
+          updateLoopState({
+              enabled: false,
+              count: 0
+          });
       }
   };
 
