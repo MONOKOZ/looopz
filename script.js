@@ -3499,6 +3499,19 @@ async function selectTrack(uri, name, artist, durationMs, imageUrl) {
           return;
       }
 
+      // Exit playlist mode when loading individual track from search
+      if (isPlaylistMode) {
+          console.log('🚪 Exiting playlist mode for search track');
+          isPlaylistMode = false;
+          appState.set('playlist.isActive', false);
+          
+          // Stop playlist engine if active
+          if (playlistEngine) {
+              playlistEngine.stop();
+              appState.set('playlist.engine', null);
+          }
+      }
+
       // Create track data object
       const trackData = { 
           uri, 
@@ -3980,6 +3993,19 @@ async function loadSavedLoop(loopId) {
 
   try {
       showStatus('🔄 Loading saved loop...');
+
+      // Exit playlist mode when loading individual library loop
+      if (isPlaylistMode) {
+          console.log('🚪 Exiting playlist mode for library loop');
+          isPlaylistMode = false;
+          appState.set('playlist.isActive', false);
+          
+          // Stop playlist engine if active
+          if (playlistEngine) {
+              playlistEngine.stop();
+              appState.set('playlist.engine', null);
+          }
+      }
 
       loop.playCount = (loop.playCount || 0) + 1;
       saveLooopsToStorage();
