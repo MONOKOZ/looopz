@@ -45,7 +45,7 @@ function setupCriticalStateHandlers() {
                 appState.set('playlist.current', null);
                 appState.set('playlist.currentIndex', 0);
                 if (playlistEngine) {
-                    playlistEngine.stop();
+                    playlistEngine.stopPlaylist();
                     appState.set('playlist.engine', null);
                 }
             }
