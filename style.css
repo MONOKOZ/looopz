@@ -2959,3 +2959,38 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
 .precision-zoom-overlay.removing {
     animation: precisionSlideOut 0.3s ease-out;
 }
+
+/* ===============================================
+   VISUAL PROGRESS BAR
+   =============================================== */
+
+.visual-progress-container {
+    position: fixed;
+    bottom: 80px; /* Above mini player */
+    left: 0;
+    right: 0;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.1);
+    z-index: 999;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.visual-progress-container.show {
+    opacity: 1;
+}
+
+.visual-progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, var(--primary), var(--secondary));
+    width: 0%;
+    transition: width 0.1s ease-out;
+    border-radius: 0 2px 2px 0;
+}
+
+/* Hide on larger screens where main player is visible */
+@media (min-width: 768px) {
+    .visual-progress-container {
+        display: none;
+    }
+}
