@@ -510,9 +510,22 @@ function updateLoopVisuals() {
     loopEnd = Math.min(30, effectiveDuration);
   }
 
+  // Validate loop bounds but allow slight overshoot for saved loops
   if (loopStart < 0) loopStart = 0;
-  if (loopEnd > effectiveDuration) loopEnd = effectiveDuration;
+  
+  // Only clip loop end if it's significantly beyond track duration (allow 10% overshoot for saved loops)
+  const maxAllowedEnd = effectiveDuration * 1.10;
+  if (loopEnd > maxAllowedEnd) {
+    console.log(`⚠️ Loop end ${loopEnd} beyond allowed range (${maxAllowedEnd}), preserving for saved loops`);
+    // For saved loops, allow more flexibility - only clip if truly excessive
+    if (loopEnd > effectiveDuration * 1.5) {
+      console.log(`⚠️ Loop end ${loopEnd} excessively beyond duration, clipping to ${effectiveDuration}`);
+      loopEnd = effectiveDuration;
+    }
+  }
+  
   if (loopStart >= loopEnd) {
+      console.log(`⚠️ Invalid loop range (start >= end), resetting to defaults`);
       loopStart = 0;
       loopEnd = Math.min(30, effectiveDuration);
   }
@@ -4803,42 +4816,37 @@ function loadPlaylistItem(playlistId, itemIndex) {
           image: item.image || ''
       };
 
-      // Set loop state immediately and via state system
+      // Set loop state immediately and via state system BEFORE loading track
       console.log('🎵 Setting loop state from playlist item - start:', item.start, 'end:', item.end, 'target:', item.playCount);
       
-      // Set directly for immediate availability
+      // Set directly for immediate availability (BEFORE loadTrackSafely)
       loopStart = item.start;
       loopEnd = item.end;
       loopTarget = item.playCount;
+      loopCount = 0; // Reset loop count
       loopEnabled = true;
       
       // Also set via state system for consistency
       appState.set('loop.start', item.start);
       appState.set('loop.end', item.end);
       appState.set('loop.target', item.playCount);
+      appState.set('loop.count', 0); // Reset loop count
       appState.set('loop.enabled', true);
 
       if (els.loopToggle) els.loopToggle.checked = true;
       updateRepeatDisplay();
 
-      // Update visuals immediately with saved values (will auto-correct when duration loads)
-      setTimeout(() => {
-          console.log('🎵 Immediate visual update - start:', loopStart, 'end:', loopEnd);
-          updateLoopVisuals();
-      }, 100);
+      console.log('🎵 About to call loadTrackSafely with preserveLoopPoints=true, current values:', {
+          loopStart, loopEnd, loopTarget, loopEnabled
+      });
 
-      // Load track (async)
+      // Load track with preserved loop points (like library loading does)
       loadTrackSafely(trackData, item.start * 1000, true).then(() => {
-          // Update visuals again after track loads with correct Spotify duration
-          setTimeout(() => {
-              console.log('🎵 Post-load visual update - start:', loopStart, 'end:', loopEnd, 'duration:', duration);
-              updateLoopVisuals();
-          }, 500);
+          console.log('🎵 Track loaded successfully with preserved loop points');
+          showStatus(`✅ Loaded: ${item.name}`);
       }).catch(error => {
           console.error('Failed to load playlist item:', error);
-          showStatus('❌ Failed to load track - but showing loop region anyway');
-          // Even if track loading fails, show the loop region
-          setTimeout(() => updateLoopVisuals(), 200);
+          showStatus('❌ Failed to load track');
       });
       
       showView('player');
