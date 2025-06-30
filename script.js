@@ -527,6 +527,16 @@ function updateMiniPlayer(track = null) {
   if (track) {
       els.miniTrackTitle.textContent = track.name || 'Unknown Track';
       els.miniTrackArtist.textContent = track.artist || 'Unknown Artist';
+      
+      // Update cover art
+      if (els.miniPlayerCover && track.image) {
+        els.miniPlayerCover.src = track.image;
+        els.miniPlayerCover.alt = `${track.name} cover`;
+        els.miniPlayerCover.style.display = 'block';
+      } else if (els.miniPlayerCover) {
+        els.miniPlayerCover.style.display = 'none';
+      }
+      
       updateMiniPlayButton();
       
       // Show visual progress bar when track is loaded
@@ -536,6 +546,13 @@ function updateMiniPlayer(track = null) {
   } else {
       els.miniTrackTitle.textContent = 'No track playing';
       els.miniTrackArtist.textContent = 'Select a track to start';
+      
+      // Hide cover art when no track
+      if (els.miniPlayerCover) {
+        els.miniPlayerCover.style.display = 'none';
+        els.miniPlayerCover.src = '';
+      }
+      
       updateMiniPlayButton();
       
       // Hide visual progress bar when no track
@@ -6722,6 +6739,7 @@ function init() {
       statusBar: document.getElementById('status-bar'),
       statusText: document.getElementById('status-text'),
       miniPlayer: document.getElementById('mini-player'),
+      miniPlayerCover: document.getElementById('mini-player-cover'),
       miniTrackTitle: document.getElementById('mini-track-title'),
       miniTrackArtist: document.getElementById('mini-track-artist'),
       miniPlayBtn: document.getElementById('mini-play-btn'),
