@@ -1558,7 +1558,7 @@ const DJFunctions = {
 // essentiaInstance already declared at line 76
 let analysisCache = new Map();
 let essentiaReady = false;
-let aiEnabled = false; // AI toggle state
+let aiEnabled = true; // AI toggle state
 
 /**
  * Initialize Essentia.js (loaded from CDN)
@@ -1705,9 +1705,9 @@ async function determineOptimalTransitionWithAI(fromTrack, toTrack, context = {}
         useAI: false
     };
     
-    // Check if AI is enabled and Essentia is ready
-    if (!aiEnabled || !essentiaReady) {
-        console.log('AI disabled or not ready, using standard logic');
+    // Check if Essentia is ready
+    if (!essentiaReady) {
+        console.log('AI not ready, using standard logic');
         return transitionPlan;
     }
     
@@ -1787,7 +1787,7 @@ async function determineOptimalTransitionWithAI(fromTrack, toTrack, context = {}
  * Find optimal loop points using onset detection
  */
 async function findOptimalLoopPoints(trackId, manualStart, manualEnd) {
-    if (!aiEnabled || !essentiaReady) {
+    if (!essentiaReady) {
         return { start: manualStart, end: manualEnd, optimized: false };
     }
     
@@ -1824,7 +1824,7 @@ async function findOptimalLoopPoints(trackId, manualStart, manualEnd) {
  * Enhanced playlist preparation with AI pre-analysis
  */
 async function preparePlaylistWithAI(playlist) {
-    if (!aiEnabled || !essentiaReady) return false;
+    if (!essentiaReady) return false;
     
     console.log('🤖 AI pre-analyzing playlist tracks...');
     
@@ -1851,25 +1851,6 @@ async function preparePlaylistWithAI(playlist) {
     }
 }
 
-/**
- * Toggle AI functionality on/off
- */
-function toggleAI() {
-    aiEnabled = !aiEnabled;
-    
-    const aiToggleBtn = document.getElementById('ai-toggle');
-    if (aiToggleBtn) {
-        if (aiEnabled) {
-            aiToggleBtn.classList.add('active');
-            console.log('🤖 AI analysis enabled');
-            showStatus('🤖 AI analysis enabled');
-        } else {
-            aiToggleBtn.classList.remove('active');
-            console.log('🤖 AI analysis disabled');
-            showStatus('🤖 AI analysis disabled');
-        }
-    }
-}
 
 // ============================================= 
 // SMART LOOP ASSIST SYSTEM
@@ -6253,10 +6234,6 @@ function setupEventListeners() {
               const newTime = Math.min(duration, currentTime + 10);
               await seekToPosition(newTime * 1000);
           }
-          else if (target.matches('#ai-toggle')) {
-              e.preventDefault();
-              toggleAI();
-          }
 
           // FIX 5: "Set Loop" button positions progress bar to loop start without auto-play
           else if (target.matches('#start-loop-btn')) {
@@ -6762,7 +6739,6 @@ function init() {
       playPauseBtn: document.getElementById('play-pause-btn'),
       backwardBtn: document.getElementById('backward-btn'),
       forwardBtn: document.getElementById('forward-btn'),
-      aiToggle: document.getElementById('ai-toggle'),
       startLoopBtn: document.getElementById('start-loop-btn'),
       saveLoopBtn: document.getElementById('save-loop-btn'),
       addToPlaylistBtn: document.getElementById('add-to-playlist-btn'),
