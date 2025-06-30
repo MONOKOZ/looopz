@@ -400,11 +400,22 @@ async function loadTrackSafely(trackData, startPositionMs = 0, preserveLoopPoint
     
     // Restore loop points if requested
     if (preservedLoop) {
+      // Update both state system AND local variables immediately
+      loopStart = preservedLoop.start;
+      loopEnd = preservedLoop.end;
+      loopTarget = preservedLoop.target;
+      loopEnabled = preservedLoop.enabled;
+      
       appState.set('loop.start', preservedLoop.start);
       appState.set('loop.end', preservedLoop.end);
       appState.set('loop.target', preservedLoop.target);
       appState.set('loop.enabled', preservedLoop.enabled);
+      
       console.log(`🔄 [SAFE LOAD ${operationId}] Restored loop points: ${formatTime(loopStart)} - ${formatTime(loopEnd)}`);
+      
+      // Update visuals immediately
+      updateLoopVisuals();
+      updateRepeatDisplay();
     } else {
       // Reset loop state for new track
       resetLoopState();
@@ -3114,6 +3125,7 @@ async function handleLoopEnd() {
   try {
       isLooping = true;
       loopCount++;
+      appState.set('loop.count', loopCount);
       
       console.log(`🔄 Loop end reached: count=${loopCount}/${loopTarget}, playlistMode=${isPlaylistMode}`);
 
@@ -3144,8 +3156,7 @@ async function handleLoopEnd() {
               
               // Ensure loop state is properly reset before transition
               loopEnabled = false;
-              loopCount = 0;
-              console.log('🔄 [PLAYLIST TRANSITION] Loop state reset for transition');
+              console.log('🔄 [PLAYLIST TRANSITION] Loop state reset for transition (keeping count for display)');
               
               // This will use the volume fading approach with underlying sample
               await playlistEngine.notifyItemComplete();
@@ -3173,9 +3184,15 @@ async function handleLoopEnd() {
               showStatus(`🎵 Loop completed cleanly (${loopTarget}×)`);
           }
           
-          // Reset loop count for next time
-          loopCount = 0;
-          console.log('🔄 Loop count reset to 0');
+          // Show completion status before reset
+          showStatus(`✅ Loop completed ${loopCount}/${loopTarget} times`);
+          
+          // Reset loop count for next time (after a delay to show completion)
+          setTimeout(() => {
+              loopCount = 0;
+              appState.set('loop.count', 0);
+              console.log('🔄 Loop count reset to 0 after completion');
+          }, 1500);
           
       } else {
           // Still have loops to go - this is a LOOP-REPETITION (same track continuing)
@@ -6067,8 +6084,8 @@ function setupEventListeners() {
                   loopTarget--;
                   appState.set('loop.target', loopTarget);
                   updateRepeatDisplay();
-                  loopCount = 0;
-                  appState.set('loop.count', 0);
+                  // Don't reset loopCount - user might be mid-loop
+                  console.log(`🔄 Repeat target decreased to ${loopTarget}, keeping current count ${loopCount}`);
               }
           }
           else if (target.matches('#repeat-increase')) {
@@ -6077,8 +6094,8 @@ function setupEventListeners() {
                   loopTarget++;
                   appState.set('loop.target', loopTarget);
                   updateRepeatDisplay();
-                  loopCount = 0;
-                  appState.set('loop.count', 0);
+                  // Don't reset loopCount - user might be mid-loop
+                  console.log(`🔄 Repeat target increased to ${loopTarget}, keeping current count ${loopCount}`);
               }
           }
 
