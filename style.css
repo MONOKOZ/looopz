@@ -794,6 +794,17 @@ body {
    height: 100%;
 }
 
+.mini-player-cover {
+   width: 40px;
+   height: 40px;
+   border-radius: 4px;
+   margin-right: var(--space-3);
+   flex-shrink: 0;
+   object-fit: cover;
+   background: var(--bg-tertiary);
+   transition: opacity 0.2s ease;
+}
+
 .mini-track-info {
    flex: 1;
    min-width: 0;
