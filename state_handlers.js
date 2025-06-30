@@ -52,14 +52,10 @@ function setupCriticalStateHandlers() {
         }
     });
     
-    // Operation cancellation handling
+    // Operation transition tracking (for debugging)
     appState.subscribe('operations.currentTrackOperation', (operation, oldOperation) => {
         if (oldOperation && oldOperation !== operation) {
-            // Mark old operation as cancelled
-            if (oldOperation.id) {
-                oldOperation.cancelled = true;
-                console.log(`🚫 Operation ${oldOperation.id} cancelled by new operation`);
-            }
+            console.log(`🔄 Operation transition: ${oldOperation.id || 'none'} → ${operation?.id || 'none'}`);
         }
     });
     
