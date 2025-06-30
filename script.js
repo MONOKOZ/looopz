@@ -4917,7 +4917,7 @@ function removeFromPlaylist(playlistId, itemIndex) {
   }
 }
 
-function loadPlaylistItem(playlistId, itemIndex) {
+async function loadPlaylistItem(playlistId, itemIndex) {
   console.log('🎵 loadPlaylistItem called - playlistId:', playlistId, 'itemIndex:', itemIndex);
   const playlist = savedPlaylists.find(p => p.id === playlistId);
   if (!playlist || !playlist.items[itemIndex]) {
@@ -4926,56 +4926,91 @@ function loadPlaylistItem(playlistId, itemIndex) {
   }
 
   const item = playlist.items[itemIndex];
-  console.log('🎵 Loading playlist item:', item);
+  console.log('🎵 Loading individual playlist item:', item);
   
-  if (item.type === 'loop') {
-      // Load as a saved loop
-      const trackData = {
-          uri: item.trackUri || item.uri, // Fix: use correct URI field
-          name: item.name,
-          artist: item.artist,
-          duration: item.duration,
-          image: item.image || ''
-      };
+  try {
+      // Exit playlist mode when loading individual playlist item
+      if (isPlaylistMode) {
+          console.log('🚪 Exiting playlist mode for individual playlist item');
+          isPlaylistMode = false;
+          appState.set('playlist.isActive', false);
+          
+          // Stop playlist engine if active
+          if (playlistEngine) {
+              playlistEngine.stop();
+              appState.set('playlist.engine', null);
+          }
+      }
 
-      // Set loop state immediately and via state system BEFORE loading track
-      console.log('🎵 Setting loop state from playlist item - start:', item.start, 'end:', item.end, 'target:', item.playCount);
-      
-      // Set directly for immediate availability (BEFORE loadTrackSafely)
-      loopStart = item.start;
-      loopEnd = item.end;
-      loopTarget = item.playCount;
-      loopCount = 0; // Reset loop count
-      loopEnabled = true;
-      
-      // Also set via state system for consistency
-      appState.set('loop.start', item.start);
-      appState.set('loop.end', item.end);
-      appState.set('loop.target', item.playCount);
-      appState.set('loop.count', 0); // Reset loop count
-      appState.set('loop.enabled', true);
+      if (item.type === 'loop') {
+          // Load as a saved loop
+          const trackData = {
+              uri: item.trackUri || item.uri, // Fix: use correct URI field
+              name: item.name,
+              artist: item.artist,
+              duration: item.duration,
+              image: item.image || ''
+          };
 
-      if (els.loopToggle) els.loopToggle.checked = true;
-      updateRepeatDisplay();
+          // Set loop state using unified function BEFORE loading track
+          updateLoopState({
+              start: item.start,
+              end: item.end,
+              target: item.playCount,
+              enabled: true,
+              count: 0,
+              startTime: Date.now()
+          });
 
-      console.log('🎵 About to call loadTrackSafely with preserveLoopPoints=true, current values:', {
-          loopStart, loopEnd, loopTarget, loopEnabled
-      });
+          console.log('🎵 About to call loadTrackSafely with preserveLoopPoints=true, current values:', {
+              loopStart, loopEnd, loopTarget, loopEnabled
+          });
 
-      // Load track with preserved loop points (like library loading does)
-      loadTrackSafely(trackData, item.start * 1000, true).then(() => {
-          console.log('🎵 Track loaded successfully with preserved loop points');
+          // Load track with preserved loop points
+          const loadSuccess = await loadTrackSafely(trackData, item.start * 1000, true);
+          if (!loadSuccess) {
+              console.log('🚫 Individual playlist item load cancelled or failed');
+              return;
+          }
+
+          // Complete UI setup like library loading does
+          updateProgress();
+          updatePlayPauseButton();
+          updateMiniPlayer(trackData);
+          startProgressUpdates();
+
+          showView('player');
+          showStatus(`✅ Loaded: ${item.name} (${item.playCount}×)`);
+          
+      } else {
+          // Load full track - use same pattern as individual track loading
+          const trackData = {
+              uri: item.uri,
+              name: item.name,
+              artist: item.artist,
+              duration: item.duration,
+              image: item.image || ''
+          };
+
+          const loadSuccess = await loadTrackSafely(trackData, 0, false);
+          if (!loadSuccess) {
+              console.log('🚫 Individual playlist track load cancelled or failed');
+              return;
+          }
+
+          // Complete UI setup
+          updateProgress();
+          updatePlayPauseButton();
+          updateMiniPlayer(trackData);
+          startProgressUpdates();
+
+          showView('player');
           showStatus(`✅ Loaded: ${item.name}`);
-      }).catch(error => {
-          console.error('Failed to load playlist item:', error);
-          showStatus('❌ Failed to load track');
-      });
+      }
       
-      showView('player');
-      showStatus(`🔄 Loading: ${item.name}`);
-  } else {
-      // Load full track
-      showStatus('❌ Full track loading not implemented yet');
+  } catch (error) {
+      console.error('🚨 Load individual playlist item error:', error);
+      showStatus('❌ Failed to load item');
   }
 }
 
