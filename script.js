@@ -3508,7 +3508,7 @@ async function selectTrack(uri, name, artist, durationMs, imageUrl) {
           
           // Stop playlist engine if active
           if (playlistEngine) {
-              playlistEngine.stop();
+              playlistEngine.stopPlaylist();
               appState.set('playlist.engine', null);
           }
           
@@ -4010,7 +4010,7 @@ async function loadSavedLoop(loopId) {
           
           // Stop playlist engine if active
           if (playlistEngine) {
-              playlistEngine.stop();
+              playlistEngine.stopPlaylist();
               appState.set('playlist.engine', null);
           }
           
@@ -4954,7 +4954,7 @@ async function loadPlaylistItem(playlistId, itemIndex) {
           
           // Stop playlist engine if active
           if (playlistEngine) {
-              playlistEngine.stop();
+              playlistEngine.stopPlaylist();
               appState.set('playlist.engine', null);
           }
           
