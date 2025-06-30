@@ -1570,7 +1570,7 @@ async function initializeEssentia() {
                     essentiaInstance = new Essentia(wasmModule);
                     essentiaReady = true;
                     console.log('✅ Essentia.js ready for audio analysis');
-                    showStatus('🤖 AI analysis ready');
+                    // Don't show status to avoid interrupting playlist status
                     return essentiaInstance;
                 } catch (e) {
                     console.log('📊 WASM initialization failed:', e.message);
@@ -1584,7 +1584,7 @@ async function initializeEssentia() {
                 essentiaInstance = new Essentia();
                 essentiaReady = true;
                 console.log('✅ Essentia.js ready (no WASM)');
-                showStatus('🤖 AI analysis ready (basic)');
+                // Don't show status to avoid interrupting playlist status
                 return essentiaInstance;
             } catch (e) {
                 console.log('📊 Basic initialization failed:', e.message);
@@ -2874,15 +2874,24 @@ function initializeSpotifyPlayer() {
 
           // Initialize AI audio analysis after a short delay
           setTimeout(() => {
-            initializeEssentia().then(essentia => {
-              if (essentia) {
-                // Add AI status indicator (optional)
-                const statusElement = document.getElementById('connection-status');
-                if (statusElement) {
-                  statusElement.innerHTML += ' <span style="color: #9945DB;">• AI Ready</span>';
+            // Only initialize if not already ready to prevent duplicates
+            if (!essentiaReady) {
+              initializeEssentia().then(essentia => {
+                if (essentia && !document.querySelector('.ai-ready-indicator')) {
+                  // Add AI status indicator (optional) - check if not already added
+                  const statusElement = document.getElementById('connection-status');
+                  if (statusElement) {
+                    const aiIndicator = document.createElement('span');
+                    aiIndicator.className = 'ai-ready-indicator';
+                    aiIndicator.style.color = '#9945DB';
+                    aiIndicator.textContent = ' • AI Ready';
+                    statusElement.appendChild(aiIndicator);
+                  }
                 }
-              }
-            });
+              }).catch(error => {
+                console.warn('AI initialization failed:', error);
+              });
+            }
           }, 2000); // Wait 2 seconds for other systems to load first
 
           setTimeout(() => {
