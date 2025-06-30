@@ -504,9 +504,16 @@ function resetLoopState() {
 function updateProgress() {
   if (!duration) return;
   const percent = (currentTime / duration) * 100;
+  
+  // Update main progress bar
   els.progressBar.style.width = `${percent}%`;
   els.currentTime.textContent = formatTime(currentTime);
   els.duration.textContent = formatTime(duration);
+  
+  // Update visual progress bar (mirrors main player)
+  if (els.visualProgressBar) {
+    els.visualProgressBar.style.width = `${percent}%`;
+  }
 }
 
 function updatePlayPauseButton() {
@@ -521,10 +528,20 @@ function updateMiniPlayer(track = null) {
       els.miniTrackTitle.textContent = track.name || 'Unknown Track';
       els.miniTrackArtist.textContent = track.artist || 'Unknown Artist';
       updateMiniPlayButton();
+      
+      // Show visual progress bar when track is loaded
+      if (els.visualProgressContainer) {
+        els.visualProgressContainer.classList.add('show');
+      }
   } else {
       els.miniTrackTitle.textContent = 'No track playing';
       els.miniTrackArtist.textContent = 'Select a track to start';
       updateMiniPlayButton();
+      
+      // Hide visual progress bar when no track
+      if (els.visualProgressContainer) {
+        els.visualProgressContainer.classList.remove('show');
+      }
   }
 }
 
@@ -6715,6 +6732,8 @@ function init() {
       currentArtist: document.getElementById('current-artist'),
       progressContainer: document.getElementById('progress-container'),
       progressBar: document.getElementById('progress-bar'),
+      visualProgressContainer: document.getElementById('visual-progress-container'),
+      visualProgressBar: document.getElementById('visual-progress-bar'),
       loopRegion: document.getElementById('loop-region'),
       loopStartHandle: document.getElementById('loop-start-handle'),
       loopEndHandle: document.getElementById('loop-end-handle'),
