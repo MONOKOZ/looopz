@@ -767,22 +767,22 @@ body {
    50% { transform: scale(1.05); }
 }
 
-/* Mini Player - Spotify Style */
+/* Mini Player Container - Groups progress bar and mini player */
 .mini-player {
    position: fixed;
    bottom: 60px;
    left: 0;
    right: 0;
-   background: var(--bg-secondary);
-   border-top: 1px solid var(--border-subtle);
    z-index: 95;
-   backdrop-filter: blur(20px);
-   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
-   height: 50px;
    margin-bottom: env(safe-area-inset-bottom);
 }
 
 .mini-player-content {
+   background: var(--bg-secondary);
+   border-top: 1px solid var(--border-subtle);
+   backdrop-filter: blur(20px);
+   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+   height: 50px;
    display: flex;
    align-items: center;
    justify-content: space-between;
@@ -791,7 +791,6 @@ body {
    margin: 0 auto;
    cursor: pointer;
    touch-action: pan-y;
-   height: 100%;
 }
 
 .mini-player-cover {
@@ -2976,13 +2975,12 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
    =============================================== */
 
 .visual-progress-container {
-    position: fixed;
-    bottom: 80px; /* Above mini player */
+    position: absolute;
+    top: -4px; /* Positioned directly above mini player content */
     left: 0;
     right: 0;
     height: 4px;
     background: rgba(255, 255, 255, 0.1);
-    z-index: 999;
     opacity: 0;
     transition: opacity 0.3s ease;
 }
