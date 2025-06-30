@@ -377,9 +377,10 @@ async function loadTrackSafely(trackData, startPositionMs = 0, preserveLoopPoint
       enabled: loopEnabled
     } : null;
     
-    // Check if operation was cancelled before proceeding
-    if (currentTrackOperation.cancelled || currentTrackOperation.id !== operationId) {
-      console.log(`🚫 [SAFE LOAD ${operationId}] Operation cancelled before load`);
+    // Check if operation is still active before proceeding
+    const activeOp = appState.get('operations.currentTrackOperation');
+    if (!activeOp || activeOp.id !== operationId) {
+      console.log(`🚫 [SAFE LOAD ${operationId}] Operation superseded before load`);
       return false;
     }
     
@@ -389,9 +390,10 @@ async function loadTrackSafely(trackData, startPositionMs = 0, preserveLoopPoint
     // Load track
     await loadTrackIntoSpotify(trackData, startPositionMs);
     
-    // Final cancellation check
-    if (currentTrackOperation.cancelled || currentTrackOperation.id !== operationId) {
-      console.log(`🚫 [SAFE LOAD ${operationId}] Operation cancelled after load`);
+    // Check if this operation is still the active one (not if it's cancelled)
+    const currentOp = appState.get('operations.currentTrackOperation');
+    if (!currentOp || currentOp.id !== operationId) {
+      console.log(`🚫 [SAFE LOAD ${operationId}] Operation superseded by new operation ${currentOp?.id || 'none'}`);
       return false;
     }
     
@@ -425,8 +427,9 @@ async function loadTrackSafely(trackData, startPositionMs = 0, preserveLoopPoint
     return true;
     
   } catch (error) {
-    if (currentTrackOperation && (currentTrackOperation.cancelled || currentTrackOperation.id !== operationId)) {
-      console.log(`🚫 [SAFE LOAD ${operationId}] Cancelled during error`);
+    const currentOp = appState.get('operations.currentTrackOperation');
+    if (!currentOp || currentOp.id !== operationId) {
+      console.log(`🚫 [SAFE LOAD ${operationId}] Superseded during error`);
       return false;
     }
     
@@ -436,7 +439,8 @@ async function loadTrackSafely(trackData, startPositionMs = 0, preserveLoopPoint
     
   } finally {
     // Clear operation if it's still ours
-    if (currentTrackOperation && currentTrackOperation.id === operationId) {
+    const finalOp = appState.get('operations.currentTrackOperation');
+    if (finalOp && finalOp.id === operationId) {
       appState.set('operations.currentTrackOperation', null);
     }
   }
