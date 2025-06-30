@@ -530,8 +530,8 @@ function updateLoopVisuals() {
       loopEnd = Math.min(30, effectiveDuration);
   }
 
-  const startPercent = (loopStart / effectiveDuration) * 100;
-  const endPercent = (loopEnd / effectiveDuration) * 100;
+  const startPercent = Math.min(100, Math.max(0, (loopStart / effectiveDuration) * 100));
+  const endPercent = Math.min(100, Math.max(0, (loopEnd / effectiveDuration) * 100));
 
   els.loopStartHandle.style.left = `${startPercent}%`;
   els.loopEndHandle.style.left = `${endPercent}%`;
@@ -1520,8 +1520,8 @@ async function initializeEssentia() {
             }
         }
         
-        // Fallback: Try without WASM initialization
-        if (typeof Essentia === 'function') {
+        // Fallback: Try without WASM initialization (only if first attempt failed)
+        if (typeof Essentia === 'function' && !essentiaReady) {
             try {
                 essentiaInstance = new Essentia();
                 essentiaReady = true;
@@ -6065,16 +6065,20 @@ function setupEventListeners() {
               e.preventDefault();
               if (loopTarget > 1) {
                   loopTarget--;
+                  appState.set('loop.target', loopTarget);
                   updateRepeatDisplay();
                   loopCount = 0;
+                  appState.set('loop.count', 0);
               }
           }
           else if (target.matches('#repeat-increase')) {
               e.preventDefault();
               if (loopTarget < 99) {
                   loopTarget++;
+                  appState.set('loop.target', loopTarget);
                   updateRepeatDisplay();
                   loopCount = 0;
+                  appState.set('loop.count', 0);
               }
           }
 
