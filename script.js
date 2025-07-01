@@ -62,14 +62,19 @@ function updateMediaSession(trackData) {
             // Prepare artwork array with different sizes
             const artwork = [];
             if (trackData.image) {
+                // Try different Spotify image sizes to avoid CORS issues
+                const imageBase = trackData.image.replace(/\/[0-9]+x[0-9]+/, '');
                 artwork.push(
-                    { src: trackData.image, sizes: '96x96', type: 'image/jpeg' },
-                    { src: trackData.image, sizes: '128x128', type: 'image/jpeg' },
-                    { src: trackData.image, sizes: '192x192', type: 'image/jpeg' },
-                    { src: trackData.image, sizes: '256x256', type: 'image/jpeg' },
-                    { src: trackData.image, sizes: '384x384', type: 'image/jpeg' },
-                    { src: trackData.image, sizes: '512x512', type: 'image/jpeg' }
+                    { src: imageBase + '/96x96', sizes: '96x96', type: 'image/jpeg' },
+                    { src: imageBase + '/128x128', sizes: '128x128', type: 'image/jpeg' },
+                    { src: imageBase + '/192x192', sizes: '192x192', type: 'image/jpeg' },
+                    { src: imageBase + '/256x256', sizes: '256x256', type: 'image/jpeg' },
+                    { src: imageBase + '/300x300', sizes: '300x300', type: 'image/jpeg' },
+                    { src: imageBase + '/512x512', sizes: '512x512', type: 'image/jpeg' },
+                    { src: trackData.image, sizes: '640x640', type: 'image/jpeg' } // Original as fallback
                 );
+                
+                console.log('📱 Media Session artwork URLs:', artwork.map(a => a.src));
             }
             
             // Set metadata for lock screen
