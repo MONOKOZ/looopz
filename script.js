@@ -20,6 +20,59 @@ function isPWA() {
            window.location.search.includes('pwa=true');
 }
 
+// Detect iOS
+function isIOS() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+           (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
+// iOS-specific silent audio element for lock screen controls
+let iosAudioElement = null;
+let iosAudioInitialized = false;
+
+function setupIOSAudio() {
+    if (isIOS() && !iosAudioElement) {
+        console.log('📱 Setting up iOS-specific silent audio element for lock screen controls');
+        iosAudioElement = document.createElement('audio');
+        iosAudioElement.loop = true;
+        iosAudioElement.volume = 0.01; // Very quiet
+        iosAudioElement.preload = 'auto';
+        
+        // Use a data URL for a silent audio track
+        iosAudioElement.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwiBjGO0vHNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwiBjGO0vHNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwiBjGO0vHNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwiBjGO0vHNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwiBjGO0vHNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwiBjGO0vHNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwiBjGO0vHNeSwF';
+        
+        // Add to DOM but keep hidden
+        iosAudioElement.style.display = 'none';
+        document.body.appendChild(iosAudioElement);
+        
+        console.log('✅ iOS silent audio element created');
+        
+        // Set up one-time user interaction handler to initialize audio
+        if (!iosAudioInitialized) {
+            const initIOSAudio = () => {
+                if (iosAudioElement && !iosAudioInitialized) {
+                    iosAudioElement.play().then(() => {
+                        iosAudioElement.pause();
+                        iosAudioInitialized = true;
+                        console.log('📱 iOS audio initialized with user interaction');
+                        
+                        // Remove the event listeners after successful initialization
+                        document.removeEventListener('touchstart', initIOSAudio);
+                        document.removeEventListener('click', initIOSAudio);
+                    }).catch(error => {
+                        console.log('📱 iOS audio initialization failed:', error);
+                    });
+                }
+            };
+            
+            // Listen for first user interaction
+            document.addEventListener('touchstart', initIOSAudio, { once: true });
+            document.addEventListener('click', initIOSAudio, { once: true });
+            console.log('📱 iOS audio initialization listeners added');
+        }
+    }
+}
+
 // Media Session API for lock screen controls
 function setupMediaSession() {
     if ('mediaSession' in navigator) {
@@ -74,6 +127,25 @@ function updateMediaSession(trackData) {
     if ('mediaSession' in navigator && trackData) {
         try {
             console.log('📱 Updating Media Session with track data:', trackData);
+            
+            // iOS-specific handling
+            if (isIOS()) {
+                console.log('📱 iOS detected - using iOS-specific media session handling');
+                
+                // Ensure iOS audio element is set up
+                setupIOSAudio();
+                
+                // Start silent audio to trigger iOS lock screen controls
+                if (iosAudioElement && iosAudioInitialized) {
+                    iosAudioElement.play().then(() => {
+                        console.log('📱 iOS silent audio started for lock screen activation');
+                    }).catch(error => {
+                        console.log('📱 iOS silent audio start failed:', error);
+                    });
+                } else if (iosAudioElement && !iosAudioInitialized) {
+                    console.log('📱 iOS audio not yet initialized - waiting for user interaction');
+                }
+            }
             
             // Prepare artwork array with different sizes
             const artwork = [];
@@ -147,6 +219,19 @@ function updateMediaSessionPlaybackState(state) {
             // Set playback state for better OS integration
             navigator.mediaSession.playbackState = state.paused ? 'paused' : 'playing';
             
+            // iOS-specific handling for playback state changes
+            if (isIOS() && iosAudioElement && iosAudioInitialized) {
+                if (state.paused) {
+                    iosAudioElement.pause();
+                    console.log('📱 iOS silent audio paused');
+                } else {
+                    iosAudioElement.play().catch(error => {
+                        console.log('📱 iOS silent audio resume failed:', error);
+                    });
+                    console.log('📱 iOS silent audio resumed');
+                }
+            }
+            
             // Update position for progress tracking on lock screen
             if (!state.paused && state.track_window?.current_track) {
                 navigator.mediaSession.setPositionState({
@@ -169,6 +254,13 @@ function clearMediaSession() {
         try {
             navigator.mediaSession.metadata = null;
             navigator.mediaSession.playbackState = 'none';
+            
+            // Stop iOS silent audio if running
+            if (isIOS() && iosAudioElement) {
+                iosAudioElement.pause();
+                console.log('📱 iOS silent audio stopped');
+            }
+            
             console.log('📱 Media Session cleared');
         } catch (error) {
             console.error('🚨 Media Session clear error:', error);
@@ -7119,6 +7211,11 @@ function init() {
 
   // Initialize Media Session API for lock screen controls
   setupMediaSession();
+  
+  // Initialize iOS-specific audio element for lock screen controls
+  if (isIOS()) {
+    setupIOSAudio();
+  }
 
   console.log('✅ LOOOPZ initialization complete with Playlist Management!');
 }
