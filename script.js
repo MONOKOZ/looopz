@@ -24,6 +24,16 @@ function isPWA() {
 function setupMediaSession() {
     if ('mediaSession' in navigator) {
         console.log('📱 Setting up Media Session API for lock screen controls');
+        console.log('📱 Browser:', navigator.userAgent);
+        console.log('📱 Platform:', navigator.platform);
+        
+        // Test if MediaMetadata constructor exists
+        try {
+            const testMetadata = new MediaMetadata({ title: 'Test' });
+            console.log('📱 MediaMetadata constructor available:', !!testMetadata);
+        } catch (error) {
+            console.error('📱 MediaMetadata constructor error:', error);
+        }
         
         // Set action handlers for lock screen controls
         navigator.mediaSession.setActionHandler('play', () => {
@@ -50,6 +60,10 @@ function setupMediaSession() {
             // TODO: Add next track logic later
         });
         
+        // Debug: Log initial state
+        console.log('📱 Initial playbackState:', navigator.mediaSession.playbackState);
+        console.log('📱 Initial metadata:', navigator.mediaSession.metadata);
+        
         console.log('✅ Media Session API initialized');
     } else {
         console.log('⚠️ Media Session API not supported');
@@ -59,9 +73,19 @@ function setupMediaSession() {
 function updateMediaSession(trackData) {
     if ('mediaSession' in navigator && trackData) {
         try {
+            console.log('📱 Updating Media Session with track data:', trackData);
+            
             // Prepare artwork array with different sizes
             const artwork = [];
             if (trackData.image) {
+                console.log('📱 Original image URL:', trackData.image);
+                
+                // Test if the image loads before using it
+                const img = new Image();
+                img.onload = () => console.log('✅ Track image loads successfully');
+                img.onerror = () => console.log('❌ Track image failed to load');
+                img.src = trackData.image;
+                
                 // Try different Spotify image sizes to avoid CORS issues
                 const imageBase = trackData.image.replace(/\/[0-9]+x[0-9]+/, '');
                 artwork.push(
@@ -75,20 +99,44 @@ function updateMediaSession(trackData) {
                 );
                 
                 console.log('📱 Media Session artwork URLs:', artwork.map(a => a.src));
+            } else {
+                console.log('⚠️ No image URL available for track');
             }
             
-            // Set metadata for lock screen
-            navigator.mediaSession.metadata = new MediaMetadata({
+            // Create metadata
+            const metadata = new MediaMetadata({
                 title: trackData.name || 'Unknown Track',
                 artist: trackData.artist || 'Unknown Artist',
                 album: 'LOOOPZ', // Could be enhanced with actual album name later
                 artwork: artwork
             });
             
-            console.log(`📱 Media Session updated: ${trackData.name} by ${trackData.artist}`);
+            // Set metadata for lock screen
+            navigator.mediaSession.metadata = metadata;
+            
+            // Force playback state to playing to trigger lock screen
+            navigator.mediaSession.playbackState = 'playing';
+            
+            console.log('📱 Media Session metadata set:', metadata);
+            console.log('📱 Media Session playbackState:', navigator.mediaSession.playbackState);
+            console.log(`✅ Media Session updated: ${trackData.name} by ${trackData.artist}`);
+            
+            // Additional debug: Check if metadata actually got set
+            setTimeout(() => {
+                console.log('📱 Verification - Current metadata:', navigator.mediaSession.metadata);
+                console.log('📱 Verification - Current playbackState:', navigator.mediaSession.playbackState);
+            }, 100);
             
         } catch (error) {
             console.error('🚨 Media Session update error:', error);
+            console.error('🚨 Error stack:', error.stack);
+        }
+    } else {
+        if (!('mediaSession' in navigator)) {
+            console.log('⚠️ Media Session API not available');
+        }
+        if (!trackData) {
+            console.log('⚠️ No track data provided to updateMediaSession');
         }
     }
 }
