@@ -20,6 +20,85 @@ function isPWA() {
            window.location.search.includes('pwa=true');
 }
 
+// Media Session API for lock screen controls
+function setupMediaSession() {
+    if ('mediaSession' in navigator) {
+        console.log('📱 Setting up Media Session API for lock screen controls');
+        
+        // Set action handlers for lock screen controls
+        navigator.mediaSession.setActionHandler('play', () => {
+            console.log('📱 Media Session: Play pressed');
+            if (spotifyPlayer) {
+                spotifyPlayer.resume();
+            }
+        });
+        
+        navigator.mediaSession.setActionHandler('pause', () => {
+            console.log('📱 Media Session: Pause pressed');
+            if (spotifyPlayer) {
+                spotifyPlayer.pause();
+            }
+        });
+        
+        navigator.mediaSession.setActionHandler('previoustrack', () => {
+            console.log('📱 Media Session: Previous pressed');
+            // TODO: Add previous track logic later
+        });
+        
+        navigator.mediaSession.setActionHandler('nexttrack', () => {
+            console.log('📱 Media Session: Next pressed');
+            // TODO: Add next track logic later
+        });
+        
+        console.log('✅ Media Session API initialized');
+    } else {
+        console.log('⚠️ Media Session API not supported');
+    }
+}
+
+function updateMediaSession(trackData) {
+    if ('mediaSession' in navigator && trackData) {
+        try {
+            // Prepare artwork array with different sizes
+            const artwork = [];
+            if (trackData.image) {
+                artwork.push(
+                    { src: trackData.image, sizes: '96x96', type: 'image/jpeg' },
+                    { src: trackData.image, sizes: '128x128', type: 'image/jpeg' },
+                    { src: trackData.image, sizes: '192x192', type: 'image/jpeg' },
+                    { src: trackData.image, sizes: '256x256', type: 'image/jpeg' },
+                    { src: trackData.image, sizes: '384x384', type: 'image/jpeg' },
+                    { src: trackData.image, sizes: '512x512', type: 'image/jpeg' }
+                );
+            }
+            
+            // Set metadata for lock screen
+            navigator.mediaSession.metadata = new MediaMetadata({
+                title: trackData.name || 'Unknown Track',
+                artist: trackData.artist || 'Unknown Artist',
+                album: 'LOOOPZ', // Could be enhanced with actual album name later
+                artwork: artwork
+            });
+            
+            console.log(`📱 Media Session updated: ${trackData.name} by ${trackData.artist}`);
+            
+        } catch (error) {
+            console.error('🚨 Media Session update error:', error);
+        }
+    }
+}
+
+function clearMediaSession() {
+    if ('mediaSession' in navigator) {
+        try {
+            navigator.mediaSession.metadata = null;
+            console.log('📱 Media Session cleared');
+        } catch (error) {
+            console.error('🚨 Media Session clear error:', error);
+        }
+    }
+}
+
 // Audio analysis caches with size limits to prevent memory leaks
 const CACHE_SIZE_LIMIT = 100; // Maximum items per cache
 const audioAnalysisCache = new Map();
@@ -414,6 +493,9 @@ async function loadTrackSafely(trackData, startPositionMs = 0, preserveLoopPoint
     
     // Update current track info
     appState.set('playback.currentTrack', trackData);
+    
+    // Update Media Session for lock screen controls
+    updateMediaSession(trackData);
     
     // Restore loop points if requested
     if (preservedLoop) {
@@ -879,6 +961,9 @@ function disconnectSpotify() {
       clearTimeout(tokenRefreshTimer);
       tokenRefreshTimer = null;
   }
+  
+  // Clear Media Session
+  clearMediaSession();
   
   localStorage.removeItem('spotify_access_token');
   localStorage.removeItem('spotify_refresh_token');
@@ -6283,6 +6368,9 @@ function forceReauth(reason) {
       tokenRefreshTimer = null;
   }
   
+  // Clear Media Session
+  clearMediaSession();
+  
   // Clear all auth data
   localStorage.removeItem('spotify_access_token');
   localStorage.removeItem('spotify_refresh_token');
@@ -6940,6 +7028,9 @@ function init() {
   }).catch((error) => {
     console.warn('Failed to initialize prebuffer cache:', error);
   });
+
+  // Initialize Media Session API for lock screen controls
+  setupMediaSession();
 
   console.log('✅ LOOOPZ initialization complete with Playlist Management!');
 }
