@@ -2,8 +2,23 @@
 
 // Config
 const SPOTIFY_CLIENT_ID = '46637d8f5adb41c0a4be34e0df0c1597';
-const SPOTIFY_REDIRECT_URI = 'https://looopz.vercel.app/';
+
+// Dynamic redirect URI to handle both web and PWA contexts
+function getRedirectUri() {
+    // Use current origin for redirect to handle PWA and web contexts
+    return window.location.origin + '/';
+}
+
+// Dynamic redirect URI function used instead of constant
 const SPOTIFY_SCOPES = 'streaming user-read-email user-read-private user-read-playback-state user-modify-playback-state';
+
+// Detect if running as PWA
+function isPWA() {
+    return window.matchMedia('(display-mode: standalone)').matches || 
+           window.navigator.standalone || 
+           document.referrer.includes('android-app://') ||
+           window.location.search.includes('pwa=true');
+}
 
 // Audio analysis caches with size limits to prevent memory leaks
 const CACHE_SIZE_LIMIT = 100; // Maximum items per cache
@@ -794,7 +809,7 @@ async function getSpotifyAuthUrl() {
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = await generateCodeChallenge(codeVerifier);
   localStorage.setItem('code_verifier', codeVerifier);
-  return `https://accounts.spotify.com/authorize?client_id=${SPOTIFY_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(SPOTIFY_REDIRECT_URI)}&scope=${encodeURIComponent(SPOTIFY_SCOPES)}&code_challenge_method=S256&code_challenge=${codeChallenge}&show_dialog=true`;
+  return `https://accounts.spotify.com/authorize?client_id=${SPOTIFY_CLIENT_ID}&response_type=code&redirect_uri=${encodeURIComponent(getRedirectUri())}&scope=${encodeURIComponent(SPOTIFY_SCOPES)}&code_challenge_method=S256&code_challenge=${codeChallenge}&show_dialog=true`;
 }
 
 async function connectSpotify() {
@@ -821,7 +836,7 @@ async function exchangeCodeForToken(code) {
       body: new URLSearchParams({
           grant_type: 'authorization_code',
           code: code,
-          redirect_uri: SPOTIFY_REDIRECT_URI,
+          redirect_uri: getRedirectUri(),
           client_id: SPOTIFY_CLIENT_ID,
           code_verifier: codeVerifier,
       }),
@@ -840,6 +855,13 @@ async function exchangeCodeForToken(code) {
           const expiryTime = Date.now() + (data.expires_in * 1000) - 300000; // Refresh 5 minutes before expiry
           localStorage.setItem('spotify_token_expiry', expiryTime.toString());
           scheduleTokenRefresh(data.expires_in);
+      }
+      
+      // For PWA, add additional persistence checks
+      if (isPWA()) {
+          console.log('🔐 PWA: Storing authentication state');
+          localStorage.setItem('spotify_pwa_authenticated', 'true');
+          localStorage.setItem('spotify_auth_timestamp', Date.now().toString());
       }
       
       localStorage.removeItem('code_verifier');
@@ -861,6 +883,8 @@ function disconnectSpotify() {
   localStorage.removeItem('spotify_access_token');
   localStorage.removeItem('spotify_refresh_token');
   localStorage.removeItem('spotify_token_expiry');
+  localStorage.removeItem('spotify_pwa_authenticated');
+  localStorage.removeItem('spotify_auth_timestamp');
   appState.set('spotify.accessToken', null);
   appState.set('spotify.isConnected', false);
   if (spotifyPlayer) spotifyPlayer.disconnect();
@@ -6063,7 +6087,15 @@ function checkAuth() {
   const hasSharedLoop = checkForSharedLoop();
   console.log('🔗 Has shared loop:', hasSharedLoop);
 
+  // Enhanced PWA token checking
   const storedToken = localStorage.getItem('spotify_access_token');
+  const storedRefreshToken = localStorage.getItem('spotify_refresh_token');
+  
+  console.log(`🔐 PWA Mode: ${isPWA()}`);
+  console.log(`🔐 Stored Token: ${storedToken ? 'Yes' : 'No'}`);
+  console.log(`🔐 Stored Refresh Token: ${storedRefreshToken ? 'Yes' : 'No'}`);
+  console.log(`🔐 Already Connected: ${isConnected}`);
+  
   if (storedToken && spotifyAccessToken && isConnected && spotifyDeviceId) {
       console.log('🔐 Already connected, checking for shared loops...');
       if (hasSharedLoop) {
@@ -6074,6 +6106,14 @@ function checkAuth() {
 
   if (storedToken) {
       console.log('🔐 Found stored token, validating...');
+      
+      // PWA-specific token validation
+      if (isPWA()) {
+          const pwaAuth = localStorage.getItem('spotify_pwa_authenticated');
+          const authTimestamp = localStorage.getItem('spotify_auth_timestamp');
+          console.log(`🔐 PWA Auth State: ${pwaAuth}, Timestamp: ${authTimestamp}`);
+      }
+      
       appState.set('spotify.accessToken', storedToken);
       spotifyAccessToken = storedToken; // Update global variable
       
@@ -6083,6 +6123,8 @@ function checkAuth() {
           const expiryTime = parseInt(tokenExpiry);
           const now = Date.now();
           const timeUntilExpiry = expiryTime - now;
+          
+          console.log(`🔐 Token expires in: ${Math.round(timeUntilExpiry / 60000)} minutes`);
           
           if (timeUntilExpiry <= 0) {
               // Token already expired, try to refresh
@@ -6110,6 +6152,10 @@ function checkAuth() {
   const code = urlParams.get('code');
   const error = urlParams.get('error');
 
+  console.log(`🔐 URL Params - Code: ${code ? 'Present' : 'None'}, Error: ${error || 'None'}`);
+  console.log(`🔐 Current URL: ${window.location.href}`);
+  console.log(`🔐 Redirect URI: ${getRedirectUri()}`);
+
   if (error) {
       console.log('🔐 Auth error:', error);
       showStatus('Authentication failed: ' + error);
@@ -6119,6 +6165,12 @@ function checkAuth() {
 
   if (code) {
       console.log('🔐 Found auth code, exchanging for token...');
+      
+      // For PWA, ensure we handle the callback properly
+      if (isPWA()) {
+          console.log('🔐 PWA: Handling auth callback');
+      }
+      
       exchangeCodeForToken(code);
       return;
   }
@@ -6263,6 +6315,8 @@ function forceReauth(reason) {
   localStorage.removeItem('spotify_access_token');
   localStorage.removeItem('spotify_refresh_token');
   localStorage.removeItem('spotify_token_expiry');
+  localStorage.removeItem('spotify_pwa_authenticated');
+  localStorage.removeItem('spotify_auth_timestamp');
   spotifyAccessToken = null;
   
   // Reset player state
