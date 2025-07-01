@@ -129,72 +129,30 @@ function updateMediaSession(trackData) {
         try {
             console.log('📱 Updating Media Session with track data:', trackData);
             
-            // iOS-specific handling
+            // iOS-specific handling - simplified approach
             if (isIOS()) {
-                console.log('📱 iOS detected - using iOS-specific media session handling');
-                
-                // Ensure iOS audio element is set up
-                setupIOSAudio();
-                
-                // Start silent audio to trigger iOS lock screen controls
-                if (iosAudioElement && iosAudioInitialized) {
-                    iosAudioElement.play().then(() => {
-                        console.log('📱 iOS silent audio started for lock screen activation');
-                    }).catch(error => {
-                        console.log('📱 iOS silent audio start failed:', error);
-                    });
-                } else if (iosAudioElement && !iosAudioInitialized) {
-                    console.log('📱 iOS audio not yet initialized - waiting for user interaction');
-                }
+                console.log('📱 iOS detected - setting up media session for iOS');
             }
             
-            // Prepare artwork array with different sizes
+            // Prepare artwork array - simplified approach
             const artwork = [];
             if (trackData.image) {
                 console.log('📱 Original image URL:', trackData.image);
-                
-                // For iOS, try both Spotify image and app icon as fallback
-                if (isIOS()) {
-                    artwork.push(
-                        { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
-                        { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
-                        { src: trackData.image, sizes: '640x640', type: 'image/jpeg' }
-                    );
-                } else {
-                    artwork.push(
-                        { src: trackData.image, sizes: '640x640', type: 'image/jpeg' },
-                        { src: trackData.image, sizes: '512x512', type: 'image/jpeg' },
-                        { src: trackData.image, sizes: '300x300', type: 'image/jpeg' },
-                        { src: trackData.image, sizes: '192x192', type: 'image/jpeg' }
-                    );
-                }
-                
+                artwork.push(
+                    { src: trackData.image, sizes: '640x640', type: 'image/jpeg' }
+                );
                 console.log('📱 Media Session artwork URLs:', artwork.map(a => a.src));
             } else {
                 console.log('⚠️ No image URL available for track');
-                // Use app icon as fallback when no track image
-                artwork.push(
-                    { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
-                    { src: '/icon-192.png', sizes: '192x192', type: 'image/png' }
-                );
             }
             
-            // Create metadata with iOS-specific handling
+            // Create metadata - back to basic approach
             const metadata = new MediaMetadata({
                 title: trackData.name || 'Unknown Track',
                 artist: trackData.artist || 'Unknown Artist',
                 album: trackData.album || 'LOOOPZ',
                 artwork: artwork
             });
-            
-            // Pre-load the image for iOS to ensure it's available
-            if (isIOS() && trackData.image) {
-                const preloadImg = new Image();
-                preloadImg.crossOrigin = 'anonymous';
-                preloadImg.onload = () => console.log('📱 iOS artwork preloaded successfully');
-                preloadImg.onerror = () => console.log('📱 iOS artwork preload failed');
-                preloadImg.src = trackData.image;
-            }
             
             // Set metadata for lock screen
             navigator.mediaSession.metadata = metadata;
@@ -232,18 +190,7 @@ function updateMediaSessionPlaybackState(state) {
             // Set playback state for better OS integration
             navigator.mediaSession.playbackState = state.paused ? 'paused' : 'playing';
             
-            // iOS-specific handling for playback state changes
-            if (isIOS() && iosAudioElement && iosAudioInitialized) {
-                if (state.paused) {
-                    iosAudioElement.pause();
-                    console.log('📱 iOS silent audio paused');
-                } else {
-                    iosAudioElement.play().catch(error => {
-                        console.log('📱 iOS silent audio resume failed:', error);
-                    });
-                    console.log('📱 iOS silent audio resumed');
-                }
-            }
+            // Simplified iOS handling - removed silent audio for now
             
             // Update position for progress tracking on lock screen
             if (!state.paused && state.track_window?.current_track) {
@@ -268,11 +215,7 @@ function clearMediaSession() {
             navigator.mediaSession.metadata = null;
             navigator.mediaSession.playbackState = 'none';
             
-            // Stop iOS silent audio if running
-            if (isIOS() && iosAudioElement) {
-                iosAudioElement.pause();
-                console.log('📱 iOS silent audio stopped');
-            }
+            // Simplified clear - no iOS audio for now
             
             console.log('📱 Media Session cleared');
         } catch (error) {
@@ -7224,11 +7167,6 @@ function init() {
 
   // Initialize Media Session API for lock screen controls
   setupMediaSession();
-  
-  // Initialize iOS-specific audio element for lock screen controls
-  if (isIOS()) {
-    setupIOSAudio();
-  }
 
   console.log('✅ LOOOPZ initialization complete with Playlist Management!');
 }
