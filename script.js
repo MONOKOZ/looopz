@@ -831,7 +831,17 @@ async function exchangeCodeForToken(code) {
   if (data.access_token) {
       appState.set('spotify.accessToken', data.access_token);
       localStorage.setItem('spotify_access_token', data.access_token);
+      spotifyAccessToken = data.access_token; // Update global variable
+      
       if (data.refresh_token) localStorage.setItem('spotify_refresh_token', data.refresh_token);
+      
+      // Store token expiry time and schedule refresh
+      if (data.expires_in) {
+          const expiryTime = Date.now() + (data.expires_in * 1000) - 300000; // Refresh 5 minutes before expiry
+          localStorage.setItem('spotify_token_expiry', expiryTime.toString());
+          scheduleTokenRefresh(data.expires_in);
+      }
+      
       localStorage.removeItem('code_verifier');
       window.history.replaceState({}, document.title, window.location.pathname);
       initializeSpotifyPlayer();
@@ -842,8 +852,15 @@ async function exchangeCodeForToken(code) {
 }
 
 function disconnectSpotify() {
+  // Clear refresh timer
+  if (tokenRefreshTimer) {
+      clearTimeout(tokenRefreshTimer);
+      tokenRefreshTimer = null;
+  }
+  
   localStorage.removeItem('spotify_access_token');
   localStorage.removeItem('spotify_refresh_token');
+  localStorage.removeItem('spotify_token_expiry');
   appState.set('spotify.accessToken', null);
   appState.set('spotify.isConnected', false);
   if (spotifyPlayer) spotifyPlayer.disconnect();
@@ -1128,9 +1145,36 @@ const apiRequestQueue = new Map();
 const API_RATE_LIMIT_MS = 1000; // Minimum 1 second between API calls for same track
 
 /**
+ * Check if token needs refresh before API calls
+ */
+async function ensureValidToken() {
+    const tokenExpiry = localStorage.getItem('spotify_token_expiry');
+    if (tokenExpiry) {
+        const expiryTime = parseInt(tokenExpiry);
+        const now = Date.now();
+        
+        // If token expires in less than 2 minutes, refresh it now
+        if (expiryTime - now < 120000) {
+            console.log('🔄 Token expiring soon, refreshing proactively...');
+            const success = await refreshSpotifyToken();
+            if (!success) {
+                throw new Error('Token refresh failed');
+            }
+        }
+    }
+}
+
+/**
  * Debounced API request function with retry logic and better error handling
  */
 async function debouncedAPIRequest(url, trackId, cacheMap, retryCount = 0) {
+    // Ensure token is valid before making request
+    try {
+        await ensureValidToken();
+    } catch (error) {
+        console.error('Token validation failed:', error);
+    }
+    
     // Check cache first
     if (cacheMap.has(trackId)) {
         return cacheMap.get(trackId);
@@ -6031,6 +6075,33 @@ function checkAuth() {
   if (storedToken) {
       console.log('🔐 Found stored token, validating...');
       appState.set('spotify.accessToken', storedToken);
+      spotifyAccessToken = storedToken; // Update global variable
+      
+      // Check if token is near expiry
+      const tokenExpiry = localStorage.getItem('spotify_token_expiry');
+      if (tokenExpiry) {
+          const expiryTime = parseInt(tokenExpiry);
+          const now = Date.now();
+          const timeUntilExpiry = expiryTime - now;
+          
+          if (timeUntilExpiry <= 0) {
+              // Token already expired, try to refresh
+              console.log('⏰ Token already expired, refreshing...');
+              refreshSpotifyToken().then(success => {
+                  if (success) {
+                      validateToken(localStorage.getItem('spotify_access_token'));
+                  } else {
+                      forceReauth('Token expired and refresh failed');
+                  }
+              });
+              return;
+          } else if (timeUntilExpiry < 3600000) { // Less than 1 hour remaining
+              // Schedule refresh based on remaining time
+              const remainingSeconds = Math.floor(timeUntilExpiry / 1000);
+              scheduleTokenRefresh(remainingSeconds + 300); // Add 5 minutes buffer
+          }
+      }
+      
       validateToken(storedToken);
       return;
   }
@@ -6098,15 +6169,16 @@ async function refreshSpotifyToken() {
   try {
       console.log('🔄 Refreshing Spotify token...');
       
+      // PKCE flow doesn't use client secret or Basic auth
       const response = await fetch('https://accounts.spotify.com/api/token', {
           method: 'POST',
           headers: {
-              'Content-Type': 'application/x-www-form-urlencoded',
-              'Authorization': `Basic ${btoa(SPOTIFY_CLIENT_ID + ':')}`
+              'Content-Type': 'application/x-www-form-urlencoded'
           },
           body: new URLSearchParams({
               grant_type: 'refresh_token',
-              refresh_token: refreshToken
+              refresh_token: refreshToken,
+              client_id: SPOTIFY_CLIENT_ID  // Required for PKCE
           })
       });
       
@@ -6116,10 +6188,18 @@ async function refreshSpotifyToken() {
           // Update tokens
           appState.set('spotify.accessToken', data.access_token);
           localStorage.setItem('spotify_access_token', data.access_token);
+          spotifyAccessToken = data.access_token; // Update global variable
           
-          // Update refresh token if provided
+          // Update refresh token if provided (Spotify may rotate refresh tokens)
           if (data.refresh_token) {
               localStorage.setItem('spotify_refresh_token', data.refresh_token);
+          }
+          
+          // Store token expiry time for proactive refresh
+          if (data.expires_in) {
+              const expiryTime = Date.now() + (data.expires_in * 1000) - 300000; // Refresh 5 minutes before expiry
+              localStorage.setItem('spotify_token_expiry', expiryTime.toString());
+              scheduleTokenRefresh(data.expires_in);
           }
           
           console.log('✅ Token refreshed successfully');
@@ -6128,6 +6208,8 @@ async function refreshSpotifyToken() {
           
       } else {
           console.warn('⚠️ Token refresh failed:', response.status);
+          const errorData = await response.text();
+          console.error('Refresh error details:', errorData);
           return false;
       }
       
@@ -6138,14 +6220,49 @@ async function refreshSpotifyToken() {
 }
 
 /**
+ * Schedule automatic token refresh before expiry
+ */
+let tokenRefreshTimer = null;
+
+function scheduleTokenRefresh(expiresIn) {
+  // Clear any existing timer
+  if (tokenRefreshTimer) {
+      clearTimeout(tokenRefreshTimer);
+  }
+  
+  // Schedule refresh 5 minutes before token expires
+  const refreshDelay = (expiresIn - 300) * 1000; // Convert to milliseconds, subtract 5 minutes
+  
+  if (refreshDelay > 0) {
+      console.log(`⏰ Scheduling token refresh in ${Math.round(refreshDelay / 60000)} minutes`);
+      
+      tokenRefreshTimer = setTimeout(async () => {
+          console.log('⏰ Proactive token refresh triggered');
+          const success = await refreshSpotifyToken();
+          
+          if (!success) {
+              console.warn('⚠️ Proactive refresh failed, will retry on next API call');
+          }
+      }, refreshDelay);
+  }
+}
+
+/**
  * Force re-authentication when tokens cannot be refreshed
  */
 function forceReauth(reason) {
   console.log(`🚨 Forcing re-auth: ${reason}`);
   
+  // Clear refresh timer
+  if (tokenRefreshTimer) {
+      clearTimeout(tokenRefreshTimer);
+      tokenRefreshTimer = null;
+  }
+  
   // Clear all auth data
   localStorage.removeItem('spotify_access_token');
   localStorage.removeItem('spotify_refresh_token');
+  localStorage.removeItem('spotify_token_expiry');
   spotifyAccessToken = null;
   
   // Reset player state
