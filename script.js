@@ -35,11 +35,12 @@ function setupIOSAudio() {
         console.log('📱 Setting up iOS-specific silent audio element for lock screen controls');
         iosAudioElement = document.createElement('audio');
         iosAudioElement.loop = true;
-        iosAudioElement.volume = 0.01; // Very quiet
+        iosAudioElement.volume = 0; // Completely silent
+        iosAudioElement.muted = true; // Extra insurance for silence
         iosAudioElement.preload = 'auto';
         
-        // Use a data URL for a silent audio track
-        iosAudioElement.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwiBjGO0vHNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwiBjGO0vHNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwiBjGO0vHNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwiBjGO0vHNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwiBjGO0vHNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwiBjGO0vHNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwiBjGO0vHNeSwF';
+        // Use a truly silent audio track (10 seconds of silence)
+        iosAudioElement.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQQAAAAAAA==';
         
         // Add to DOM but keep hidden
         iosAudioElement.style.display = 'none';
@@ -152,36 +153,48 @@ function updateMediaSession(trackData) {
             if (trackData.image) {
                 console.log('📱 Original image URL:', trackData.image);
                 
-                // Test if the image loads before using it
-                const img = new Image();
-                img.onload = () => console.log('✅ Track image loads successfully');
-                img.onerror = () => console.log('❌ Track image failed to load');
-                img.src = trackData.image;
-                
-                // Try different Spotify image sizes to avoid CORS issues
-                const imageBase = trackData.image.replace(/\/[0-9]+x[0-9]+/, '');
-                artwork.push(
-                    { src: imageBase + '/96x96', sizes: '96x96', type: 'image/jpeg' },
-                    { src: imageBase + '/128x128', sizes: '128x128', type: 'image/jpeg' },
-                    { src: imageBase + '/192x192', sizes: '192x192', type: 'image/jpeg' },
-                    { src: imageBase + '/256x256', sizes: '256x256', type: 'image/jpeg' },
-                    { src: imageBase + '/300x300', sizes: '300x300', type: 'image/jpeg' },
-                    { src: imageBase + '/512x512', sizes: '512x512', type: 'image/jpeg' },
-                    { src: trackData.image, sizes: '640x640', type: 'image/jpeg' } // Original as fallback
-                );
+                // For iOS, try both Spotify image and app icon as fallback
+                if (isIOS()) {
+                    artwork.push(
+                        { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+                        { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+                        { src: trackData.image, sizes: '640x640', type: 'image/jpeg' }
+                    );
+                } else {
+                    artwork.push(
+                        { src: trackData.image, sizes: '640x640', type: 'image/jpeg' },
+                        { src: trackData.image, sizes: '512x512', type: 'image/jpeg' },
+                        { src: trackData.image, sizes: '300x300', type: 'image/jpeg' },
+                        { src: trackData.image, sizes: '192x192', type: 'image/jpeg' }
+                    );
+                }
                 
                 console.log('📱 Media Session artwork URLs:', artwork.map(a => a.src));
             } else {
                 console.log('⚠️ No image URL available for track');
+                // Use app icon as fallback when no track image
+                artwork.push(
+                    { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
+                    { src: '/icon-192.png', sizes: '192x192', type: 'image/png' }
+                );
             }
             
-            // Create metadata
+            // Create metadata with iOS-specific handling
             const metadata = new MediaMetadata({
                 title: trackData.name || 'Unknown Track',
                 artist: trackData.artist || 'Unknown Artist',
-                album: 'LOOOPZ', // Could be enhanced with actual album name later
+                album: trackData.album || 'LOOOPZ',
                 artwork: artwork
             });
+            
+            // Pre-load the image for iOS to ensure it's available
+            if (isIOS() && trackData.image) {
+                const preloadImg = new Image();
+                preloadImg.crossOrigin = 'anonymous';
+                preloadImg.onload = () => console.log('📱 iOS artwork preloaded successfully');
+                preloadImg.onerror = () => console.log('📱 iOS artwork preload failed');
+                preloadImg.src = trackData.image;
+            }
             
             // Set metadata for lock screen
             navigator.mediaSession.metadata = metadata;
