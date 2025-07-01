@@ -93,10 +93,34 @@ function updateMediaSession(trackData) {
     }
 }
 
+function updateMediaSessionPlaybackState(state) {
+    if ('mediaSession' in navigator && state) {
+        try {
+            // Set playback state for better OS integration
+            navigator.mediaSession.playbackState = state.paused ? 'paused' : 'playing';
+            
+            // Update position for progress tracking on lock screen
+            if (!state.paused && state.track_window?.current_track) {
+                navigator.mediaSession.setPositionState({
+                    duration: state.track_window.current_track.duration_ms / 1000,
+                    playbackRate: 1.0,
+                    position: state.position / 1000
+                });
+            }
+            
+            console.log(`📱 Media Session state: ${state.paused ? 'paused' : 'playing'}, position: ${Math.round(state.position / 1000)}s`);
+            
+        } catch (error) {
+            console.error('🚨 Media Session state update error:', error);
+        }
+    }
+}
+
 function clearMediaSession() {
     if ('mediaSession' in navigator) {
         try {
             navigator.mediaSession.metadata = null;
+            navigator.mediaSession.playbackState = 'none';
             console.log('📱 Media Session cleared');
         } catch (error) {
             console.error('🚨 Media Session clear error:', error);
@@ -3101,6 +3125,9 @@ function initializeSpotifyPlayer() {
           updateProgress();
           updatePlayPauseButton();
           updateMiniPlayer(currentTrack);
+          
+          // Update Media Session playback state for lock screen
+          updateMediaSessionPlaybackState(state);
 
           if (state.track_window.current_track) {
               const track = state.track_window.current_track;
@@ -3114,9 +3141,17 @@ function initializeSpotifyPlayer() {
                   currentTrack.name = track.name || 'Unknown Track';
                   currentTrack.artist = artistName;
                   currentTrack.duration = duration;
+                  
+                  // Try to get album artwork from track
+                  if (track.album && track.album.images && track.album.images.length > 0) {
+                      currentTrack.image = track.album.images[0].url;
+                  }
 
                   els.currentTrack.textContent = track.name || 'Unknown Track';
                   els.currentArtist.textContent = artistName;
+                  
+                  // Update Media Session with new track info
+                  updateMediaSession(currentTrack);
               }
           }
       });
