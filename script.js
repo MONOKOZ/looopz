@@ -3549,35 +3549,7 @@ function updateSearchTrackHighlighting(uri, isSelected = false) {
 }
 
 // Background play without navigation
-async function playTrackInBackground(track) {
-  try {
-      showStatus('🎵 Loading track...');
-
-      const trackData = {
-          uri: track.uri,
-          name: track.name,
-          artist: track.artists && track.artists.length > 0 ? track.artists[0].name : 'Unknown Artist',
-          duration: track.duration_ms / 1000,
-          image: track.album.images[0]?.url || ''
-      };
-
-      duration = trackData.duration;
-
-      const loadSuccess = await loadTrackSafely(trackData, 0, false);
-      if (!loadSuccess) {
-          console.log('🚫 Background play cancelled or failed');
-          return; // Exit early if load was cancelled
-      }
-
-      updateSearchTrackHighlighting(track.uri);
-      updateMiniPlayer(currentTrack);
-      showStatus(`🎵 Playing: ${track.name}`);
-
-  } catch (error) {
-      console.error('🚨 Background play error:', error);
-      showStatus('Failed to play track');
-  }
-}
+// playTrackInBackground function removed - all playback now uses unified selectTrack()
 
 // SEAMLESS SEARCH-TO-PLAYER TRANSITION - NEW IMPLEMENTATION
 async function selectTrack(uri, name, artist, durationMs, imageUrl) {
@@ -6501,7 +6473,10 @@ function setupEventListeners() {
               e.preventDefault();
               const index = parseInt(target.dataset.trackIndex);
               const track = currentSearchResults[index];
-              if (track) await playTrackInBackground(track);
+              if (track) {
+                  const artistName = track.artists && track.artists.length > 0 ? track.artists[0].name : 'Unknown Artist';
+                  await selectTrack(track.uri, track.name, artistName, track.duration_ms, track.album.images[0]?.url || '');
+              }
           }
           // select-track-btn removed - functionality now available via context menu
           else if (target.matches('.track-menu-btn')) {
