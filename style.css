@@ -409,6 +409,13 @@ body {
 
 .track-item:hover .track-actions { opacity: 1; }
 
+/* Ensure track actions are always visible on touch devices */
+@media (hover: none) {
+   .track-actions {
+      opacity: 1;
+   }
+}
+
 .track-action-btn {
    background: var(--primary);
    color: white;
@@ -1026,8 +1033,26 @@ body {
 .control-btn:hover { background: linear-gradient(145deg, #444, #333); transform: scale(1.05); }
 
 /* Fix button click/touch issues - prevent SVG icons from capturing clicks */
-.control-btn svg {
+.control-btn svg,
+.delete-x-btn svg,
+.track-action-btn svg,
+.playlist-action-btn svg,
+.loop-action-btn svg,
+.btn svg,
+.back-btn svg,
+.drag-handle svg {
    pointer-events: none;
+}
+
+/* Improve button touch responsiveness */
+.delete-x-btn,
+.track-action-btn,
+.playlist-action-btn,
+.loop-action-btn,
+.btn,
+.back-btn {
+   touch-action: manipulation;
+   cursor: pointer;
 }
 
 .play-pause-btn {
