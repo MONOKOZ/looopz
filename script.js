@@ -3767,7 +3767,7 @@ function updateSearchTrackHighlighting(uri, isSelected = false) {
 // playTrackInBackground function removed - all playback now uses unified selectTrack()
 
 // SEAMLESS SEARCH-TO-PLAYER TRANSITION - NEW IMPLEMENTATION
-async function selectTrack(uri, name, artist, durationMs, imageUrl) {
+async function selectTrack(uri, name, artist, durationMs, imageUrl, stayInSearchView = false) {
   try {
       // Check if same track is already playing
       const isCurrentTrack = currentTrack && currentTrack.uri === uri && isPlaying;
@@ -3833,7 +3833,11 @@ async function selectTrack(uri, name, artist, durationMs, imageUrl) {
 
       updateLoopVisuals();
       updateProgress();
-      showView('player');
+      
+      // Only switch to player view if not staying in search
+      if (!stayInSearchView) {
+          showView('player');
+      }
 
   } catch (error) {
       console.error('🚨 Track selection error:', error);
@@ -6701,7 +6705,8 @@ function setupEventListeners() {
               const track = currentSearchResults[index];
               if (track) {
                   const artistName = track.artists && track.artists.length > 0 ? track.artists[0].name : 'Unknown Artist';
-                  await selectTrack(track.uri, track.name, artistName, track.duration_ms, track.album.images[0]?.url || '');
+                  // Stay in search view when playing tracks from search
+                  await selectTrack(track.uri, track.name, artistName, track.duration_ms, track.album.images[0]?.url || '', true);
               }
           }
           // select-track-btn removed - functionality now available via context menu
@@ -6712,14 +6717,26 @@ function setupEventListeners() {
               showTrackContextMenu(index, target);
           }
           else if (target.closest('.track-item') && !target.closest('.track-actions')) {
-              e.preventDefault();
+              // Handle double-click on track items to switch to player view
               const item = target.closest('.track-item');
-              const index = parseInt(item.dataset.trackIndex);
-              const track = currentSearchResults[index];
-              if (track) {
-                  const artistName = track.artists && track.artists.length > 0 ? track.artists[0].name : 'Unknown Artist';
-                  await selectTrack(track.uri, track.name, artistName, track.duration_ms, track.album.images[0]?.url || '');
+              const now = Date.now();
+              const lastClick = item.dataset.lastClick ? parseInt(item.dataset.lastClick) : 0;
+              const timeDiff = now - lastClick;
+              
+              item.dataset.lastClick = now;
+              
+              // Double-click detected (within 300ms)
+              if (timeDiff < 300) {
+                  e.preventDefault();
+                  const index = parseInt(item.dataset.trackIndex);
+                  const track = currentSearchResults[index];
+                  if (track) {
+                      const artistName = track.artists && track.artists.length > 0 ? track.artists[0].name : 'Unknown Artist';
+                      // Double-click switches to player view
+                      await selectTrack(track.uri, track.name, artistName, track.duration_ms, track.album.images[0]?.url || '', false);
+                  }
               }
+              // Single click - do nothing (let play button handle track loading)
           }
 
           // Context Menu Actions - IMMEDIATE RESPONSE
