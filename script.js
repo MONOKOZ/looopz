@@ -4873,7 +4873,7 @@ function renderPlaylistItemsAsCards(playlist) {
           <div class="loop-actions">
               <button class="loop-action-btn load-playlist-item-btn" data-playlist-id="${playlist.id}" data-item-index="${index}">Load</button>
               <button class="loop-action-btn edit-playlist-item-btn" data-playlist-id="${playlist.id}" data-item-index="${index}">Edit</button>
-              <button class="loop-action-btn share-btn" data-item='${JSON.stringify(item)}'>Share</button>
+              <button class="loop-action-btn share-btn" data-item='${JSON.stringify(item).replace(/'/g, '&apos;')}'>Share</button>
           </div>
 
           <div class="loop-edit-form" id="edit-playlist-item-${playlist.id}-${index}">
@@ -4895,7 +4895,7 @@ function renderPlaylistItemsAsCards(playlist) {
               </div>
               <div class="edit-actions">
                   <button class="btn secondary" onclick="updatePlaylistItem('${playlist.id}', ${index})">💾 Update</button>
-                  <button class="btn secondary" onclick="savePlaylistItemAsNew('${playlist.id}', ${index})">➕ Save as New Loop</button>
+                  ${isLoop ? `<button class="btn secondary" onclick="savePlaylistItemAsNew('${playlist.id}', ${index})">➕ Save as New Loop</button>` : ''}
                   <button class="btn" onclick="cancelPlaylistItemEdit('${playlist.id}', ${index})">❌ Cancel</button>
               </div>
           </div>
