@@ -127,31 +127,46 @@ function setupMediaSession() {
 function updateMediaSession(trackData) {
     if ('mediaSession' in navigator && trackData) {
         try {
-            // Simple artwork - use app icon as primary, track image as fallback
-            const artwork = [
-                { src: '/icon-512.png', sizes: '512x512', type: 'image/png' },
-                { src: '/icon-192.png', sizes: '192x192', type: 'image/png' }
-            ];
-            
-            // Add track image if available
+            // Prepare artwork array with different sizes
+            const artwork = [];
             if (trackData.image) {
-                artwork.push({ src: trackData.image, sizes: '640x640', type: 'image/jpeg' });
+                // Try different Spotify image sizes to avoid CORS issues
+                const imageBase = trackData.image.replace(/\/[0-9]+x[0-9]+/, '');
+                artwork.push(
+                    { src: imageBase + '/96x96', sizes: '96x96', type: 'image/jpeg' },
+                    { src: imageBase + '/128x128', sizes: '128x128', type: 'image/jpeg' },
+                    { src: imageBase + '/192x192', sizes: '192x192', type: 'image/jpeg' },
+                    { src: imageBase + '/256x256', sizes: '256x256', type: 'image/jpeg' },
+                    { src: imageBase + '/300x300', sizes: '300x300', type: 'image/jpeg' },
+                    { src: imageBase + '/512x512', sizes: '512x512', type: 'image/jpeg' },
+                    { src: trackData.image, sizes: '640x640', type: 'image/jpeg' } // Original as fallback
+                );
+            } else {
+                // Use app logo when no track image available
+                artwork.push(
+                    { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+                    { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }
+                );
             }
             
+            // Create metadata
             const metadata = new MediaMetadata({
                 title: trackData.name || 'Unknown Track',
                 artist: trackData.artist || 'Unknown Artist',
-                album: 'LOOOPZ',
+                album: 'LOOOPZ', // Could be enhanced with actual album name later
                 artwork: artwork
             });
             
+            // Set metadata for lock screen
             navigator.mediaSession.metadata = metadata;
+            
+            // Force playback state to playing to trigger lock screen
             navigator.mediaSession.playbackState = 'playing';
             
-            console.log(`📱 Media Session updated: ${trackData.name} by ${trackData.artist}`);
+            console.log(`✅ Media Session updated: ${trackData.name} by ${trackData.artist}`);
             
         } catch (error) {
-            console.error('🚨 Media Session error:', error);
+            console.error('🚨 Media Session update error:', error);
         }
     }
 }
