@@ -1041,7 +1041,8 @@ body {
 .btn svg,
 .back-btn svg,
 .drag-handle svg,
-.repeat-btn svg {
+.repeat-btn svg,
+.popup-close svg {
    pointer-events: none;
 }
 
@@ -1052,7 +1053,8 @@ body {
 .loop-action-btn,
 .btn,
 .back-btn,
-.repeat-btn {
+.repeat-btn,
+.popup-close {
    touch-action: manipulation;
    cursor: pointer;
 }
