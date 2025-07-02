@@ -26,49 +26,83 @@ function isIOS() {
            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
-// iOS-specific silent audio element for lock screen controls
-let iosAudioElement = null;
+// iOS-specific silent audio using Web Audio API (Professional Approach)
+let iosAudioContext = null;
+let iosOscillator = null;
+let iosGainNode = null;
 let iosAudioInitialized = false;
 
 function setupIOSAudio() {
-    if (isIOS() && !iosAudioElement) {
-        console.log('📱 Setting up iOS-specific silent audio element for lock screen controls');
-        iosAudioElement = document.createElement('audio');
-        iosAudioElement.loop = true;
-        iosAudioElement.volume = 0.01; // Industry standard low volume
-        iosAudioElement.preload = 'auto';
+    if (isIOS() && !iosAudioContext) {
+        console.log('📱 Setting up professional iOS silent audio using Web Audio API');
         
-        // Use truly silent audio file (1 second of actual silence)
-        iosAudioElement.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQQAAAAAAA==';
-        
-        // Add to DOM but keep hidden
-        iosAudioElement.style.display = 'none';
-        document.body.appendChild(iosAudioElement);
-        
-        console.log('✅ iOS silent audio element created');
-        
-        // Set up one-time user interaction handler to initialize audio
-        if (!iosAudioInitialized) {
-            const initIOSAudio = () => {
-                if (iosAudioElement && !iosAudioInitialized) {
-                    iosAudioElement.play().then(() => {
-                        iosAudioElement.pause();
-                        iosAudioInitialized = true;
-                        console.log('📱 iOS audio initialized with user interaction');
-                        
-                        // Remove the event listeners after successful initialization
-                        document.removeEventListener('touchstart', initIOSAudio);
-                        document.removeEventListener('click', initIOSAudio);
-                    }).catch(error => {
-                        console.log('📱 iOS audio initialization failed:', error);
-                    });
-                }
-            };
+        try {
+            // Create Web Audio context (industry standard)
+            iosAudioContext = new (window.AudioContext || window.webkitAudioContext)();
             
-            // Listen for first user interaction
-            document.addEventListener('touchstart', initIOSAudio, { once: true });
-            document.addEventListener('click', initIOSAudio, { once: true });
-            console.log('📱 iOS audio initialization listeners added');
+            // Create gain node for volume control
+            iosGainNode = iosAudioContext.createGain();
+            iosGainNode.gain.setValueAtTime(0.02, iosAudioContext.currentTime); // Spotify's volume level
+            iosGainNode.connect(iosAudioContext.destination);
+            
+            console.log('✅ iOS Web Audio context created');
+            
+            // Set up one-time user interaction handler
+            if (!iosAudioInitialized) {
+                const initIOSAudio = () => {
+                    if (iosAudioContext && !iosAudioInitialized) {
+                        // Resume audio context (required by iOS)
+                        iosAudioContext.resume().then(() => {
+                            iosAudioInitialized = true;
+                            console.log('📱 iOS Web Audio context initialized with user interaction');
+                            
+                            // Remove event listeners
+                            document.removeEventListener('touchstart', initIOSAudio);
+                            document.removeEventListener('click', initIOSAudio);
+                        }).catch(error => {
+                            console.log('📱 iOS Web Audio initialization failed:', error);
+                        });
+                    }
+                };
+                
+                // Listen for first user interaction
+                document.addEventListener('touchstart', initIOSAudio, { once: true });
+                document.addEventListener('click', initIOSAudio, { once: true });
+                console.log('📱 iOS Web Audio initialization listeners added');
+            }
+            
+        } catch (error) {
+            console.error('🚨 iOS Web Audio setup failed:', error);
+        }
+    }
+}
+
+function startIOSSilentAudio() {
+    if (isIOS() && iosAudioContext && iosAudioInitialized && !iosOscillator) {
+        try {
+            // Create oscillator for inaudible 18Hz tone (Spotify's approach)
+            iosOscillator = iosAudioContext.createOscillator();
+            iosOscillator.frequency.setValueAtTime(18, iosAudioContext.currentTime); // Below human hearing
+            iosOscillator.type = 'sine';
+            iosOscillator.connect(iosGainNode);
+            iosOscillator.start();
+            
+            console.log('📱 iOS silent 18Hz oscillator started');
+        } catch (error) {
+            console.error('🚨 iOS oscillator start failed:', error);
+        }
+    }
+}
+
+function stopIOSSilentAudio() {
+    if (iosOscillator) {
+        try {
+            iosOscillator.stop();
+            iosOscillator.disconnect();
+            iosOscillator = null;
+            console.log('📱 iOS silent oscillator stopped');
+        } catch (error) {
+            console.error('🚨 iOS oscillator stop failed:', error);
         }
     }
 }
@@ -128,23 +162,15 @@ function updateMediaSession(trackData) {
         try {
             console.log('📱 Updating Media Session with track data:', trackData);
             
-            // iOS-specific handling
+            // iOS-specific handling (Professional Web Audio API approach)
             if (isIOS()) {
-                console.log('📱 iOS detected - using iOS-specific media session handling');
+                console.log('📱 iOS detected - using professional Web Audio API approach');
                 
-                // Ensure iOS audio element is set up
+                // Ensure iOS audio context is set up
                 setupIOSAudio();
                 
-                // Start silent audio to trigger iOS lock screen controls
-                if (iosAudioElement && iosAudioInitialized) {
-                    iosAudioElement.play().then(() => {
-                        console.log('📱 iOS silent audio started for lock screen activation');
-                    }).catch(error => {
-                        console.log('📱 iOS silent audio start failed:', error);
-                    });
-                } else if (iosAudioElement && !iosAudioInitialized) {
-                    console.log('📱 iOS audio not yet initialized - waiting for user interaction');
-                }
+                // Start inaudible 18Hz oscillator to trigger iOS lock screen controls
+                startIOSSilentAudio();
             }
             
             // Prepare artwork array with different sizes
@@ -211,16 +237,12 @@ function updateMediaSessionPlaybackState(state) {
             // Set playback state for better OS integration
             navigator.mediaSession.playbackState = state.paused ? 'paused' : 'playing';
             
-            // iOS-specific handling for playback state changes
-            if (isIOS() && iosAudioElement && iosAudioInitialized) {
+            // iOS-specific handling for playback state changes (Web Audio API)
+            if (isIOS()) {
                 if (state.paused) {
-                    iosAudioElement.pause();
-                    console.log('📱 iOS silent audio paused');
+                    stopIOSSilentAudio();
                 } else {
-                    iosAudioElement.play().catch(error => {
-                        console.log('📱 iOS silent audio resume failed:', error);
-                    });
-                    console.log('📱 iOS silent audio resumed');
+                    startIOSSilentAudio();
                 }
             }
             
@@ -248,9 +270,8 @@ function clearMediaSession() {
             navigator.mediaSession.playbackState = 'none';
             
             // Stop iOS silent audio if running
-            if (isIOS() && iosAudioElement) {
-                iosAudioElement.pause();
-                console.log('📱 iOS silent audio stopped');
+            if (isIOS()) {
+                stopIOSSilentAudio();
             }
             
             console.log('📱 Media Session cleared');
