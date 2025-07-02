@@ -475,6 +475,10 @@ const PREBUFFER_MESSAGES = [
   "🎹 Processing '{track}'... seamless experience loading!"
 ];
 
+// Track loading failure tracking for progressive error messages
+let trackLoadFailureCount = 0;
+let lastFailedTrackUri = null;
+
 // Utils
 function formatTime(seconds, showMs = true) {
   // Validate input and provide default
@@ -514,6 +518,16 @@ function showStatus(message, duration = 3000) {
   els.statusText.textContent = message;
   els.statusBar.classList.add('show');
   setTimeout(() => els.statusBar.classList.remove('show'), duration);
+}
+
+function getProgressiveErrorMessage(failureCount) {
+  if (failureCount <= 2) {
+    return "Ups! Loading failed - please try again and/or choose a different one";
+  } else if (failureCount <= 4) {
+    return "Still having trouble - try a different track or check your connection";
+  } else {
+    return "So sorry - You need to refresh. Reload LOOOPZ to fix loading issues";
+  }
 }
 
 /**
@@ -592,6 +606,13 @@ async function loadTrackSafely(trackData, startPositionMs = 0, preserveLoopPoint
     }
     
     console.log(`✅ [SAFE LOAD ${operationId}] Successfully loaded: ${trackData.name}`);
+    
+    // Reset failure count on success
+    if (trackData.uri === lastFailedTrackUri) {
+      trackLoadFailureCount = 0;
+      lastFailedTrackUri = null;
+    }
+    
     return true;
     
   } catch (error) {
@@ -602,7 +623,24 @@ async function loadTrackSafely(trackData, startPositionMs = 0, preserveLoopPoint
     }
     
     console.error(`🚨 [SAFE LOAD ${operationId}] Failed to load track:`, error);
-    showStatus('⚠️ Failed to load track');
+    
+    // Track failures for progressive error messages
+    if (trackData.uri === lastFailedTrackUri) {
+      trackLoadFailureCount++;
+    } else {
+      trackLoadFailureCount = 1;
+      lastFailedTrackUri = trackData.uri;
+    }
+    
+    const errorMessage = getProgressiveErrorMessage(trackLoadFailureCount);
+    showStatus(errorMessage, trackLoadFailureCount > 4 ? 5000 : 3000);
+    
+    // Update mini player with helpful message instead of generic "select track"
+    if (els.miniTrackTitle && els.miniTrackArtist) {
+      els.miniTrackTitle.textContent = 'Loading failed';
+      els.miniTrackArtist.textContent = trackLoadFailureCount > 4 ? 'Please refresh page' : 'Try again or pick another';
+    }
+    
     return false;
     
   } finally {
@@ -1051,13 +1089,13 @@ function disconnectSpotify() {
 }
 
 // Load track with optional start position
-async function loadTrackIntoSpotify(track, startPositionMs = 0) {
+async function loadTrackIntoSpotify(track, startPositionMs = 0, retryCount = 0) {
   if (!spotifyDeviceId || !spotifyAccessToken) {
       throw new Error('Spotify not ready');
   }
 
   try {
-      console.log('🎵 Loading track:', track.name, 'at position:', startPositionMs);
+      console.log('🎵 Loading track:', track.name, 'at position:', startPositionMs, retryCount > 0 ? `(retry ${retryCount})` : '');
 
       const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
       if (isMobile && spotifyPlayer) {
@@ -1081,21 +1119,31 @@ async function loadTrackIntoSpotify(track, startPositionMs = 0) {
       });
 
       if (!response.ok) {
-          if (response.status === 400) {
-              console.warn('🔄 Device conflict detected, attempting to reconnect player...');
+          if (response.status === 400 || response.status === 404) {
+              console.warn('🔄 Device issue detected, attempting to reconnect player...');
               // Device might be inactive or conflicted, try to reconnect
-              if (spotifyPlayer) {
+              if (spotifyPlayer && retryCount < 2) {
                   try {
                       await spotifyPlayer.disconnect();
                       await new Promise(resolve => setTimeout(resolve, 1000));
                       await spotifyPlayer.connect();
-                      showStatus('🔄 Reconnected to Spotify');
-                      throw new Error('Device reconnected - please retry');
+                      await new Promise(resolve => setTimeout(resolve, 1000));
+                      
+                      // Retry loading after reconnect
+                      return await loadTrackIntoSpotify(track, startPositionMs, retryCount + 1);
                   } catch (reconnectError) {
                       console.error('Failed to reconnect:', reconnectError);
                   }
               }
           }
+          
+          // Auto-retry on 502/503 errors (server issues)
+          if ((response.status === 502 || response.status === 503) && retryCount < 2) {
+              console.log('🔄 Server error, retrying in 1 second...');
+              await new Promise(resolve => setTimeout(resolve, 1000));
+              return await loadTrackIntoSpotify(track, startPositionMs, retryCount + 1);
+          }
+          
           throw new Error(`Load failed: ${response.status}`);
       }
 
@@ -6527,7 +6575,13 @@ function setupEventListeners() {
           if (target.matches('#play-pause-btn')) {
               e.preventDefault();
               if (!currentTrack) {
-                  showStatus('Please select a track first');
+                  // Check if user has saved loops they could load instead
+                  const savedLoops = appState.get('storage.savedLoops') || [];
+                  if (savedLoops.length > 0) {
+                      showStatus('Please select a track or load a saved loop');
+                  } else {
+                      showStatus('Please select a track first');
+                  }
                   return;
               }
               target.disabled = true;
