@@ -35,10 +35,10 @@ function setupIOSAudio() {
         console.log('📱 Setting up iOS-specific silent audio element for lock screen controls');
         iosAudioElement = document.createElement('audio');
         iosAudioElement.loop = true;
-        iosAudioElement.volume = 0.000001; // Ultra quiet
+        iosAudioElement.volume = 0.01; // Industry standard low volume
         iosAudioElement.preload = 'auto';
         
-        // Use a truly silent audio track (1 second of actual silence)
+        // Use truly silent audio file (1 second of actual silence)
         iosAudioElement.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQQAAAAAAA==';
         
         // Add to DOM but keep hidden
