@@ -26,84 +26,45 @@ function isIOS() {
            (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
 }
 
-// iOS-specific silent audio using Web Audio API (Professional Approach)
-let iosAudioContext = null;
-let iosOscillator = null;
-let iosGainNode = null;
-let iosAudioInitialized = false;
+// iOS Media Session Enhancement - Hook into Spotify's audio stream
+let iosMediaSessionEnhanced = false;
 
-function setupIOSAudio() {
-    if (isIOS() && !iosAudioContext) {
-        console.log('📱 Setting up professional iOS silent audio using Web Audio API');
+function enhanceIOSMediaSession() {
+    if (isIOS() && !iosMediaSessionEnhanced && 'mediaSession' in navigator) {
+        console.log('📱 Enhancing iOS Media Session to work with Spotify audio stream');
         
-        try {
-            // Create Web Audio context (industry standard)
-            iosAudioContext = new (window.AudioContext || window.webkitAudioContext)();
-            
-            // Create gain node for volume control
-            iosGainNode = iosAudioContext.createGain();
-            iosGainNode.gain.setValueAtTime(0.02, iosAudioContext.currentTime); // Spotify's volume level
-            iosGainNode.connect(iosAudioContext.destination);
-            
-            console.log('✅ iOS Web Audio context created');
-            
-            // Set up one-time user interaction handler
-            if (!iosAudioInitialized) {
-                const initIOSAudio = () => {
-                    if (iosAudioContext && !iosAudioInitialized) {
-                        // Resume audio context (required by iOS)
-                        iosAudioContext.resume().then(() => {
-                            iosAudioInitialized = true;
-                            console.log('📱 iOS Web Audio context initialized with user interaction');
-                            
-                            // Remove event listeners
-                            document.removeEventListener('touchstart', initIOSAudio);
-                            document.removeEventListener('click', initIOSAudio);
-                        }).catch(error => {
-                            console.log('📱 iOS Web Audio initialization failed:', error);
-                        });
-                    }
-                };
-                
-                // Listen for first user interaction
-                document.addEventListener('touchstart', initIOSAudio, { once: true });
-                document.addEventListener('click', initIOSAudio, { once: true });
-                console.log('📱 iOS Web Audio initialization listeners added');
+        // Enhanced Media Session action handlers that work with Spotify
+        navigator.mediaSession.setActionHandler('play', () => {
+            console.log('📱 iOS Media Session: Play pressed');
+            if (spotifyPlayer) {
+                spotifyPlayer.resume().catch(error => {
+                    console.log('📱 Spotify resume failed:', error);
+                });
             }
-            
-        } catch (error) {
-            console.error('🚨 iOS Web Audio setup failed:', error);
-        }
-    }
-}
-
-function startIOSSilentAudio() {
-    if (isIOS() && iosAudioContext && iosAudioInitialized && !iosOscillator) {
-        try {
-            // Create oscillator for inaudible 18Hz tone (Spotify's approach)
-            iosOscillator = iosAudioContext.createOscillator();
-            iosOscillator.frequency.setValueAtTime(18, iosAudioContext.currentTime); // Below human hearing
-            iosOscillator.type = 'sine';
-            iosOscillator.connect(iosGainNode);
-            iosOscillator.start();
-            
-            console.log('📱 iOS silent 18Hz oscillator started');
-        } catch (error) {
-            console.error('🚨 iOS oscillator start failed:', error);
-        }
-    }
-}
-
-function stopIOSSilentAudio() {
-    if (iosOscillator) {
-        try {
-            iosOscillator.stop();
-            iosOscillator.disconnect();
-            iosOscillator = null;
-            console.log('📱 iOS silent oscillator stopped');
-        } catch (error) {
-            console.error('🚨 iOS oscillator stop failed:', error);
-        }
+        });
+        
+        navigator.mediaSession.setActionHandler('pause', () => {
+            console.log('📱 iOS Media Session: Pause pressed');
+            if (spotifyPlayer) {
+                spotifyPlayer.pause().catch(error => {
+                    console.log('📱 Spotify pause failed:', error);
+                });
+            }
+        });
+        
+        // Position state synchronization with Spotify
+        navigator.mediaSession.setActionHandler('seekto', (details) => {
+            console.log('📱 iOS Media Session: Seek to', details.seekTime);
+            if (spotifyPlayer && details.seekTime) {
+                const seekMs = details.seekTime * 1000;
+                spotifyPlayer.seek(seekMs).catch(error => {
+                    console.log('📱 Spotify seek failed:', error);
+                });
+            }
+        });
+        
+        iosMediaSessionEnhanced = true;
+        console.log('✅ iOS Media Session enhanced for Spotify integration');
     }
 }
 
@@ -162,15 +123,10 @@ function updateMediaSession(trackData) {
         try {
             console.log('📱 Updating Media Session with track data:', trackData);
             
-            // iOS-specific handling (Professional Web Audio API approach)
+            // iOS-specific handling - Enhanced Media Session integration with Spotify
             if (isIOS()) {
-                console.log('📱 iOS detected - using professional Web Audio API approach');
-                
-                // Ensure iOS audio context is set up
-                setupIOSAudio();
-                
-                // Start inaudible 18Hz oscillator to trigger iOS lock screen controls
-                startIOSSilentAudio();
+                console.log('📱 iOS detected - enhancing Media Session integration with Spotify stream');
+                enhanceIOSMediaSession();
             }
             
             // Prepare artwork array with different sizes
@@ -237,13 +193,9 @@ function updateMediaSessionPlaybackState(state) {
             // Set playback state for better OS integration
             navigator.mediaSession.playbackState = state.paused ? 'paused' : 'playing';
             
-            // iOS-specific handling for playback state changes (Web Audio API)
+            // Enhanced iOS Media Session state synchronization 
             if (isIOS()) {
-                if (state.paused) {
-                    stopIOSSilentAudio();
-                } else {
-                    startIOSSilentAudio();
-                }
+                enhanceIOSMediaSession();
             }
             
             // Update position for progress tracking on lock screen
@@ -269,9 +221,9 @@ function clearMediaSession() {
             navigator.mediaSession.metadata = null;
             navigator.mediaSession.playbackState = 'none';
             
-            // Stop iOS silent audio if running
+            // Clear iOS Media Session enhancements
             if (isIOS()) {
-                stopIOSSilentAudio();
+                iosMediaSessionEnhanced = false;
             }
             
             console.log('📱 Media Session cleared');
@@ -7225,9 +7177,9 @@ function init() {
   // Initialize Media Session API for lock screen controls
   setupMediaSession();
   
-  // Initialize iOS-specific audio element for lock screen controls
+  // Initialize iOS-specific Media Session enhancements
   if (isIOS()) {
-    setupIOSAudio();
+    enhanceIOSMediaSession();
   }
 
   console.log('✅ LOOOPZ initialization complete with Playlist Management!');
