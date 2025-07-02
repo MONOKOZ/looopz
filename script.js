@@ -149,29 +149,22 @@ function updateMediaSession(trackData) {
             
             // Prepare artwork array with different sizes
             const artwork = [];
+            
+            // Always start with LOOOPZ logo as primary (works reliably on iOS)
+            artwork.push(
+                { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+                { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }
+            );
+            
             if (trackData.image) {
                 console.log('📱 Original image URL:', trackData.image);
                 
-                // Try different Spotify image sizes to avoid CORS issues
-                const imageBase = trackData.image.replace(/\/[0-9]+x[0-9]+/, '');
-                artwork.push(
-                    { src: imageBase + '/96x96', sizes: '96x96', type: 'image/jpeg' },
-                    { src: imageBase + '/128x128', sizes: '128x128', type: 'image/jpeg' },
-                    { src: imageBase + '/192x192', sizes: '192x192', type: 'image/jpeg' },
-                    { src: imageBase + '/256x256', sizes: '256x256', type: 'image/jpeg' },
-                    { src: imageBase + '/300x300', sizes: '300x300', type: 'image/jpeg' },
-                    { src: imageBase + '/512x512', sizes: '512x512', type: 'image/jpeg' },
-                    { src: trackData.image, sizes: '640x640', type: 'image/jpeg' } // Original as fallback
-                );
+                // Add Spotify image as secondary option
+                artwork.push({ src: trackData.image, sizes: '640x640', type: 'image/jpeg' });
                 
                 console.log('📱 Media Session artwork URLs:', artwork.map(a => a.src));
             } else {
                 console.log('⚠️ No image URL available for track');
-                // Add LOOOPZ logo as fallback when no track image
-                artwork.push(
-                    { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
-                    { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }
-                );
             }
             
             // Create metadata
