@@ -7068,7 +7068,7 @@ window.enablePlaylistNameEdit = enablePlaylistNameEdit;
 window.updatePlaylistName = updatePlaylistName;
 window.updatePlaylistItem = updatePlaylistItem;
 window.cancelPlaylistItemEdit = cancelPlaylistItemEdit;
-window.saveOrUpdatePlaylistItem = saveOrUpdatePlaylistItem;
+window.savePlaylistItemAsNew = savePlaylistItemAsNew;
 
 // Init
 function init() {
