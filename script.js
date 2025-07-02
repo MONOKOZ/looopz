@@ -36,11 +36,10 @@ function setupIOSAudio() {
         iosAudioElement = document.createElement('audio');
         iosAudioElement.loop = true;
         iosAudioElement.volume = 0.000001; // Ultra quiet
-        iosAudioElement.muted = true; // Completely silent but still "playing"
         iosAudioElement.preload = 'auto';
         
-        // Use a data URL for a silent audio track
-        iosAudioElement.src = 'data:audio/wav;base64,UklGRnoGAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQoGAACBhYqFbF1fdJivrJBhNjVgodDbq2EcBj+a2/LDciUFLIHO8tiJNwgZaLvt559NEAxQp+PwtmMcBjiR1/LMeSwFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwiBjGO0vHNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwiBjGO0vHNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwiBjGO0vHNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwiBjGO0vHNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwiBjGO0vHNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwiBjGO0vHNeSsFJHfH8N2QQAoUXrTp66hVFApGn+DyvmwiBjGO0vHNeSwF';
+        // Use a truly silent audio track (1 second of actual silence)
+        iosAudioElement.src = 'data:audio/wav;base64,UklGRigAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YQQAAAAAAA==';
         
         // Add to DOM but keep hidden
         iosAudioElement.style.display = 'none';
