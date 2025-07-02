@@ -51,14 +51,20 @@ function setupMediaSession() {
             }
         });
         
-        navigator.mediaSession.setActionHandler('previoustrack', () => {
+        navigator.mediaSession.setActionHandler('previoustrack', async () => {
             console.log('📱 Media Session: Previous pressed');
-            // TODO: Add previous track logic later
+            // Check if we're in playlist mode
+            if (window.playlistEngine && window.isPlaylistMode) {
+                await window.playlistEngine.skipToPrevious();
+            }
         });
         
-        navigator.mediaSession.setActionHandler('nexttrack', () => {
+        navigator.mediaSession.setActionHandler('nexttrack', async () => {
             console.log('📱 Media Session: Next pressed');
-            // TODO: Add next track logic later
+            // Check if we're in playlist mode
+            if (window.playlistEngine && window.isPlaylistMode) {
+                await window.playlistEngine.skipToNext();
+            }
         });
         
         // Debug: Log initial state
@@ -3310,6 +3316,8 @@ function setupPlaylistEngineCallbacks() {
 // Enhanced progress updates with bulletproof timer management
 let progressUpdateActive = false;
 let lastProgressUpdate = 0;
+let backgroundUpdateTimer = null;
+let isBackgrounded = false;
 
 function startProgressUpdates() {
   // Prevent multiple timers
@@ -3322,10 +3330,13 @@ function startProgressUpdates() {
   progressUpdateActive = true;
   let consecutiveFailures = 0;
   let lastKnownPosition = 0;
+  let updateCount = 0;
   
   console.log('🎵 Starting progress updates');
   
   updateTimer = setInterval(async () => {
+      updateCount++;
+      
       // Safety check - ensure we should still be running
       if (!progressUpdateActive) {
           console.log('🚫 Progress updates deactivated, stopping timer');
@@ -3369,6 +3380,19 @@ function startProgressUpdates() {
                       // Only check loop end if playing and not in loop operation
                       if (isPlaying && loopEnabled && !isLooping) {
                           await checkLoopEnd();
+                      }
+                      
+                      // Update MediaSession position every 5 updates (250ms) when not backgrounded
+                      if (!isBackgrounded && updateCount % 5 === 0 && 'mediaSession' in navigator && currentTrack) {
+                          try {
+                              navigator.mediaSession.setPositionState({
+                                  duration: currentTrack.duration / 1000,
+                                  playbackRate: 1.0,
+                                  position: currentTime
+                              });
+                          } catch (e) {
+                              // Ignore position state errors
+                          }
                       }
                   } else {
                       // Reduce spam by only logging significant jumps occasionally
@@ -3446,6 +3470,106 @@ function stopProgressUpdates() {
       updateTimer = null;
   }
 }
+
+// Background-safe progress updates for lock screen support
+function startBackgroundProgressUpdates() {
+  console.log('📱 Starting background progress updates');
+  
+  // Clear any existing background timer
+  if (backgroundUpdateTimer) {
+      clearInterval(backgroundUpdateTimer);
+  }
+  
+  let heartbeatCounter = 0;
+  
+  // Use 1 second interval for background updates (browser-friendly)
+  backgroundUpdateTimer = setInterval(async () => {
+      if (!spotifyPlayer || !isPlaying) return;
+      
+      try {
+          const state = await spotifyPlayer.getCurrentState();
+          if (state && !state.paused) {
+              currentTime = state.position / 1000;
+              
+              // Update MediaSession position for lock screen progress
+              if ('mediaSession' in navigator) {
+                  try {
+                      navigator.mediaSession.setPositionState({
+                          duration: state.track_window.current_track.duration_ms / 1000,
+                          playbackRate: 1.0,
+                          position: currentTime
+                      });
+                      
+                      // Ensure playback state is correct
+                      navigator.mediaSession.playbackState = 'playing';
+                  } catch (e) {
+                      // Ignore position state errors
+                  }
+              }
+              
+              // Still check for loop end, but less frequently
+              if (loopEnabled) {
+                  await checkLoopEnd();
+              }
+              
+              // Heartbeat every 10 seconds to keep connection alive
+              heartbeatCounter++;
+              if (heartbeatCounter % 10 === 0) {
+                  console.log('💓 Background heartbeat - position:', Math.round(currentTime), 's');
+                  // Force state refresh
+                  updateMediaSessionPlaybackState(state);
+              }
+          }
+      } catch (error) {
+          console.error('🚨 Background update error:', error);
+          // Try to recover by refreshing MediaSession
+          if (currentTrack) {
+              updateMediaSession(currentTrack);
+          }
+      }
+  }, 1000); // 1 second interval for background
+}
+
+function stopBackgroundProgressUpdates() {
+  if (backgroundUpdateTimer) {
+      clearInterval(backgroundUpdateTimer);
+      backgroundUpdateTimer = null;
+  }
+}
+
+// Visibility change handler for robust lock screen support
+document.addEventListener('visibilitychange', () => {
+  isBackgrounded = document.hidden;
+  
+  if (document.hidden) {
+      console.log('📱 App backgrounded - switching to background updates');
+      
+      // Stop normal high-frequency updates
+      if (progressUpdateActive) {
+          stopProgressUpdates();
+      }
+      
+      // Start background-safe updates if playing
+      if (isPlaying) {
+          startBackgroundProgressUpdates();
+      }
+  } else {
+      console.log('📱 App foregrounded - resuming normal updates');
+      
+      // Stop background updates
+      stopBackgroundProgressUpdates();
+      
+      // Resume normal updates if playing
+      if (isPlaying) {
+          startProgressUpdates();
+          
+          // Force a MediaSession update on return
+          if (currentTrack) {
+              updateMediaSession(currentTrack);
+          }
+      }
+  }
+});
 
 // FIX 9: Unified loop end handling function with seamless transition preparation
 async function checkLoopEnd() {
