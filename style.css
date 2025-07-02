@@ -1040,7 +1040,8 @@ body {
 .loop-action-btn svg,
 .btn svg,
 .back-btn svg,
-.drag-handle svg {
+.drag-handle svg,
+.repeat-btn svg {
    pointer-events: none;
 }
 
@@ -1050,7 +1051,8 @@ body {
 .playlist-action-btn,
 .loop-action-btn,
 .btn,
-.back-btn {
+.back-btn,
+.repeat-btn {
    touch-action: manipulation;
    cursor: pointer;
 }
