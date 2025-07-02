@@ -124,10 +124,55 @@ function setupMediaSession() {
     }
 }
 
+// Add visual debug indicator
+function showMediaSessionDebug(message, isError = false) {
+    // Remove existing debug if present
+    const existing = document.getElementById('media-session-debug');
+    if (existing) existing.remove();
+    
+    // Create debug indicator
+    const debug = document.createElement('div');
+    debug.id = 'media-session-debug';
+    debug.style.cssText = `
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        right: 10px;
+        background: ${isError ? '#ff4444' : '#4CAF50'};
+        color: white;
+        padding: 10px;
+        border-radius: 8px;
+        font-size: 12px;
+        z-index: 10000;
+        font-family: monospace;
+        max-height: 200px;
+        overflow-y: auto;
+    `;
+    debug.textContent = message;
+    document.body.appendChild(debug);
+    
+    // Auto-remove after 5 seconds unless it's an error
+    if (!isError) {
+        setTimeout(() => {
+            if (debug.parentNode) debug.remove();
+        }, 5000);
+    }
+}
+
 function updateMediaSession(trackData) {
+    console.log('📱 updateMediaSession called with:', trackData);
+    console.log('📱 Media Session API available:', 'mediaSession' in navigator);
+    
+    showMediaSessionDebug(`Media Session called with: ${trackData?.name || 'NO NAME'} by ${trackData?.artist || 'NO ARTIST'}`);
+    
     if ('mediaSession' in navigator && trackData) {
         try {
-            console.log('📱 Updating Media Session with track data:', trackData);
+            console.log('📱 Updating Media Session with track data:', {
+                name: trackData.name,
+                artist: trackData.artist, 
+                album: trackData.album,
+                image: trackData.image
+            });
             
             // iOS-specific handling - simplified approach
             if (isIOS()) {
@@ -147,6 +192,13 @@ function updateMediaSession(trackData) {
             }
             
             // Create metadata - back to basic approach
+            console.log('📱 Creating MediaMetadata with:', {
+                title: trackData.name || 'Unknown Track',
+                artist: trackData.artist || 'Unknown Artist', 
+                album: trackData.album || 'LOOOPZ',
+                artworkCount: artwork.length
+            });
+            
             const metadata = new MediaMetadata({
                 title: trackData.name || 'Unknown Track',
                 artist: trackData.artist || 'Unknown Artist',
@@ -154,32 +206,48 @@ function updateMediaSession(trackData) {
                 artwork: artwork
             });
             
+            console.log('📱 MediaMetadata created successfully:', metadata);
+            
             // Set metadata for lock screen
             navigator.mediaSession.metadata = metadata;
+            console.log('📱 Media Session metadata set');
             
             // Force playback state to playing to trigger lock screen
             navigator.mediaSession.playbackState = 'playing';
+            console.log('📱 Media Session playbackState set to:', navigator.mediaSession.playbackState);
             
-            console.log('📱 Media Session metadata set:', metadata);
-            console.log('📱 Media Session playbackState:', navigator.mediaSession.playbackState);
+            // Visual confirmation
+            showMediaSessionDebug(`✅ SUCCESS: "${trackData.name}" by "${trackData.artist}" - State: ${navigator.mediaSession.playbackState}`);
+            
+            // Immediate verification
+            console.log('📱 Immediate verification - metadata:', navigator.mediaSession.metadata);
+            console.log('📱 Immediate verification - playbackState:', navigator.mediaSession.playbackState);
             console.log(`✅ Media Session updated: ${trackData.name} by ${trackData.artist}`);
             
-            // Additional debug: Check if metadata actually got set
+            // Additional debug: Check if metadata actually got set after delay
             setTimeout(() => {
-                console.log('📱 Verification - Current metadata:', navigator.mediaSession.metadata);
-                console.log('📱 Verification - Current playbackState:', navigator.mediaSession.playbackState);
-            }, 100);
+                console.log('📱 Delayed verification - Current metadata title:', navigator.mediaSession.metadata?.title);
+                console.log('📱 Delayed verification - Current metadata artist:', navigator.mediaSession.metadata?.artist);
+                console.log('📱 Delayed verification - Current playbackState:', navigator.mediaSession.playbackState);
+                
+                const finalTitle = navigator.mediaSession.metadata?.title;
+                const finalState = navigator.mediaSession.playbackState;
+                showMediaSessionDebug(`Final check: "${finalTitle}" - State: ${finalState}`, !finalTitle);
+            }, 1000);
             
         } catch (error) {
             console.error('🚨 Media Session update error:', error);
             console.error('🚨 Error stack:', error.stack);
+            showMediaSessionDebug(`ERROR: ${error.message}`, true);
         }
     } else {
         if (!('mediaSession' in navigator)) {
             console.log('⚠️ Media Session API not available');
+            showMediaSessionDebug('❌ Media Session API not supported in this browser', true);
         }
         if (!trackData) {
             console.log('⚠️ No track data provided to updateMediaSession');
+            showMediaSessionDebug('❌ No track data provided', true);
         }
     }
 }
