@@ -4894,7 +4894,6 @@ function renderPlaylistItemsAsCards(playlist) {
                   </div>
               </div>
               <div class="edit-actions">
-                  <button class="btn secondary" onclick="saveOrUpdatePlaylistItem('${playlist.id}', ${index})">💾 Save (Old)</button>
                   <button class="btn secondary" onclick="updatePlaylistItem('${playlist.id}', ${index})">💾 Update</button>
                   <button class="btn secondary" onclick="savePlaylistItemAsNew('${playlist.id}', ${index})">➕ Save as New Loop</button>
                   <button class="btn" onclick="cancelPlaylistItemEdit('${playlist.id}', ${index})">❌ Cancel</button>
@@ -5318,19 +5317,6 @@ async function loadPlaylistItem(playlistId, itemIndex) {
   }
 }
 
-// Add save or update function
-function saveOrUpdatePlaylistItem(playlistId, itemIndex) {
-  const choice = confirm("Do you want to:\n\nOK = Save as new loop\nCancel = Update existing");
-  
-  if (choice) {
-      // Save as new
-      savePlaylistItemAsNew(playlistId, itemIndex);
-  } else {
-      // Update existing
-      updatePlaylistItem(playlistId, itemIndex);
-  }
-}
-
 function savePlaylistItemAsNew(playlistId, itemIndex) {
   const playlist = savedPlaylists.find(p => p.id === playlistId);
   if (!playlist || !playlist.items[itemIndex]) return;
@@ -5349,12 +5335,12 @@ function savePlaylistItemAsNew(playlistId, itemIndex) {
   const newPlayCount = parseInt(document.getElementById(`edit-playcount-${playlistId}-${itemIndex}`).value);
 
   if (newStart >= 0 && newEnd > newStart && newPlayCount >= 1 && newPlayCount <= 99) {
-      // Create new loop
+      // Create new loop - note: playlist items use 'trackUri' not 'uri'
       const newLoop = {
           id: `loop_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
           name: prompt('Enter a name for the new loop:', item.name) || null,
           track: {
-              uri: item.uri,
+              uri: item.trackUri || item.uri,  // Handle both property names
               name: item.name,
               artist: item.artist,
               duration: item.duration,
