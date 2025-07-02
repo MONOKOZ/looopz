@@ -20,53 +20,6 @@ function isPWA() {
            window.location.search.includes('pwa=true');
 }
 
-// Detect iOS
-function isIOS() {
-    return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
-           (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-}
-
-// iOS Media Session Enhancement - Hook into Spotify's audio stream
-let iosMediaSessionEnhanced = false;
-
-function enhanceIOSMediaSession() {
-    if (isIOS() && !iosMediaSessionEnhanced && 'mediaSession' in navigator) {
-        console.log('📱 Enhancing iOS Media Session to work with Spotify audio stream');
-        
-        // Enhanced Media Session action handlers that work with Spotify
-        navigator.mediaSession.setActionHandler('play', () => {
-            console.log('📱 iOS Media Session: Play pressed');
-            if (spotifyPlayer) {
-                spotifyPlayer.resume().catch(error => {
-                    console.log('📱 Spotify resume failed:', error);
-                });
-            }
-        });
-        
-        navigator.mediaSession.setActionHandler('pause', () => {
-            console.log('📱 iOS Media Session: Pause pressed');
-            if (spotifyPlayer) {
-                spotifyPlayer.pause().catch(error => {
-                    console.log('📱 Spotify pause failed:', error);
-                });
-            }
-        });
-        
-        // Position state synchronization with Spotify
-        navigator.mediaSession.setActionHandler('seekto', (details) => {
-            console.log('📱 iOS Media Session: Seek to', details.seekTime);
-            if (spotifyPlayer && details.seekTime) {
-                const seekMs = details.seekTime * 1000;
-                spotifyPlayer.seek(seekMs).catch(error => {
-                    console.log('📱 Spotify seek failed:', error);
-                });
-            }
-        });
-        
-        iosMediaSessionEnhanced = true;
-        console.log('✅ iOS Media Session enhanced for Spotify integration');
-    }
-}
 
 // Media Session API for lock screen controls
 function setupMediaSession() {
@@ -122,12 +75,6 @@ function updateMediaSession(trackData) {
     if ('mediaSession' in navigator && trackData) {
         try {
             console.log('📱 Updating Media Session with track data:', trackData);
-            
-            // iOS-specific handling - Enhanced Media Session integration with Spotify
-            if (isIOS()) {
-                console.log('📱 iOS detected - enhancing Media Session integration with Spotify stream');
-                enhanceIOSMediaSession();
-            }
             
             // Prepare artwork array with different sizes
             const artwork = [];
@@ -193,11 +140,6 @@ function updateMediaSessionPlaybackState(state) {
             // Set playback state for better OS integration
             navigator.mediaSession.playbackState = state.paused ? 'paused' : 'playing';
             
-            // Enhanced iOS Media Session state synchronization 
-            if (isIOS()) {
-                enhanceIOSMediaSession();
-            }
-            
             // Update position for progress tracking on lock screen
             if (!state.paused && state.track_window?.current_track) {
                 navigator.mediaSession.setPositionState({
@@ -220,11 +162,6 @@ function clearMediaSession() {
         try {
             navigator.mediaSession.metadata = null;
             navigator.mediaSession.playbackState = 'none';
-            
-            // Clear iOS Media Session enhancements
-            if (isIOS()) {
-                iosMediaSessionEnhanced = false;
-            }
             
             console.log('📱 Media Session cleared');
         } catch (error) {
@@ -7176,11 +7113,6 @@ function init() {
 
   // Initialize Media Session API for lock screen controls
   setupMediaSession();
-  
-  // Initialize iOS-specific Media Session enhancements
-  if (isIOS()) {
-    enhanceIOSMediaSession();
-  }
 
   console.log('✅ LOOOPZ initialization complete with Playlist Management!');
 }
