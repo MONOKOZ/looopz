@@ -6602,7 +6602,7 @@ function setupEventListeners() {
               await seekToPosition(newTime * 1000);
           }
 
-          // FIX 5: "Set Loop" button positions progress bar to loop start without auto-play
+          // Smart "Set Loop" - maintains play state based on user intent
           else if (target.matches('#start-loop-btn')) {
               e.preventDefault();
               if (!currentTrack || !loopEnabled) {
@@ -6614,19 +6614,33 @@ function setupEventListeners() {
               loopCount = 0;
               loopStartTime = Date.now();
               
-              // Position progress bar to loop start point without auto-playing
-              if (isPlaying) {
-                  // If playing, pause first, then seek
-                  await togglePlayPause();
-                  await seekToPosition(loopStart * 1000);
-                  showStatus(`▶️ Paused at loop start: ${formatTime(loopStart)}`);
-              } else {
-                  // If paused, just seek to position
-                  await seekToPosition(loopStart * 1000);
-                  showStatus(`📍 Positioned at loop start: ${formatTime(loopStart)}`);
-              }
+              // Smart behavior: maintain current play state
+              const wasPlaying = isPlaying;
+              console.log(`🔍 DEBUG Set Loop: wasPlaying = ${wasPlaying}, isPlaying = ${isPlaying}`);
               
-              console.log(`🎯 Set Loop: positioned at ${formatTime(loopStart)} without auto-play`);
+              if (wasPlaying) {
+                  // User was listening - they want to keep listening from loop start
+                  console.log(`🎯 Smart Set Loop: seeking to ${formatTime(loopStart)} while playing`);
+                  await seekToPosition(loopStart * 1000);
+                  
+                  // Check if still playing after seek
+                  setTimeout(() => {
+                      console.log(`🔍 DEBUG After seek: isPlaying = ${isPlaying}`);
+                      if (!isPlaying) {
+                          console.log(`🔧 Resuming playback after seek`);
+                          spotifyPlayer?.resume();
+                      }
+                  }, 100);
+                  
+                  showStatus(`🔄 Loop started - playing from ${formatTime(loopStart, false)}`);
+                  console.log(`🎯 Smart Set Loop: continued playing from ${formatTime(loopStart)}`);
+              } else {
+                  // User was paused - they want to position and stay paused
+                  console.log(`🎯 Smart Set Loop: seeking to ${formatTime(loopStart)} while paused`);
+                  await seekToPosition(loopStart * 1000);
+                  showStatus(`📍 Positioned at loop start - ${formatTime(loopStart, false)}`);
+                  console.log(`🎯 Smart Set Loop: positioned at ${formatTime(loopStart)} (stayed paused)`);
+              }
           }
           else if (target.matches('#repeat-decrease')) {
               e.preventDefault();
