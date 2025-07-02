@@ -4894,7 +4894,9 @@ function renderPlaylistItemsAsCards(playlist) {
                   </div>
               </div>
               <div class="edit-actions">
-                  <button class="btn secondary" onclick="saveOrUpdatePlaylistItem('${playlist.id}', ${index})">💾 Save</button>
+                  <button class="btn secondary" onclick="saveOrUpdatePlaylistItem('${playlist.id}', ${index})">💾 Save (Old)</button>
+                  <button class="btn secondary" onclick="updatePlaylistItem('${playlist.id}', ${index})">💾 Update</button>
+                  <button class="btn secondary" onclick="savePlaylistItemAsNew('${playlist.id}', ${index})">➕ Save as New Loop</button>
                   <button class="btn" onclick="cancelPlaylistItemEdit('${playlist.id}', ${index})">❌ Cancel</button>
               </div>
           </div>
