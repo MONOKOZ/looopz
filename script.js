@@ -5202,6 +5202,8 @@ function updatePlaylistItem(playlistId, itemIndex) {
 }
 
 function removeFromPlaylist(playlistId, itemIndex) {
+  if (!confirm('Remove this item from the playlist?')) return;
+  
   removeItemFromPlaylist(playlistId, itemIndex);
 
   // Re-render the playlist items if in edit view
