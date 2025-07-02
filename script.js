@@ -4894,7 +4894,8 @@ function renderPlaylistItemsAsCards(playlist) {
                   </div>
               </div>
               <div class="edit-actions">
-                  <button class="btn secondary" onclick="saveOrUpdatePlaylistItem('${playlist.id}', ${index})">💾 Save</button>
+                  <button class="btn secondary" onclick="updatePlaylistItem('${playlist.id}', ${index})">💾 Update</button>
+                  <button class="btn secondary" onclick="savePlaylistItemAsNew('${playlist.id}', ${index})">➕ Save as New Loop</button>
                   <button class="btn" onclick="cancelPlaylistItemEdit('${playlist.id}', ${index})">❌ Cancel</button>
               </div>
           </div>
@@ -5313,19 +5314,6 @@ async function loadPlaylistItem(playlistId, itemIndex) {
   } catch (error) {
       console.error('🚨 Load individual playlist item error:', error);
       showStatus('❌ Failed to load item');
-  }
-}
-
-// Add save or update function
-function saveOrUpdatePlaylistItem(playlistId, itemIndex) {
-  const choice = confirm("Do you want to:\n\nOK = Save as new loop\nCancel = Update existing");
-  
-  if (choice) {
-      // Save as new
-      savePlaylistItemAsNew(playlistId, itemIndex);
-  } else {
-      // Update existing
-      updatePlaylistItem(playlistId, itemIndex);
   }
 }
 
