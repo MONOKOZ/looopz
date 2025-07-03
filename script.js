@@ -3345,6 +3345,11 @@ function startProgressUpdates() {
           return;
       }
       
+      // Skip progress updates during drag operations to prevent visual conflicts
+      if (isDragging) {
+          return;
+      }
+      
       try {
           // Always try to update progress when connected
           if (spotifyPlayer && isConnected) {
@@ -4017,9 +4022,51 @@ function showView(view) {
   }
 }
 
-// Loop Handles
+// Loop Handles with RAF optimization
 function setupLoopHandles() {
   let dragTarget = null;
+  let rafId = null;
+  let pendingUpdates = {
+    transform: null,
+    boxShadow: null,
+    startTime: null,
+    endTime: null,
+    loopState: null
+  };
+  
+  // Batched DOM updates using RequestAnimationFrame for 60fps performance
+  function scheduleUpdate() {
+    if (rafId) return; // Already scheduled
+    
+    rafId = requestAnimationFrame(() => {
+      // Apply all pending visual updates in a single frame
+      if (pendingUpdates.transform && dragTarget) {
+        dragTarget.style.transform = pendingUpdates.transform;
+      }
+      if (pendingUpdates.boxShadow && dragTarget) {
+        dragTarget.style.boxShadow = pendingUpdates.boxShadow;
+      }
+      if (pendingUpdates.startTime && els.startPopup) {
+        els.startPopup.textContent = pendingUpdates.startTime;
+      }
+      if (pendingUpdates.endTime && els.endPopup) {
+        els.endPopup.textContent = pendingUpdates.endTime;
+      }
+      if (pendingUpdates.loopState) {
+        updateLoopState(pendingUpdates.loopState);
+      }
+      
+      // Clear pending updates
+      pendingUpdates = {
+        transform: null,
+        boxShadow: null,
+        startTime: null,
+        endTime: null,
+        loopState: null
+      };
+      rafId = null;
+    });
+  }
 
   function startDrag(e, target) {
       isDragging = true;
@@ -4037,7 +4084,7 @@ function setupLoopHandles() {
       precisionZoom.lastMoveTime = Date.now();
       precisionZoom.handleType = target === els.loopStartHandle ? 'start' : 'end';
       
-      console.log(`🎯 Drag started on ${precisionZoom.handleType} handle - speed detection active`);
+      console.log(`🎯 Drag started on ${precisionZoom.handleType} handle - timer paused for smooth dragging`);
   }
 
   function updateDrag(e) {
@@ -4047,7 +4094,12 @@ function setupLoopHandles() {
       const effectiveDuration = duration > 0 ? duration : 240; // 4 minutes fallback
       if (e.preventDefault) e.preventDefault();
 
-      const rect = els.progressContainer.getBoundingClientRect();
+      // Cache getBoundingClientRect to avoid expensive recalculation on every mousemove
+      if (!updateDrag.cachedRect || Date.now() - updateDrag.lastRectTime > 100) {
+        updateDrag.cachedRect = els.progressContainer.getBoundingClientRect();
+        updateDrag.lastRectTime = Date.now();
+      }
+      const rect = updateDrag.cachedRect;
       const clientX = e.clientX || (e.touches && e.touches[0] ? e.touches[0].clientX : 0);
       const percent = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
       
@@ -4096,15 +4148,16 @@ function setupLoopHandles() {
           precisionZoom.windowStart = Math.max(0, currentTime - windowSize / 2);
           precisionZoom.windowEnd = Math.min(duration, currentTime + windowSize / 2);
           
-          // Linear visual feedback
+          // Linear visual feedback - batch for RAF
           if (dragTarget) {
               const intensity = 1 - precisionFactor; // More precision = more glow
               const scale = 1 + (intensity * 0.1); // 1.0 to 1.1
               const glow = 10 + (intensity * 15); // 10 to 25px
               const alpha = 0.3 + (intensity * 0.5); // 0.3 to 0.8
               
-              dragTarget.style.transform = `translateX(-50%) translateY(-50%) scale(${scale})`;
-              dragTarget.style.boxShadow = `0 0 ${glow}px rgba(29, 185, 84, ${alpha})`;
+              // Schedule visual updates for next frame
+              pendingUpdates.transform = `translateX(-50%) translateY(-50%) scale(${scale})`;
+              pendingUpdates.boxShadow = `0 0 ${glow}px rgba(29, 185, 84, ${alpha})`;
           }
           
           console.log(`🎯 Speed: ${speed.toFixed(1)} px/s, Window: ${windowSize.toFixed(1)}s`);
@@ -4116,10 +4169,10 @@ function setupLoopHandles() {
               precisionZoom.windowStart = null;
               precisionZoom.windowEnd = null;
               
-              // Reset visual feedback
+              // Reset visual feedback - batch for RAF
               if (dragTarget) {
-                  dragTarget.style.transform = 'translateX(-50%) translateY(-50%) scale(1)';
-                  dragTarget.style.boxShadow = '0 2px 12px rgba(0, 0, 0, 0.4)';
+                  pendingUpdates.transform = 'translateX(-50%) translateY(-50%) scale(1)';
+                  pendingUpdates.boxShadow = '0 2px 12px rgba(0, 0, 0, 0.4)';
               }
           }
       }
@@ -4128,40 +4181,35 @@ function setupLoopHandles() {
       precisionZoom.lastPosition = clientX;
       precisionZoom.lastMoveTime = now;
 
+      // Batch all updates for RAF instead of direct DOM manipulation
       if (dragTarget === els.loopStartHandle) {
           const maxStart = Math.max(0, loopEnd - 0.1);
           const newStart = Math.max(0, Math.min(newTime, maxStart));
-          updateLoopState({ start: newStart });
-          els.startPopup.textContent = formatTime(newStart);
+          pendingUpdates.loopState = { start: newStart };
+          pendingUpdates.startTime = formatTime(newStart);
       } else if (dragTarget === els.loopEndHandle) {
           const minEnd = Math.min(duration, loopStart + 0.1);
           const newEnd = Math.max(minEnd, Math.min(newTime, duration));
-          updateLoopState({ end: newEnd });
-          els.endPopup.textContent = formatTime(newEnd);
+          pendingUpdates.loopState = { end: newEnd };
+          pendingUpdates.endTime = formatTime(newEnd);
       }
+      
+      // Schedule all pending updates for next animation frame
+      scheduleUpdate();
       
       // No overlay needed - precision is built into the existing progress bar mapping!
 
-      // Smart Loop Assist: Calculate and display real-time scores
+      // Smart Loop Assist: Calculate and display real-time scores (optimized for performance)
       if (smartLoopAssistEnabled && !isAnalyzingLoop) {
-          // Reduced throttle for more responsive haptic feedback (50ms instead of 100ms)
+          // Reduced throttle for better performance during drag (200ms instead of 50ms)
           const now = Date.now();
-          if (!updateDrag.lastScoreUpdate || now - updateDrag.lastScoreUpdate > 50) {
+          if (!updateDrag.lastScoreUpdate || now - updateDrag.lastScoreUpdate > 200) {
               updateDrag.lastScoreUpdate = now;
-              
-              // Capture current drag state for async callback
-              const currentDragTarget = dragTarget;
-              const currentIsDragging = isDragging;
               
               // Calculate current loop score
               calculateLoopScore(loopStart, loopEnd).then(score => {
-                  // Update UI with score
+                  // Update UI with score only
                   updateSmartAssistUI(score);
-                  
-                  // Time popups now have unified simple styling
-                  
-                  // Trigger haptic feedback based on score zones (like locking points)
-                  triggerZoneHapticFeedback(score, currentDragTarget, currentIsDragging);
               }).catch(err => {
                   console.warn('Smart Loop Assist scoring failed:', err);
               });
@@ -4171,6 +4219,12 @@ function setupLoopHandles() {
 
   function stopDrag(e) {
       if (isDragging && dragTarget) {
+          // Cancel any pending RAF updates
+          if (rafId) {
+            cancelAnimationFrame(rafId);
+            rafId = null;
+          }
+          
           dragTarget.classList.remove('dragging');
           const popup = dragTarget.querySelector('.time-popup');
           if (popup) setTimeout(() => popup.classList.remove('show'), 500);
@@ -4197,6 +4251,7 @@ function setupLoopHandles() {
           
           isDragging = false;
           dragTarget = null;
+          console.log('🎯 Drag ended - timer resumed, RAF cleanup complete');
           if (e && e.preventDefault) e.preventDefault();
       }
   }
