@@ -3025,6 +3025,6 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
 /* Hide on larger screens where main player is visible */
 @media (min-width: 768px) {
     .visual-progress-container {
-        display: none;
+       /* display: ;*/
     }
 }
