@@ -597,6 +597,102 @@ class AppUpdateScheduler {
 // Global scheduler instance
 const appScheduler = new AppUpdateScheduler();
 
+// Mobile browser UI detection for glassmorphism effect
+class MobileBrowserUIDetector {
+  constructor() {
+    this.initialViewportHeight = window.innerHeight;
+    this.viewportThreshold = 100; // Height difference threshold
+    this.isGlassMode = false;
+    this.elements = {
+      mobileNav: null,
+      miniPlayer: null
+    };
+    
+    this.init();
+  }
+  
+  init() {
+    // Wait for DOM to be ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', () => this.setupElements());
+    } else {
+      this.setupElements();
+    }
+    
+    // Listen for viewport changes
+    this.setupViewportDetection();
+  }
+  
+  setupElements() {
+    this.elements.mobileNav = document.querySelector('.mobile-nav');
+    this.elements.miniPlayer = document.getElementById('mini-player');
+    
+    console.log('🔮 Glassmorphism detector initialized', {
+      nav: !!this.elements.mobileNav,
+      player: !!this.elements.miniPlayer
+    });
+  }
+  
+  setupViewportDetection() {
+    let resizeTimeout;
+    
+    // Use both resize and visualViewport for better detection
+    const handleViewportChange = () => {
+      clearTimeout(resizeTimeout);
+      resizeTimeout = setTimeout(() => {
+        this.detectBrowserUIChange();
+      }, 150); // Debounce for smooth transitions
+    };
+    
+    window.addEventListener('resize', handleViewportChange);
+    
+    // Enhanced detection with Visual Viewport API if available
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleViewportChange);
+    }
+  }
+  
+  detectBrowserUIChange() {
+    const currentHeight = window.innerHeight;
+    const heightDifference = this.initialViewportHeight - currentHeight;
+    const shouldActivateGlass = Math.abs(heightDifference) > this.viewportThreshold;
+    
+    if (shouldActivateGlass !== this.isGlassMode) {
+      this.isGlassMode = shouldActivateGlass;
+      this.toggleGlassmorphism(this.isGlassMode);
+      
+      console.log('🔮 Browser UI changed:', {
+        mode: this.isGlassMode ? 'glassmorphism' : 'solid',
+        heightDiff: heightDifference,
+        currentHeight
+      });
+    }
+  }
+  
+  toggleGlassmorphism(activate) {
+    const { mobileNav, miniPlayer } = this.elements;
+    
+    if (mobileNav) {
+      if (activate) {
+        mobileNav.classList.add('glassmorphism');
+      } else {
+        mobileNav.classList.remove('glassmorphism');
+      }
+    }
+    
+    if (miniPlayer) {
+      if (activate) {
+        miniPlayer.classList.add('glassmorphism');
+      } else {
+        miniPlayer.classList.remove('glassmorphism');
+      }
+    }
+  }
+}
+
+// Initialize glassmorphism detector
+const glassmorphismDetector = new MobileBrowserUIDetector();
+
 // UNIFIED LOOP SYSTEM - Fixed timing and state management
 let lastSeekTime = 0; // For debouncing seeks
 const SEEK_DEBOUNCE_MS = 500; // Minimum time between seeks
