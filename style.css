@@ -781,14 +781,12 @@ body {
    left: 0;
    right: 0;
    z-index: 95;
-   margin-bottom: env(safe-area-inset-bottom);
+   background: var(--bg-secondary); /* Solid background for entire container */
+   backdrop-filter: blur(20px);
+   border-top: 1px solid var(--border-subtle);
 }
 
 .mini-player-content {
-   background: var(--bg-secondary);
-   border-top: 1px solid var(--border-subtle);
-   backdrop-filter: blur(20px);
-   box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
    height: 50px;
    display: flex;
    align-items: center;
@@ -3005,14 +3003,12 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
 
 .visual-progress-container {
     position: relative;
-    left: 10px; /* 10px spacing from left edge */
-    right: 10px; /* 10px spacing from right edge */
-    width: calc(100% - 20px); /* Full width minus 10px on each side */
+    margin: 0 10px; /* 10px horizontal spacing on both sides */
     height: 4px;
     background: rgba(255, 255, 255, 0.1);
     opacity: 0;
     transition: opacity 0.3s ease;
-    margin-bottom: 8px; /* Some bottom spacing within mini-player */
+    padding-bottom: 4px; /* Small bottom padding */
 }
 
 .visual-progress-container.show {
