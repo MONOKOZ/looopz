@@ -597,12 +597,12 @@ class AppUpdateScheduler {
 // Global scheduler instance
 const appScheduler = new AppUpdateScheduler();
 
-// Mobile browser UI detection for glassmorphism effect
+// Mobile browser UI detection for proper fixed positioning behavior
 class MobileBrowserUIDetector {
   constructor() {
     this.initialViewportHeight = window.innerHeight;
     this.viewportThreshold = 100; // Height difference threshold
-    this.isGlassMode = false;
+    this.isUIHidden = false;
     this.elements = {
       mobileNav: null,
       miniPlayer: null
@@ -627,7 +627,7 @@ class MobileBrowserUIDetector {
     this.elements.mobileNav = document.querySelector('.mobile-nav');
     this.elements.miniPlayer = document.getElementById('mini-player');
     
-    console.log('🔮 Glassmorphism detector initialized', {
+    console.log('📱 Mobile UI detector initialized', {
       nav: !!this.elements.mobileNav,
       player: !!this.elements.miniPlayer
     });
@@ -641,7 +641,7 @@ class MobileBrowserUIDetector {
       clearTimeout(resizeTimeout);
       resizeTimeout = setTimeout(() => {
         this.detectBrowserUIChange();
-      }, 150); // Debounce for smooth transitions
+      }, 150); // Debounce for smooth behavior
     };
     
     window.addEventListener('resize', handleViewportChange);
@@ -655,43 +655,35 @@ class MobileBrowserUIDetector {
   detectBrowserUIChange() {
     const currentHeight = window.innerHeight;
     const heightDifference = this.initialViewportHeight - currentHeight;
-    const shouldActivateGlass = Math.abs(heightDifference) > this.viewportThreshold;
+    const uiIsHidden = Math.abs(heightDifference) > this.viewportThreshold;
     
-    if (shouldActivateGlass !== this.isGlassMode) {
-      this.isGlassMode = shouldActivateGlass;
-      this.toggleGlassmorphism(this.isGlassMode);
+    if (uiIsHidden !== this.isUIHidden) {
+      this.isUIHidden = uiIsHidden;
+      this.handleUIStateChange(this.isUIHidden);
       
-      console.log('🔮 Browser UI changed:', {
-        mode: this.isGlassMode ? 'glassmorphism' : 'solid',
+      console.log('📱 Browser UI changed:', {
+        state: this.isUIHidden ? 'hidden' : 'visible',
         heightDiff: heightDifference,
         currentHeight
       });
     }
   }
   
-  toggleGlassmorphism(activate) {
-    const { mobileNav, miniPlayer } = this.elements;
+  handleUIStateChange(isUIHidden) {
+    // Here we can add any behavior adjustments needed when browser UI changes
+    // For now, just the detection and logging - no styling changes
     
-    if (mobileNav) {
-      if (activate) {
-        mobileNav.classList.add('glassmorphism');
-      } else {
-        mobileNav.classList.remove('glassmorphism');
-      }
-    }
-    
-    if (miniPlayer) {
-      if (activate) {
-        miniPlayer.classList.add('glassmorphism');
-      } else {
-        miniPlayer.classList.remove('glassmorphism');
-      }
+    // Future: Could adjust z-index, add body classes, etc. if needed
+    if (isUIHidden) {
+      document.body.classList.add('browser-ui-hidden');
+    } else {
+      document.body.classList.remove('browser-ui-hidden');
     }
   }
 }
 
-// Initialize glassmorphism detector
-const glassmorphismDetector = new MobileBrowserUIDetector();
+// Initialize mobile UI detector
+const mobileUIDetector = new MobileBrowserUIDetector();
 
 // UNIFIED LOOP SYSTEM - Fixed timing and state management
 let lastSeekTime = 0; // For debouncing seeks
