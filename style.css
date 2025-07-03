@@ -785,14 +785,7 @@ body {
    left: 0;
    right: 0;
    z-index: 95;
-   /* Dynamic glassmorphism background */
    background: var(--bg-secondary);
-   backdrop-filter: blur(0px); /* Start with no blur */
-   /* Smooth transitions for glassmorphism effect */
-   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-   will-change: backdrop-filter, background;
-   /* Hardware acceleration */
-   transform: translateZ(0);
 }
 
 .mini-player-content {
@@ -1361,33 +1354,11 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
    bottom: 0; /* Fixed at viewport bottom - never moves */
    left: 0;
    right: 0;
-   /* Dynamic glassmorphism background */
    background: var(--bg-secondary);
-   backdrop-filter: blur(0px); /* Start with no blur */
    padding: var(--space-2) 0 calc(var(--space-2) + 4px);
    z-index: 100;
    height: 60px;
    min-height: 60px;
-   /* Smooth transitions for glassmorphism effect */
-   transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-   will-change: backdrop-filter, background;
-   /* Hardware acceleration */
-   transform: translateZ(0);
-}
-
-/* Glassmorphism states for when browser UI hides */
-.mobile-nav.glassmorphism {
-   background: rgba(37, 37, 37, 0.8); /* Semi-transparent background */
-   backdrop-filter: blur(20px); /* Beautiful blur effect */
-   border-top: 1px solid rgba(255, 255, 255, 0.1); /* Subtle glass border */
-   box-shadow: 0 -8px 32px rgba(0, 0, 0, 0.3); /* Floating glass shadow */
-}
-
-.mini-player.glassmorphism {
-   background: rgba(37, 37, 37, 0.8); /* Semi-transparent background */
-   backdrop-filter: blur(20px); /* Beautiful blur effect */
-   border-top: 1px solid rgba(255, 255, 255, 0.1); /* Subtle glass border */
-   box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.2); /* Floating glass shadow */
 }
 
 .nav-container {
