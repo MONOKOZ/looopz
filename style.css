@@ -777,7 +777,7 @@ body {
 /* Mini Player Container - Groups progress bar and mini player */
 .mini-player {
    position: fixed;
-   bottom: 60px; /* Reset to original position */
+   bottom: calc(60px + env(safe-area-inset-bottom, 0)); /* Always 60px above nav */
    left: 0;
    right: 0;
    z-index: 95;
@@ -1349,16 +1349,15 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
 
 .mobile-nav {
    position: fixed;
-   bottom: 0;
+   bottom: env(safe-area-inset-bottom, 0); /* Use safe area only */
    left: 0;
    right: 0;
    background: var(--bg-secondary); /* Solid background, no transparency */
    /* backdrop-filter removed to prevent see-through */
-   padding: var(--space-2) 0 calc(var(--space-2) + 8px); /* Added 4px to bottom padding */
-   padding-bottom: calc(var(--space-2) + 4px + env(safe-area-inset-bottom));
+   padding: var(--space-2) 0 calc(var(--space-2) + 4px); /* Simplified padding with 4px bottom offset */
    /*border-top: 1px solid var(--bg-primary); /* Changed to solid color instead of subtle */
    z-index: 100;
-   height: calc(60px + env(safe-area-inset-bottom));
+   height: 60px; /* Fixed height, safe area handled by bottom position */
    min-height: 60px;
 }
 
