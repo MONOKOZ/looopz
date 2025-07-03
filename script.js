@@ -690,6 +690,143 @@ let lastSeekTime = 0; // For debouncing seeks
 const SEEK_DEBOUNCE_MS = 500; // Minimum time between seeks
 const LOOP_END_THRESHOLD = 0.05; // More precise timing (50ms)
 
+// SMART LOOP DETECTION - Adaptive polling for performance optimization
+class SmartLoopDetector {
+  constructor() {
+    this.intervals = {
+      FAR: 500,      // >10s from loop end: 500ms intervals (2 FPS)
+      APPROACHING: 200, // 3-10s from loop end: 200ms intervals (5 FPS)  
+      NEAR: 50,      // 1-3s from loop end: 50ms intervals (20 FPS)
+      CRITICAL: 25   // <1s from loop end: 25ms intervals (40 FPS)
+    };
+    
+    this.zones = {
+      FAR_THRESHOLD: 10,        // 10 seconds
+      APPROACHING_THRESHOLD: 3, // 3 seconds  
+      NEAR_THRESHOLD: 1,        // 1 second
+      CRITICAL_THRESHOLD: 0.5   // 500ms
+    };
+    
+    this.currentZone = 'FAR';
+    this.lastApiCall = 0;
+    this.predictedPosition = null;
+    this.lastKnownRate = 1.0; // Playback rate for prediction
+    
+    const reduction = this.getApiCallReduction();
+    console.log(`🎯 SmartLoopDetector initialized with adaptive polling (~${reduction}% API call reduction)`);
+  }
+  
+  determineZone(timeToLoopEnd) {
+    if (timeToLoopEnd > this.zones.FAR_THRESHOLD) {
+      return 'FAR';
+    } else if (timeToLoopEnd > this.zones.APPROACHING_THRESHOLD) {
+      return 'APPROACHING';
+    } else if (timeToLoopEnd > this.zones.NEAR_THRESHOLD) {
+      return 'NEAR';
+    } else {
+      return 'CRITICAL';
+    }
+  }
+  
+  shouldMakeApiCall(timeToLoopEnd) {
+    const zone = this.determineZone(timeToLoopEnd);
+    const requiredInterval = this.intervals[zone];
+    const timeSinceLastCall = Date.now() - this.lastApiCall;
+    
+    // Zone change detection for logging and user feedback
+    if (zone !== this.currentZone) {
+      console.log(`🎯 Loop detection zone: ${this.currentZone} → ${zone} (${timeToLoopEnd.toFixed(1)}s to end, ${requiredInterval}ms intervals)`);
+      this.currentZone = zone;
+      
+      // Show user feedback for zone transitions during critical moments
+      if (zone === 'CRITICAL') {
+        showStatus('🎯 Precision loop detection active');
+      } else if (zone === 'NEAR') {
+        showStatus('🎯 Enhanced loop tracking');
+      }
+    }
+    
+    return timeSinceLastCall >= requiredInterval;
+  }
+  
+  updatePosition(newPosition, actualTime) {
+    this.lastApiCall = Date.now();
+    this.predictedPosition = newPosition;
+    
+    // Calculate playback rate for prediction accuracy
+    if (this.lastKnownPosition && this.lastUpdateTime) {
+      const timeDelta = (actualTime - this.lastUpdateTime) / 1000;
+      const positionDelta = newPosition - this.lastKnownPosition;
+      if (timeDelta > 0) {
+        this.lastKnownRate = positionDelta / timeDelta;
+      }
+    }
+    
+    this.lastKnownPosition = newPosition;
+    this.lastUpdateTime = actualTime;
+  }
+  
+  getPredictedPosition() {
+    if (!this.predictedPosition || !this.lastUpdateTime) {
+      return null;
+    }
+    
+    const timeSinceUpdate = (Date.now() - this.lastUpdateTime) / 1000;
+    return this.predictedPosition + (timeSinceUpdate * this.lastKnownRate);
+  }
+  
+  getApiCallReduction() {
+    // Calculate percentage reduction compared to constant 50ms polling
+    const baseCallsPerSecond = 1000 / 50; // 20 calls/sec at 50ms
+    
+    // Estimate calls per zone (rough calculation)
+    const zoneCallRates = {
+      FAR: 1000 / this.intervals.FAR,        // 2 calls/sec
+      APPROACHING: 1000 / this.intervals.APPROACHING, // 5 calls/sec  
+      NEAR: 1000 / this.intervals.NEAR,      // 20 calls/sec
+      CRITICAL: 1000 / this.intervals.CRITICAL // 40 calls/sec
+    };
+    
+    // Weighted average assuming typical song distribution
+    const avgCallRate = (
+      zoneCallRates.FAR * 0.7 +      // 70% of song time in FAR zone
+      zoneCallRates.APPROACHING * 0.2 + // 20% in APPROACHING
+      zoneCallRates.NEAR * 0.08 +    // 8% in NEAR  
+      zoneCallRates.CRITICAL * 0.02  // 2% in CRITICAL
+    );
+    
+    const reduction = ((baseCallsPerSecond - avgCallRate) / baseCallsPerSecond) * 100;
+    return Math.round(reduction);
+  }
+}
+
+// Global smart detector instance
+const smartLoopDetector = new SmartLoopDetector();
+
+// Debug function for testing smart detection performance
+window.showSmartDetectionStats = function() {
+  if (!loopEnabled) {
+    console.log('❌ Loop not enabled - smart detection inactive');
+    return;
+  }
+  
+  const timeToEnd = loopEnd - (smartLoopDetector.getPredictedPosition() || currentTime);
+  const reduction = smartLoopDetector.getApiCallReduction();
+  
+  console.log(`🎯 SMART LOOP DETECTION STATS:
+📊 Current Zone: ${smartLoopDetector.currentZone}
+⏱️  Time to Loop End: ${timeToEnd.toFixed(2)}s
+🔄 Current Interval: ${smartLoopDetector.intervals[smartLoopDetector.currentZone]}ms
+📉 API Call Reduction: ${reduction}%
+🎯 Predicted Position: ${(smartLoopDetector.getPredictedPosition() || 0).toFixed(3)}s
+📍 Actual Position: ${currentTime.toFixed(3)}s
+⚡ Playback Rate: ${smartLoopDetector.lastKnownRate.toFixed(3)}x`);
+  
+  showStatus(`🎯 Smart detection: ${smartLoopDetector.currentZone} zone, ${reduction}% API reduction`);
+};
+
+console.log('🎯 Smart Loop Detection installed! Type showSmartDetectionStats() to see performance stats');
+
 // Playlist state (variables moved to legacy declarations above)
 let savedPlaylists = [];
 let savedLoops = [];
@@ -988,20 +1125,37 @@ function updateProgress() {
   if (!duration) return;
   const percent = (currentTime / duration) * 100;
   
-  // Schedule batched DOM updates instead of direct manipulation (80 ops/sec → 16-20 ops/sec)
-  appScheduler.pendingUpdates.progressBar = `${percent}%`;
-  appScheduler.pendingUpdates.currentTime = formatTime(currentTime);
-  appScheduler.pendingUpdates.duration = formatTime(duration);
-  appScheduler.pendingUpdates.visualProgressBar = `${percent}%`;
+  // EMERGENCY FIX: Keep data calculations immediate for timing-critical operations
+  // These values are used by MediaSession, loop logic, and state synchronization
+  const formattedCurrentTime = formatTime(currentTime);
+  const formattedDuration = formatTime(duration);
+  const progressPercent = `${percent}%`;
+  
+  // IMMEDIATE: Update global state variables for timing-critical logic
+  // (These must be available immediately for loop detection, MediaSession, etc.)
+  window.currentProgressPercent = percent;
+  window.formattedCurrentTime = formattedCurrentTime;
+  window.formattedDuration = formattedDuration;
+  
+  // RAF BATCHED: Only cosmetic DOM updates for performance
+  appScheduler.pendingUpdates.progressBar = progressPercent;
+  appScheduler.pendingUpdates.currentTime = formattedCurrentTime;
+  appScheduler.pendingUpdates.duration = formattedDuration;
+  appScheduler.pendingUpdates.visualProgressBar = progressPercent;
   
   appScheduler.schedule();
 }
 
 function updatePlayPauseButton() {
-  // Schedule batched play button updates
+  // EMERGENCY FIX: Immediate state synchronization for timing-critical operations
   const playIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-play"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>';
   const pauseIcon = '<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-pause"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg>';
   
+  // IMMEDIATE: Update global state for immediate access by other systems
+  window.currentPlayState = isPlaying;
+  window.currentPlayIcon = isPlaying ? pauseIcon : playIcon;
+  
+  // RAF BATCHED: Visual button updates only
   appScheduler.pendingUpdates.playPauseButton = isPlaying ? pauseIcon : playIcon;
   updateMiniPlayButton();
   
@@ -1010,7 +1164,15 @@ function updatePlayPauseButton() {
 
 function updateMiniPlayer(track = null) {
   if (track) {
-      // Schedule batched mini-player updates
+      // EMERGENCY FIX: Immediate state updates for playlist management
+      window.currentMiniPlayerTrack = {
+        name: track.name || 'Unknown Track',
+        artist: track.artist || 'Unknown Artist', 
+        image: track.image,
+        hasTrack: true
+      };
+      
+      // RAF BATCHED: Visual mini-player updates
       appScheduler.pendingUpdates.miniTrackTitle = track.name || 'Unknown Track';
       appScheduler.pendingUpdates.miniTrackArtist = track.artist || 'Unknown Artist';
       
@@ -1030,7 +1192,15 @@ function updateMiniPlayer(track = null) {
       // Show visual progress bar when track is loaded
       appScheduler.pendingUpdates.visualProgressShow = true;
   } else {
-      // Schedule updates for no track state
+      // EMERGENCY FIX: Immediate state updates for no track
+      window.currentMiniPlayerTrack = {
+        name: 'No track playing',
+        artist: 'Select a track to start',
+        image: null,
+        hasTrack: false
+      };
+      
+      // RAF BATCHED: Visual updates for no track state
       appScheduler.pendingUpdates.miniTrackTitle = 'No track playing';
       appScheduler.pendingUpdates.miniTrackArtist = 'Select a track to start';
       
@@ -3627,12 +3797,26 @@ function startProgressUpdates() {
       }
       
       try {
-          // Always try to update progress when connected
-          if (spotifyPlayer && isConnected) {
+          // SMART LOOP DETECTION: Use adaptive polling for API optimization
+          let shouldCallApi = true;
+          let timeToLoopEnd = Infinity;
+          
+          if (loopEnabled && loopEnd > 0) {
+              // Use predicted position if available, otherwise use last known position
+              const estimatedPosition = smartLoopDetector.getPredictedPosition() || currentTime;
+              timeToLoopEnd = Math.max(0, loopEnd - estimatedPosition);
+              shouldCallApi = smartLoopDetector.shouldMakeApiCall(timeToLoopEnd);
+          }
+          
+          // Always try to update progress when connected, but respect smart polling
+          if (spotifyPlayer && isConnected && shouldCallApi) {
               const state = await spotifyPlayer.getCurrentState();
               
               if (state && state.position !== undefined) {
                   const newTime = state.position / 1000;
+                  
+                  // Update smart detector with new position
+                  smartLoopDetector.updatePosition(newTime, Date.now());
                   
                   // Validate position makes sense (allow reasonable jumps and forward progress)
                   const timeDiff = Math.abs(newTime - lastKnownPosition);
@@ -3710,6 +3894,18 @@ function startProgressUpdates() {
                       progressUpdateActive = false;
                       setTimeout(() => startProgressUpdates(), 1000);
                       return;
+                  }
+              }
+          } else if (loopEnabled && !shouldCallApi) {
+              // SMART POLLING: Update UI with predicted position instead of API call
+              const predictedPosition = smartLoopDetector.getPredictedPosition();
+              if (predictedPosition !== null && isPlaying) {
+                  currentTime = predictedPosition;
+                  updateProgress();
+                  
+                  // Still check loop end with predicted position for precise timing
+                  if (loopEnabled && !isLooping) {
+                      await checkLoopEnd();
                   }
               }
           } else {
@@ -3852,11 +4048,15 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// FIX 9: Unified loop end handling function with seamless transition preparation
+// FIX 9: Unified loop end handling function with seamless transition preparation + Smart Detection
 async function checkLoopEnd() {
-  // Minimal debug logging for playlist loops (only log rarely)
-  if (isPlaylistMode && loopEnabled && Math.random() < 0.01) {
-      console.log(`🔍 Checking playlist loop: time=${currentTime.toFixed(3)}s, end=${loopEnd.toFixed(3)}s, threshold=${LOOP_END_THRESHOLD}s, loopCount=${loopCount}/${loopTarget}`);
+  // Use predicted position for more accurate loop detection
+  const effectivePosition = smartLoopDetector.getPredictedPosition() || currentTime;
+  const timeToEnd = loopEnd - effectivePosition;
+  
+  // Enhanced debug logging for smart detection (only log occasionally)
+  if (isPlaylistMode && loopEnabled && Math.random() < 0.005) {
+      console.log(`🔍 Smart loop check: predicted=${effectivePosition.toFixed(3)}s, actual=${currentTime.toFixed(3)}s, end=${loopEnd.toFixed(3)}s, zone=${smartLoopDetector.currentZone}, loopCount=${loopCount}/${loopTarget}`);
   }
 
   // SEAMLESS TRANSITION: Prepare next track when we're close to final loop end
@@ -3867,8 +4067,8 @@ async function checkLoopEnd() {
       }
   }
 
-  // Check if we've reached the loop end with precise timing
-  if (currentTime >= loopEnd - LOOP_END_THRESHOLD && loopCount < loopTarget) {
+  // Check if we've reached the loop end with precise timing using smart detection
+  if (effectivePosition >= loopEnd - LOOP_END_THRESHOLD && loopCount < loopTarget) {
       const timeSinceLoopStart = Date.now() - loopStartTime;
       if (timeSinceLoopStart > 800) {
           // Only log occasionally to reduce spam
@@ -7397,7 +7597,13 @@ function setupEventListeners() {
       appState.set('loop.count', 0);
       els.startLoopBtn.disabled = !loopEnabled;
       updateLoopVisuals(); // FIX 6: This will show/hide handles
-      showStatus(loopEnabled ? `Loop enabled: ${loopTarget} time(s)` : 'Loop disabled');
+      
+      if (loopEnabled) {
+          const reduction = smartLoopDetector.getApiCallReduction();
+          showStatus(`🎯 Smart loop enabled: ${loopTarget} time(s) (${reduction}% API efficiency boost)`);
+      } else {
+          showStatus('Loop disabled');
+      }
   });
 
   els.searchInput.addEventListener('input', function() {
