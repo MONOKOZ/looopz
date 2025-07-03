@@ -348,6 +348,431 @@ class AppState {
 // Global state instance
 const appState = new AppState();
 
+// PLAYER STATE GUARD - Enhanced resilience for embed player stability
+class PlayerStateGuard {
+    constructor() {
+        this.isMonitoring = false;
+        this.healthCheckInterval = null;
+        this.consecutiveFailures = 0;
+        this.lastValidState = null;
+        this.suspendedState = null;
+        this.currentCheckInterval = 10000; // Start with 10 seconds
+        this.maxCheckInterval = 30000; // Max 30 seconds when stable
+        this.minCheckInterval = 2000; // Min 2 seconds when issues detected
+        this.setupComplete = false;
+        
+        // Initialize after DOM is ready
+        this.initialize();
+    }
+    
+    initialize() {
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => this.setupGuards());
+        } else {
+            this.setupGuards();
+        }
+    }
+    
+    setupGuards() {
+        if (this.setupComplete) return;
+        
+        console.log('🛡️ Setting up Player State Guard...');
+        
+        // 1. Page visibility change protection
+        document.addEventListener('visibilitychange', () => {
+            if (document.hidden) {
+                this.handlePageSuspension();
+            } else {
+                this.handlePageResume();
+            }
+        });
+        
+        // 2. Window focus/blur for additional protection
+        window.addEventListener('focus', () => {
+            this.handleWindowFocus();
+        });
+        
+        window.addEventListener('blur', () => {
+            this.handleWindowBlur();
+        });
+        
+        // 3. Before unload protection
+        window.addEventListener('beforeunload', () => {
+            this.saveEmergencyState();
+        });
+        
+        // 4. Network status monitoring
+        window.addEventListener('online', () => {
+            console.log('🌐 Network restored - checking player health');
+            this.performHealthCheck();
+        });
+        
+        window.addEventListener('offline', () => {
+            console.log('🌐 Network lost - saving state');
+            this.saveStateSnapshot();
+        });
+        
+        this.setupComplete = true;
+        console.log('✅ Player State Guard initialized');
+    }
+    
+    startMonitoring() {
+        if (this.isMonitoring) return;
+        
+        this.isMonitoring = true;
+        this.consecutiveFailures = 0;
+        this.currentCheckInterval = 10000;
+        
+        console.log('🛡️ Starting adaptive health monitoring');
+        this.scheduleNextHealthCheck();
+    }
+    
+    stopMonitoring() {
+        if (!this.isMonitoring) return;
+        
+        this.isMonitoring = false;
+        if (this.healthCheckInterval) {
+            clearTimeout(this.healthCheckInterval);
+            this.healthCheckInterval = null;
+        }
+        
+        console.log('🛡️ Stopped health monitoring');
+    }
+    
+    scheduleNextHealthCheck() {
+        if (!this.isMonitoring) return;
+        
+        this.healthCheckInterval = setTimeout(() => {
+            this.performHealthCheck();
+        }, this.currentCheckInterval);
+    }
+    
+    async performHealthCheck() {
+        if (!this.isMonitoring) return;
+        
+        try {
+            const isHealthy = await this.checkPlayerHealth();
+            
+            if (isHealthy) {
+                // Player is healthy - slow down checks
+                this.consecutiveFailures = 0;
+                this.currentCheckInterval = Math.min(
+                    this.maxCheckInterval, 
+                    this.currentCheckInterval * 1.2
+                );
+                
+                // Save current good state
+                this.saveStateSnapshot();
+                
+            } else {
+                // Player has issues - speed up checks and attempt recovery
+                this.consecutiveFailures++;
+                this.currentCheckInterval = Math.max(
+                    this.minCheckInterval,
+                    this.currentCheckInterval * 0.7
+                );
+                
+                console.warn(`🚨 Player health check failed (${this.consecutiveFailures} consecutive failures)`);
+                
+                // Attempt recovery after 2 consecutive failures
+                if (this.consecutiveFailures >= 2) {
+                    await this.attemptRecovery();
+                }
+            }
+        } catch (error) {
+            console.error('🛡️ Health check error:', error);
+            this.consecutiveFailures++;
+        }
+        
+        // Schedule next check
+        this.scheduleNextHealthCheck();
+    }
+    
+    async checkPlayerHealth() {
+        // Check if Spotify player exists and is responsive
+        if (!spotifyPlayer) {
+            console.log('🛡️ No Spotify player instance');
+            return false;
+        }
+        
+        try {
+            // Test player responsiveness with timeout
+            const healthCheckPromise = spotifyPlayer.getCurrentState();
+            const timeoutPromise = new Promise((_, reject) => 
+                setTimeout(() => reject(new Error('Health check timeout')), 5000)
+            );
+            
+            const state = await Promise.race([healthCheckPromise, timeoutPromise]);
+            
+            if (!state) {
+                console.log('🛡️ No player state available');
+                return false;
+            }
+            
+            // Verify essential state properties
+            const hasTrack = state.track_window?.current_track;
+            const hasPosition = typeof state.position === 'number';
+            const hasPlaybackState = typeof state.paused === 'boolean';
+            const hasDevice = !!state.device_id;
+            
+            const isHealthy = hasTrack && hasPosition && hasPlaybackState && hasDevice;
+            
+            if (isHealthy) {
+                // Update AppState with current healthy state
+                appState.set('spotify.isConnected', true);
+                appState.set('playback.currentTime', state.position / 1000);
+                appState.set('playback.isPlaying', !state.paused);
+                
+                if (hasTrack) {
+                    appState.set('playback.currentTrack', {
+                        uri: state.track_window.current_track.uri,
+                        name: state.track_window.current_track.name,
+                        artist: state.track_window.current_track.artists[0]?.name || 'Unknown'
+                    });
+                }
+            }
+            
+            return isHealthy;
+            
+        } catch (error) {
+            console.warn('🛡️ Player health check failed:', error.message);
+            return false;
+        }
+    }
+    
+    async attemptRecovery() {
+        console.log('🔄 Attempting player recovery...');
+        
+        try {
+            // Method 1: Try to reconnect existing player
+            if (spotifyPlayer) {
+                await spotifyPlayer.connect();
+                console.log('🔄 Reconnected existing player');
+                
+                // Verify recovery worked
+                const state = await spotifyPlayer.getCurrentState();
+                if (state) {
+                    this.consecutiveFailures = 0;
+                    showStatus('✅ Player connection restored');
+                    return true;
+                }
+            }
+            
+            // Method 2: Restore from saved state
+            if (this.lastValidState) {
+                console.log('🔄 Restoring from saved state...');
+                await this.restoreFromSavedState();
+                return true;
+            }
+            
+            // Method 3: Signal for manual recovery
+            console.log('🔄 Signaling need for manual recovery');
+            this.signalRecoveryNeeded();
+            
+        } catch (error) {
+            console.error('🛡️ Recovery attempt failed:', error);
+            this.signalRecoveryNeeded();
+        }
+        
+        return false;
+    }
+    
+    handlePageSuspension() {
+        console.log('📱 Page going into background - saving state');
+        this.saveStateSnapshot();
+        this.suspendedState = {
+            timestamp: Date.now(),
+            wasPlaying: appState.get('playback.isPlaying'),
+            currentTime: appState.get('playback.currentTime'),
+            currentTrack: appState.get('playback.currentTrack')
+        };
+    }
+    
+    async handlePageResume() {
+        console.log('📱 Page resumed from background - checking state');
+        
+        // Wait a moment for the page to fully activate
+        await new Promise(resolve => setTimeout(resolve, 500));
+        
+        // Check if we need to recover
+        const isHealthy = await this.checkPlayerHealth();
+        if (!isHealthy && this.suspendedState) {
+            console.log('🔄 Recovering from page suspension...');
+            await this.recoverFromSuspension();
+        }
+        
+        this.suspendedState = null;
+    }
+    
+    async handleWindowFocus() {
+        // Quick health check on focus
+        const isHealthy = await this.checkPlayerHealth();
+        if (!isHealthy) {
+            console.log('🔄 Player issues detected on focus - starting recovery');
+            await this.attemptRecovery();
+        }
+    }
+    
+    handleWindowBlur() {
+        // Save state when losing focus
+        this.saveStateSnapshot();
+    }
+    
+    saveStateSnapshot() {
+        try {
+            const snapshot = {
+                version: '1.0',
+                timestamp: Date.now(),
+                spotify: {
+                    isConnected: appState.get('spotify.isConnected'),
+                    deviceId: appState.get('spotify.deviceId')
+                },
+                playback: {
+                    currentTrack: appState.get('playback.currentTrack'),
+                    isPlaying: appState.get('playback.isPlaying'),
+                    currentTime: appState.get('playback.currentTime'),
+                    duration: appState.get('playback.duration')
+                },
+                loop: {
+                    enabled: appState.get('loop.enabled'),
+                    start: appState.get('loop.start'),
+                    end: appState.get('loop.end'),
+                    count: appState.get('loop.count'),
+                    target: appState.get('loop.target')
+                },
+                playlist: {
+                    isActive: appState.get('playlist.isActive'),
+                    current: appState.get('playlist.current'),
+                    currentIndex: appState.get('playlist.currentIndex')
+                }
+            };
+            
+            // Save to sessionStorage (survives tab suspension)
+            sessionStorage.setItem('playerStateSnapshot', JSON.stringify(snapshot));
+            this.lastValidState = snapshot;
+            
+        } catch (error) {
+            console.warn('🛡️ Failed to save state snapshot:', error);
+        }
+    }
+    
+    saveEmergencyState() {
+        // Save critical state before page unload
+        this.saveStateSnapshot();
+        
+        // Also save to localStorage for cross-session recovery
+        try {
+            const emergencyState = {
+                timestamp: Date.now(),
+                currentTrack: appState.get('playback.currentTrack'),
+                isPlaying: appState.get('playback.isPlaying'),
+                currentTime: appState.get('playback.currentTime')
+            };
+            
+            localStorage.setItem('playerEmergencyState', JSON.stringify(emergencyState));
+        } catch (error) {
+            console.warn('🛡️ Failed to save emergency state:', error);
+        }
+    }
+    
+    async recoverFromSuspension() {
+        if (!this.suspendedState) return;
+        
+        const timeSuspended = Date.now() - this.suspendedState.timestamp;
+        console.log(`🔄 Recovering from ${timeSuspended}ms suspension`);
+        
+        // If we were playing, try to resume
+        if (this.suspendedState.wasPlaying && spotifyPlayer) {
+            try {
+                await spotifyPlayer.resume();
+                showStatus('🎵 Playback resumed after suspension');
+            } catch (error) {
+                console.warn('🛡️ Failed to resume playback:', error);
+                this.signalRecoveryNeeded();
+            }
+        }
+    }
+    
+    async restoreFromSavedState() {
+        if (!this.lastValidState) return;
+        
+        const state = this.lastValidState;
+        console.log('🔄 Restoring from saved state:', state);
+        
+        // Restore AppState
+        appState.update({
+            'spotify.isConnected': state.spotify.isConnected,
+            'playback.currentTrack': state.playback.currentTrack,
+            'playback.isPlaying': state.playback.isPlaying,
+            'playback.currentTime': state.playback.currentTime,
+            'playback.duration': state.playback.duration,
+            'loop.enabled': state.loop.enabled,
+            'loop.start': state.loop.start,
+            'loop.end': state.loop.end,
+            'loop.count': state.loop.count,
+            'loop.target': state.loop.target
+        });
+        
+        // Update UI to reflect restored state
+        if (state.playback.currentTrack) {
+            if (els.currentTrack) els.currentTrack.textContent = state.playback.currentTrack.name;
+            if (els.currentArtist) els.currentArtist.textContent = state.playback.currentTrack.artist;
+            updateMiniPlayer(state.playback.currentTrack);
+        }
+        
+        if (state.loop.enabled) {
+            if (els.loopToggle) els.loopToggle.checked = true;
+            updateLoopVisuals();
+        }
+        
+        updatePlayPauseButton();
+        showStatus('✅ Player state restored');
+    }
+    
+    signalRecoveryNeeded() {
+        // Update UI to show recovery is needed
+        appState.set('spotify.isConnected', false);
+        showStatus('⚠️ Player connection lost - click to reconnect', 'warning');
+        
+        // Update connection status display
+        if (els.connectionStatus) {
+            els.connectionStatus.querySelector('.status-dot').classList.add('disconnected');
+            els.connectionStatus.querySelector('span').textContent = 'Disconnected';
+        }
+    }
+    
+    // Check for saved state on initialization
+    checkForSavedState() {
+        try {
+            const savedState = sessionStorage.getItem('playerStateSnapshot');
+            if (savedState) {
+                this.lastValidState = JSON.parse(savedState);
+                console.log('🛡️ Found saved state from previous session');
+            }
+            
+            const emergencyState = localStorage.getItem('playerEmergencyState');
+            if (emergencyState) {
+                const state = JSON.parse(emergencyState);
+                const timeSinceEmergency = Date.now() - state.timestamp;
+                
+                // Only use emergency state if it's recent (within 5 minutes)
+                if (timeSinceEmergency < 300000) {
+                    console.log('🛡️ Found recent emergency state');
+                    this.lastValidState = state;
+                }
+                
+                // Clean up old emergency state
+                localStorage.removeItem('playerEmergencyState');
+            }
+        } catch (error) {
+            console.warn('🛡️ Failed to check for saved state:', error);
+        }
+    }
+}
+
+// Global state guard instance
+const playerStateGuard = new PlayerStateGuard();
+
 // Spotify Web Playback SDK callback - available immediately
 window.onSpotifyWebPlaybackSDKReady = window.onSpotifyWebPlaybackSDKReady || function() {
     console.log('⚠️ Spotify SDK ready but player not initialized yet');
@@ -3603,6 +4028,12 @@ function initializeSpotifyPlayer() {
           console.log('🎵 Spotify player ready with Device ID:', device_id);
           spotifyDeviceId = device_id;
           isConnected = true;
+          
+          // Update AppState with Spotify connection
+          appState.set('spotify.deviceId', device_id);
+          appState.set('spotify.isConnected', true);
+          appState.set('spotify.player', spotifyPlayer);
+          
           updateConnectionStatus();
           showView('search');
           showStatus('Connected!');
@@ -3610,6 +4041,11 @@ function initializeSpotifyPlayer() {
           // Initialize playlist engine
           playlistEngine = new PlaylistTransitionEngine(spotifyPlayer, spotifyAccessToken, spotifyDeviceId);
           setupPlaylistEngineCallbacks();
+          
+          // Start PlayerStateGuard monitoring after successful connection
+          playerStateGuard.checkForSavedState();
+          playerStateGuard.startMonitoring();
+          console.log('🛡️ PlayerStateGuard monitoring started');
 
           // Initialize AI audio analysis after a short delay
           setTimeout(() => {
@@ -3646,8 +4082,18 @@ function initializeSpotifyPlayer() {
       });
 
       spotifyPlayer.addListener('not_ready', ({ device_id }) => {
+          console.log('🚫 Spotify player not ready, device ID:', device_id);
           isConnected = false;
+          
+          // Update AppState with disconnection
+          appState.set('spotify.isConnected', false);
+          appState.set('spotify.deviceId', null);
+          
           updateConnectionStatus();
+          
+          // Stop PlayerStateGuard monitoring when player is not ready
+          playerStateGuard.stopMonitoring();
+          console.log('🛡️ PlayerStateGuard monitoring stopped');
       });
 
       let lastStateChange = 0;
