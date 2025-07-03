@@ -71,8 +71,9 @@ body {
    font-size: 16px;
    line-height: 1.5;
    overflow-x: hidden;
-   min-height: 100vh;
-   min-height: 100dvh;
+   /* Progressive enhancement for viewport height stability */
+   min-height: 100vh; /* Fallback for older browsers */
+   min-height: 100svh; /* Small viewport height - most stable on mobile */
    touch-action: pan-y;
    overscroll-behavior: none;
 }
@@ -144,8 +145,11 @@ body {
    padding: 80px var(--space-4) calc(110px + env(safe-area-inset-bottom));
    max-width: 600px;
    margin: 0 auto;
-   min-height: 100vh;
-   min-height: 100dvh;
+   /* Progressive enhancement for stable viewport height */
+   min-height: 100vh; /* Fallback for older browsers */
+   min-height: 100svh; /* Small viewport height - stable on mobile */
+   /* Performance optimization */
+   will-change: auto; /* Let browser decide what to optimize */
 }
 
 .card {
@@ -784,6 +788,9 @@ body {
    background: var(--bg-secondary); /* Solid background for entire container */
    /* backdrop-filter removed to ensure no see-through */
   /* border-top: 1px solid var(--bg-primary); /* Solid border to prevent gaps */
+   /* Performance optimization for smooth mobile browser UI transitions */
+   will-change: transform;
+   transform: translateZ(0); /* Hardware acceleration */
 }
 
 .mini-player-content {
@@ -1359,6 +1366,9 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
    z-index: 100;
    height: 60px; /* Fixed height, safe area handled by bottom position */
    min-height: 60px;
+   /* Performance optimization for smooth mobile browser UI transitions */
+   will-change: transform;
+   transform: translateZ(0); /* Hardware acceleration */
 }
 
 .nav-container {
