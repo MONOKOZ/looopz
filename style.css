@@ -777,7 +777,7 @@ body {
 /* Mini Player Container - Groups progress bar and mini player */
 .mini-player {
    position: fixed;
-   bottom: 64px; /* Moved up by 4px to make room for progress bar */
+   bottom: 60px; /* Reset to original position */
    left: 0;
    right: 0;
    z-index: 95;
@@ -3004,15 +3004,15 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
    =============================================== */
 
 .visual-progress-container {
-    position: fixed;
-    bottom: 60px; /* Positioned directly above mobile navigation */
-    left: 0;
-    right: 0;
+    position: relative;
+    left: 10px; /* 10px spacing from left edge */
+    right: 10px; /* 10px spacing from right edge */
+    width: calc(100% - 20px); /* Full width minus 10px on each side */
     height: 4px;
     background: rgba(255, 255, 255, 0.1);
     opacity: 0;
     transition: opacity 0.3s ease;
-    z-index: 98; /* Between mini-player (95) and mobile-nav (100) */
+    margin-bottom: 8px; /* Some bottom spacing within mini-player */
 }
 
 .visual-progress-container.show {
