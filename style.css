@@ -783,7 +783,7 @@ body {
    z-index: 95;
    background: var(--bg-secondary); /* Solid background for entire container */
    /* backdrop-filter removed to ensure no see-through */
-   border-top: 1px solid var(--bg-primary); /* Solid border to prevent gaps */
+  /* border-top: 1px solid var(--bg-primary); /* Solid border to prevent gaps */
 }
 
 .mini-player-content {
