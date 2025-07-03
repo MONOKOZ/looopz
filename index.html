@@ -19,7 +19,7 @@
    
 </head>
 <body>
-    <div class="app-header">
+    <div class="app-header hidden" id="app-header">
         <div class="header-content">
             <div class="logo">
                 <a href="/pitch.html" target="_blank" class="logo" style="text-decoration: none; color: inherit;">
@@ -34,12 +34,12 @@
         </div>
     </div>
 
-    <div class="status-bar" id="status-bar">
+    <div class="status-bar hidden" id="status-bar">
         <span id="status-text">Ready</span>
     </div>
 
     <!-- Mini Player (Spotify-style) -->
-    <div class="mini-player" id="mini-player">
+    <div class="mini-player hidden" id="mini-player">
         <div class="mini-player-content">
             <img class="mini-player-cover" id="mini-player-cover" src="" alt="" style="display: none;">
             <div class="mini-track-info">
@@ -377,7 +377,7 @@
         </div>
     </div>
 
-    <div class="mobile-nav">
+    <div class="mobile-nav hidden" id="mobile-nav">
         <div class="nav-container">
             <button class="nav-btn" id="nav-search">
                 <div class="nav-icon">
