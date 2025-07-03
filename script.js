@@ -4912,7 +4912,26 @@ function showView(view) {
   els.librarySection.classList.add('hidden');
   els.playlistsSection.classList.add('hidden');
 
-  if (view === 'login') els.loginScreen.classList.remove('hidden');
+  // UI elements that should be hidden on login screen
+  const appHeader = document.getElementById('app-header');
+  const statusBar = document.getElementById('status-bar');
+  const miniPlayer = document.getElementById('mini-player');
+  const mobileNav = document.getElementById('mobile-nav');
+
+  if (view === 'login') {
+    els.loginScreen.classList.remove('hidden');
+    // Hide UI elements on login screen
+    if (appHeader) appHeader.classList.add('hidden');
+    if (statusBar) statusBar.classList.add('hidden');
+    if (miniPlayer) miniPlayer.classList.add('hidden');
+    if (mobileNav) mobileNav.classList.add('hidden');
+  } else {
+    // Show UI elements for all other views
+    if (appHeader) appHeader.classList.remove('hidden');
+    if (statusBar) statusBar.classList.remove('hidden');
+    if (miniPlayer) miniPlayer.classList.remove('hidden');
+    if (mobileNav) mobileNav.classList.remove('hidden');
+  }
   if (view === 'search') els.searchSection.classList.remove('hidden');
   if (view === 'player') {
       els.playerSection.classList.remove('hidden');
