@@ -454,28 +454,34 @@ class PlayerStateGuard {
             const isHealthy = await this.checkPlayerHealth();
             
             if (isHealthy) {
-                // Player is healthy - slow down checks
+                // Player is healthy - slow down checks and reset failures
                 this.consecutiveFailures = 0;
                 this.currentCheckInterval = Math.min(
                     this.maxCheckInterval, 
-                    this.currentCheckInterval * 1.2
+                    this.currentCheckInterval * 1.5
                 );
                 
-                // Save current good state
-                this.saveStateSnapshot();
+                // Save current good state (less frequently)
+                if (this.consecutiveFailures === 0) {
+                    this.saveStateSnapshot();
+                }
                 
             } else {
-                // Player has issues - speed up checks and attempt recovery
+                // Player has issues - be more tolerant before acting
                 this.consecutiveFailures++;
-                this.currentCheckInterval = Math.max(
-                    this.minCheckInterval,
-                    this.currentCheckInterval * 0.7
-                );
+                
+                // Only speed up checks if we have real issues
+                if (this.consecutiveFailures > 3) {
+                    this.currentCheckInterval = Math.max(
+                        this.minCheckInterval,
+                        this.currentCheckInterval * 0.8
+                    );
+                }
                 
                 console.warn(`🚨 Player health check failed (${this.consecutiveFailures} consecutive failures)`);
                 
-                // Attempt recovery after 2 consecutive failures
-                if (this.consecutiveFailures >= 2) {
+                // Only attempt recovery after many failures (reduced from 2 to avoid interruptions)
+                if (this.consecutiveFailures >= 5) {
                     await this.attemptRecovery();
                 }
             }
@@ -491,51 +497,64 @@ class PlayerStateGuard {
     async checkPlayerHealth() {
         // Check if Spotify player exists and is responsive
         if (!spotifyPlayer) {
-            console.log('🛡️ No Spotify player instance');
-            return false;
+            return false; // Don't log this - it's expected during initialization
         }
         
         try {
-            // Test player responsiveness with timeout
+            // Test player responsiveness with longer timeout to avoid false positives
             const healthCheckPromise = spotifyPlayer.getCurrentState();
             const timeoutPromise = new Promise((_, reject) => 
-                setTimeout(() => reject(new Error('Health check timeout')), 5000)
+                setTimeout(() => reject(new Error('Health check timeout')), 8000)
             );
             
             const state = await Promise.race([healthCheckPromise, timeoutPromise]);
             
+            // Allow null state sometimes - it's normal when nothing is playing
             if (!state) {
-                console.log('🛡️ No player state available');
-                return false;
+                // Only consider this unhealthy if we expect to be playing
+                const expectedToPlay = appState.get('playback.isPlaying');
+                if (!expectedToPlay) {
+                    return true; // Healthy if we're not supposed to be playing
+                }
+                return false; // Unhealthy if we should be playing but no state
             }
             
-            // Verify essential state properties
-            const hasTrack = state.track_window?.current_track;
-            const hasPosition = typeof state.position === 'number';
-            const hasPlaybackState = typeof state.paused === 'boolean';
+            // More lenient health check - just verify basic connectivity
             const hasDevice = !!state.device_id;
+            const hasBasicState = typeof state.paused === 'boolean';
             
-            const isHealthy = hasTrack && hasPosition && hasPlaybackState && hasDevice;
+            const isHealthy = hasDevice && hasBasicState;
             
             if (isHealthy) {
-                // Update AppState with current healthy state
-                appState.set('spotify.isConnected', true);
-                appState.set('playback.currentTime', state.position / 1000);
-                appState.set('playback.isPlaying', !state.paused);
-                
-                if (hasTrack) {
-                    appState.set('playback.currentTrack', {
-                        uri: state.track_window.current_track.uri,
-                        name: state.track_window.current_track.name,
-                        artist: state.track_window.current_track.artists[0]?.name || 'Unknown'
-                    });
+                // Only update AppState occasionally to avoid excessive updates
+                if (this.consecutiveFailures > 0 || Math.random() < 0.1) {
+                    appState.set('spotify.isConnected', true);
+                    
+                    if (state.position !== undefined) {
+                        appState.set('playback.currentTime', state.position / 1000);
+                    }
+                    
+                    if (state.paused !== undefined) {
+                        appState.set('playback.isPlaying', !state.paused);
+                    }
+                    
+                    if (state.track_window?.current_track) {
+                        appState.set('playback.currentTrack', {
+                            uri: state.track_window.current_track.uri,
+                            name: state.track_window.current_track.name,
+                            artist: state.track_window.current_track.artists[0]?.name || 'Unknown'
+                        });
+                    }
                 }
             }
             
             return isHealthy;
             
         } catch (error) {
-            console.warn('🛡️ Player health check failed:', error.message);
+            // Only log errors if we have multiple failures
+            if (this.consecutiveFailures > 2) {
+                console.warn('🛡️ Player health check failed:', error.message);
+            }
             return false;
         }
     }
@@ -543,29 +562,22 @@ class PlayerStateGuard {
     async attemptRecovery() {
         console.log('🔄 Attempting player recovery...');
         
+        // Only attempt recovery after significant consecutive failures
+        if (this.consecutiveFailures < 5) {
+            console.log(`🛡️ Only ${this.consecutiveFailures} failures, waiting before recovery`);
+            return false;
+        }
+        
         try {
-            // Method 1: Try to reconnect existing player
-            if (spotifyPlayer) {
-                await spotifyPlayer.connect();
-                console.log('🔄 Reconnected existing player');
-                
-                // Verify recovery worked
-                const state = await spotifyPlayer.getCurrentState();
-                if (state) {
-                    this.consecutiveFailures = 0;
-                    showStatus('✅ Player connection restored');
-                    return true;
-                }
-            }
-            
-            // Method 2: Restore from saved state
+            // GENTLE recovery - only restore state, don't force reconnection
             if (this.lastValidState) {
                 console.log('🔄 Restoring from saved state...');
                 await this.restoreFromSavedState();
+                this.consecutiveFailures = 0; // Reset after successful restore
                 return true;
             }
             
-            // Method 3: Signal for manual recovery
+            // Only signal for manual recovery - don't force reconnection
             console.log('🔄 Signaling need for manual recovery');
             this.signalRecoveryNeeded();
             
