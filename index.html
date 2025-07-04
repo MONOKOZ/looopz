@@ -5,9 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="theme-color" content="#1a1a1a">
-    <title>LOOOPZ - Create Viral Music Loops from Spotify</title>
-    <meta property="og:title" content="LOOOPZ - Create Viral Music Loops">
-    <meta property="og:description" content="Create perfect loops from any Spotify track. Precision timing. Endless possibilities.">
+    <title>MOMENTURY - Create, Share & Discover Your Favorite Music Moments</title>
+    <meta property="og:title" content="MOMENTURY - Create & Share Music Moments">
+    <meta property="og:description" content="Create, share & discover your favorite moments in music. Save what moves you. Share what matters.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://looopz.vercel.app/">
     <meta property="og:image" content="https://looopz.vercel.app/og-image.png">
@@ -23,7 +23,7 @@
         <div class="header-content">
             <div class="logo">
                 <a href="/pitch.html" target="_blank" class="logo" style="text-decoration: none; color: inherit;">
-                    <img src="assets/looopz-logo.svg" alt="LOOOPZ" style="height: 24px; width: auto;">
+                    <img src="assets/looopz-logo.svg" alt="MOMENTURY" style="height: 24px; width: auto;">
                 </a>
             </div>
             <div class="connection-status" id="connection-status">
@@ -62,9 +62,9 @@
         <!-- Login -->
         <div id="login-screen" class="login-screen">
             <div class="login-icon">
-                <img src="assets/looopz-logo-wordmark.svg" alt="LOOOPZ" style="width: 200px; height: auto; max-width: 100%;">
+                <img src="assets/looopz-logo-wordmark.svg" alt="MOMENTURY" style="width: 200px; height: auto; max-width: 100%;">
             </div>
-            <p class="login-subtitle">Create perfect loops from any Spotify track.<br>Precision timing. Endless possibilities.</p>
+            <p class="login-subtitle">Create, share & discover your favorite moments in music.<br>Save what moves you. Share what matters.</p>
             <button class="btn" id="connect-btn">Connect Spotify Premium</button>
             <p style="color: var(--light-gray); font-size: 13px; margin-top: 12px;">Requires Spotify Premium for full track playback</p>
         </div>
@@ -81,7 +81,7 @@
                     </div>
                 </div>
                 <div id="search-results">
-                    <div style="text-align: center; padding: 40px; color: var(--light-gray);">Search for tracks to start creating loops</div>
+                    <div style="text-align: center; padding: 40px; color: var(--light-gray);">Search for tracks to start creating moments</div>
                 </div>
             </div>
         </div>
@@ -120,7 +120,7 @@
                     <div class="current-artist" id="current-artist"></div>
                 </div>
 
-                <!-- Smart Loop Assist Toggle -->
+                <!-- Smart Moment Assist Toggle -->
                 <div class="smart-loop-assist" id="smart-loop-assist">
                     <div class="smart-assist-toggle">
                         <span class="smart-assist-label">Smart Loop Assist</span>
@@ -165,7 +165,7 @@
 
                     <div class="loop-controls">
                         <div class="loop-section">
-                            <span>Loop Mode</span>
+                            <span>Moment Mode</span>
                             <label class="toggle-switch">
                                 <input type="checkbox" id="loop-toggle">
                                 <span class="toggle-slider"></span>
@@ -186,8 +186,8 @@
                         </div>
 
                         <div class="loop-actions">
-                            <button class="btn start-loop-btn" id="start-loop-btn">Set Loop</button>
-                            <button class="btn secondary" id="save-loop-btn">Save Loop</button>
+                            <button class="btn start-loop-btn" id="start-loop-btn">Set Moment</button>
+                            <button class="btn secondary" id="save-loop-btn">Save Moment</button>
                             <button class="btn secondary" id="add-to-playlist-btn">+ Playlist</button>
                             <button class="btn" id="precision-btn" style="background: linear-gradient(135deg, #444, #333); padding: 10px 16px;">
                                 <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-settings" style="margin-right: 6px; vertical-align: text-bottom;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
@@ -203,7 +203,7 @@
         <div id="library-section" class="hidden">
             <div class="card">
                 <h2 class="card-title">
-                    <span>My Saved Loops</span>
+                    <span>My Moments</span>
                     <button class="btn danger" id="clear-all-loops" style="padding: 6px 12px; font-size: 12px;">Clear All</button>
                 </h2>
                 <div id="loops-list">
@@ -211,8 +211,8 @@
                         <div style="font-size: 48px; margin-bottom: 16px; opacity: 0.4;">
                             <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-archive"><polyline points="21 8 21 21 3 21 3 8"></polyline><rect x="1" y="3" width="22" height="5"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
                         </div>
-                        <div style="color: var(--light-gray); font-size: 16px; margin-bottom: 8px;">No saved loops yet</div>
-                        <div style="color: var(--light-gray); font-size: 13px;">Create and save loops to build your collection</div>
+                        <div style="color: var(--light-gray); font-size: 16px; margin-bottom: 8px;">No saved moments yet</div>
+                        <div style="color: var(--light-gray); font-size: 13px;">Create and save moments to build your collection</div>
                     </div>
                 </div>
             </div>
@@ -231,7 +231,7 @@
                             <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-music"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
                         </div>
                         <div style="color: var(--light-gray); font-size: 16px; margin-bottom: 8px;">No playlists yet</div>
-                        <div style="color: var(--light-gray); font-size: 13px;">Create playlists to mix loops and full tracks</div>
+                        <div style="color: var(--light-gray); font-size: 13px;">Create playlists to mix moments and full tracks</div>
                     </div>
                 </div>
             </div>
@@ -262,7 +262,7 @@
             <div class="fine-tune-section">
                 <div class="fine-tune-controls">
                     <div class="fine-tune-group">
-                        <div class="fine-tune-title">Start Loop</div>
+                        <div class="fine-tune-title">Start Moment</div>
                         <div class="fine-tune-row">
                             <button class="fine-tune-btn" data-target="start" data-amount="-1">-1s</button>
                             <button class="fine-tune-btn" data-target="start" data-amount="1">+1s</button>
@@ -273,7 +273,7 @@
                         </div>
                     </div>
                     <div class="fine-tune-group">
-                        <div class="fine-tune-title">End Loop</div>
+                        <div class="fine-tune-title">End Moment</div>
                         <div class="fine-tune-row">
                             <button class="fine-tune-btn" data-target="end" data-amount="-1">-1s</button>
                             <button class="fine-tune-btn" data-target="end" data-amount="1">+1s</button>
@@ -307,7 +307,7 @@
             <span class="context-menu-icon">
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-refresh-ccw"><polyline points="1 4 1 10 7 10"></polyline><polyline points="23 20 23 14 17 14"></polyline><path d="M20.49 9A9 9 0 0 0 5.64 5.64L1 10m22 4l-4.64 4.36A9 9 0 0 1 3.51 15"></path></svg>
             </span>
-            <span class="context-menu-text">Create Loop</span>
+            <span class="context-menu-text">Create Moment</span>
         </button>
         <button class="context-menu-item" id="menu-share">
             <span class="context-menu-icon">
@@ -389,27 +389,27 @@
                 <div class="nav-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-play-circle"><circle cx="12" cy="12" r="10"></circle><polygon points="10 8 16 12 10 16 10 8"></polygon></svg>
                 </div>
-                <div class="nav-label">Player</div>
+                <div class="nav-label">Create</div>
             </button>
             <button class="nav-btn" id="nav-library">
                 <div class="nav-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-book-open"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"></path><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"></path></svg>
                 </div>
-                <div class="nav-label">Library</div>
+                <div class="nav-label">Collect</div>
                 <span class="loop-count-badge" id="loop-count-badge">0</span>
             </button>
             <button class="nav-btn" id="nav-playlists">
                 <div class="nav-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-music"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
                 </div>
-                <div class="nav-label">Playlists</div>
+                <div class="nav-label">Curate</div>
                 <span class="playlist-count-badge" id="playlist-count-badge">0</span>
             </button>
             <button class="nav-btn" id="nav-discovery">
                 <div class="nav-icon">
                     <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-message-circle"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"></path></svg>
                 </div>
-                <div class="nav-label">Discovery</div>
+                <div class="nav-label">Explore</div>
             </button>
         </div>
     </div>
