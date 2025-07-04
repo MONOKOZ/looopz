@@ -37,17 +37,26 @@ function setupMediaSession() {
         }
         
         // Set action handlers for lock screen controls
-        navigator.mediaSession.setActionHandler('play', () => {
+        navigator.mediaSession.setActionHandler('play', async () => {
             console.log('📱 Media Session: Play pressed');
             if (spotifyPlayer) {
-                spotifyPlayer.resume();
+                await spotifyPlayer.resume();
+                // Force state sync after resume
+                setTimeout(async () => {
+                    await syncPlayerState();
+                    startProgressUpdates();
+                }, 500);
             }
         });
         
-        navigator.mediaSession.setActionHandler('pause', () => {
+        navigator.mediaSession.setActionHandler('pause', async () => {
             console.log('📱 Media Session: Pause pressed');
             if (spotifyPlayer) {
-                spotifyPlayer.pause();
+                await spotifyPlayer.pause();
+                // Force state sync after pause
+                setTimeout(async () => {
+                    await syncPlayerState();
+                }, 500);
             }
         });
         
@@ -75,6 +84,33 @@ function setupMediaSession() {
     } else {
         console.log('⚠️ Media Session API not supported');
     }
+    
+    // Add focus listener for returning from locked screen
+    window.addEventListener('focus', async () => {
+        console.log('📱 Window gained focus - syncing state');
+        if (spotifyPlayer && isConnected) {
+            setTimeout(async () => {
+                await syncPlayerState();
+                // Restart progress updates if we were playing
+                if (isPlaying) {
+                    startProgressUpdates();
+                }
+            }, 1000); // Give a moment for the player to stabilize
+        }
+    });
+    
+    // Also listen for page visibility changes
+    document.addEventListener('visibilitychange', async () => {
+        if (!document.hidden && spotifyPlayer && isConnected) {
+            console.log('📱 Page became visible - syncing state');
+            setTimeout(async () => {
+                await syncPlayerState();
+                if (isPlaying) {
+                    startProgressUpdates();
+                }
+            }, 500);
+        }
+    });
 }
 
 function updateMediaSession(trackData) {
@@ -783,6 +819,58 @@ class PlayerStateGuard {
 
 // Global state guard instance
 const playerStateGuard = new PlayerStateGuard();
+
+// Force complete player state synchronization
+async function syncPlayerState() {
+    console.log('🔄 Forcing player state sync...');
+    
+    if (!spotifyPlayer) {
+        console.warn('No Spotify player for state sync');
+        return;
+    }
+    
+    try {
+        const state = await spotifyPlayer.getCurrentState();
+        
+        if (state) {
+            // Update current time and playing status
+            currentTime = state.position / 1000;
+            isPlaying = !state.paused;
+            
+            // Update UI elements
+            updateProgress();
+            updatePlayPauseButton();
+            
+            // If we have track info, update that too
+            if (state.track_window?.current_track) {
+                currentTrack = {
+                    uri: state.track_window.current_track.uri,
+                    name: state.track_window.current_track.name,
+                    artist: state.track_window.current_track.artists[0]?.name || 'Unknown',
+                    duration: state.track_window.current_track.duration_ms
+                };
+                
+                duration = currentTrack.duration;
+                updateMiniPlayer(currentTrack);
+                
+                // Update track display
+                if (els.currentTrack) els.currentTrack.textContent = currentTrack.name;
+                if (els.currentArtist) els.currentArtist.textContent = currentTrack.artist;
+            }
+            
+            // Re-enable loop detection if it was enabled
+            if (loopEnabled) {
+                console.log(`🔄 Restored loop state: ${loopStart}s - ${loopEnd}s (${loopCount}/${loopTarget})`);
+            }
+            
+            console.log(`🔄 State synced: ${currentTime.toFixed(1)}s, playing: ${isPlaying}`);
+        } else {
+            console.warn('No player state available for sync');
+        }
+    } catch (error) {
+        console.error('🔄 State sync failed:', error);
+    }
+}
 
 // Spotify Web Playback SDK callback - available immediately
 window.onSpotifyWebPlaybackSDKReady = window.onSpotifyWebPlaybackSDKReady || function() {
