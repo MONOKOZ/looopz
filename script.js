@@ -1237,31 +1237,10 @@ class SmartLoopDetector {
 }
 
 // Global smart detector instance
-const smartLoopDetector = new SmartLoopDetector();
+// SmartLoopDetector disabled for core functionality focus  
+// const smartLoopDetector = new SmartLoopDetector();
 
-// Debug function for testing smart detection performance
-window.showSmartDetectionStats = function() {
-  if (!loopEnabled) {
-    console.log('❌ Loop not enabled - smart detection inactive');
-    return;
-  }
-  
-  const timeToEnd = loopEnd - (smartLoopDetector.getPredictedPosition() || currentTime);
-  const reduction = smartLoopDetector.getApiCallReduction();
-  
-  console.log(`🎯 SMART LOOP DETECTION STATS:
-📊 Current Zone: ${smartLoopDetector.currentZone}
-⏱️  Time to Loop End: ${timeToEnd.toFixed(2)}s
-🔄 Current Interval: ${smartLoopDetector.intervals[smartLoopDetector.currentZone]}ms
-📉 API Call Reduction: ${reduction}%
-🎯 Predicted Position: ${(smartLoopDetector.getPredictedPosition() || 0).toFixed(3)}s
-📍 Actual Position: ${currentTime.toFixed(3)}s
-⚡ Playback Rate: ${smartLoopDetector.lastKnownRate.toFixed(3)}x`);
-  
-  showStatus(`🎯 Smart detection: ${smartLoopDetector.currentZone} zone, ${reduction}% API reduction`);
-};
-
-console.log('🎯 Smart Loop Detection installed! Type showSmartDetectionStats() to see performance stats');
+// Smart detection debug functions disabled for core functionality focus
 
 // Playlist state (variables moved to legacy declarations above)
 let savedPlaylists = [];
@@ -4053,10 +4032,10 @@ function initializeSpotifyPlayer() {
           playlistEngine = new PlaylistTransitionEngine(spotifyPlayer, spotifyAccessToken, spotifyDeviceId);
           setupPlaylistEngineCallbacks();
           
-          // Start PlayerStateGuard monitoring after successful connection
-          playerStateGuard.checkForSavedState();
-          playerStateGuard.startMonitoring();
-          console.log('🛡️ PlayerStateGuard monitoring started');
+          // PlayerStateGuard disabled for core functionality focus
+          // playerStateGuard.checkForSavedState();
+          // playerStateGuard.startMonitoring();
+          console.log('🎵 Core player functionality focused - monitoring disabled');
 
           // Initialize AI audio analysis after a short delay
           setTimeout(() => {
@@ -4102,9 +4081,9 @@ function initializeSpotifyPlayer() {
           
           updateConnectionStatus();
           
-          // Stop PlayerStateGuard monitoring when player is not ready
-          playerStateGuard.stopMonitoring();
-          console.log('🛡️ PlayerStateGuard monitoring stopped');
+          // PlayerStateGuard disabled
+          // playerStateGuard.stopMonitoring();
+          console.log('🎵 Player not ready - core functionality focus');
       });
 
       let lastStateChange = 0;
@@ -4258,22 +4237,14 @@ function startProgressUpdates() {
           let shouldCallApi = true;
           let timeToLoopEnd = Infinity;
           
-          if (loopEnabled && loopEnd > 0) {
-              // Use predicted position if available, otherwise use last known position
-              const estimatedPosition = smartLoopDetector.getPredictedPosition() || currentTime;
-              timeToLoopEnd = Math.max(0, loopEnd - estimatedPosition);
-              shouldCallApi = smartLoopDetector.shouldMakeApiCall(timeToLoopEnd);
-          }
-          
-          // Always try to update progress when connected, but respect smart polling
-          if (spotifyPlayer && isConnected && shouldCallApi) {
+          // Simple, reliable progress updates - no smart detection complexity
+          if (spotifyPlayer && isConnected) {
               const state = await spotifyPlayer.getCurrentState();
               
               if (state && state.position !== undefined) {
                   const newTime = state.position / 1000;
                   
-                  // Update smart detector with new position
-                  smartLoopDetector.updatePosition(newTime, Date.now());
+                  // Simple position update without complexity
                   
                   // Validate position makes sense (allow reasonable jumps and forward progress)
                   const timeDiff = Math.abs(newTime - lastKnownPosition);
@@ -4353,18 +4324,7 @@ function startProgressUpdates() {
                       return;
                   }
               }
-          } else if (loopEnabled && !shouldCallApi) {
-              // SMART POLLING: Update UI with predicted position instead of API call
-              const predictedPosition = smartLoopDetector.getPredictedPosition();
-              if (predictedPosition !== null && isPlaying) {
-                  currentTime = predictedPosition;
-                  updateProgress();
-                  
-                  // Still check loop end with predicted position for precise timing
-                  if (loopEnabled && !isLooping) {
-                      await checkLoopEnd();
-                  }
-              }
+          // Removed smart polling complexity - simple and reliable updates only
           } else {
               // Not connected - slow down polling
               consecutiveFailures++;
@@ -4505,16 +4465,10 @@ document.addEventListener('visibilitychange', () => {
   }
 });
 
-// FIX 9: Unified loop end handling function with seamless transition preparation + Smart Detection
+// Simple, reliable loop end detection
 async function checkLoopEnd() {
-  // Use predicted position for more accurate loop detection
-  const effectivePosition = smartLoopDetector.getPredictedPosition() || currentTime;
-  const timeToEnd = loopEnd - effectivePosition;
-  
-  // Enhanced debug logging for smart detection (only log occasionally)
-  if (isPlaylistMode && loopEnabled && Math.random() < 0.005) {
-      console.log(`🔍 Smart loop check: predicted=${effectivePosition.toFixed(3)}s, actual=${currentTime.toFixed(3)}s, end=${loopEnd.toFixed(3)}s, zone=${smartLoopDetector.currentZone}, loopCount=${loopCount}/${loopTarget}`);
-  }
+  // Use simple, direct current time - no predictions or complexity
+  const timeToEnd = loopEnd - currentTime;
 
   // SEAMLESS TRANSITION: Prepare next track when we're close to final loop end
   if (isPlaylistMode && loopCount === loopTarget - 1) { // On the last loop iteration
@@ -8075,10 +8029,9 @@ function setupEventListeners() {
       updateLoopVisuals(); // FIX 6: This will show/hide handles
       
       if (loopEnabled) {
-          const reduction = smartLoopDetector.getApiCallReduction();
-          showStatus(`🎯 Smart loop enabled: ${loopTarget} time(s) (${reduction}% API efficiency boost)`);
+          showStatus(`🎯 Moment mode enabled: ${loopTarget} time(s)`);
       } else {
-          showStatus('Loop disabled');
+          showStatus('Moment mode disabled');
       }
   });
 
