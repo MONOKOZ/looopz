@@ -4478,8 +4478,8 @@ async function checkLoopEnd() {
       }
   }
 
-  // Check if we've reached the loop end with precise timing using smart detection
-  if (effectivePosition >= loopEnd - LOOP_END_THRESHOLD && loopCount < loopTarget) {
+  // Check if we've reached the loop end with simple, reliable timing
+  if (currentTime >= loopEnd - LOOP_END_THRESHOLD && loopCount < loopTarget) {
       const timeSinceLoopStart = Date.now() - loopStartTime;
       if (timeSinceLoopStart > 800) {
           // Only log occasionally to reduce spam
