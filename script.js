@@ -526,26 +526,13 @@ class PlayerStateGuard {
             const isHealthy = hasDevice && hasBasicState;
             
             if (isHealthy) {
-                // Only update AppState occasionally to avoid excessive updates
-                if (this.consecutiveFailures > 0 || Math.random() < 0.1) {
+                // Only update connection status - NEVER interfere with track progression
+                if (this.consecutiveFailures > 0) {
                     appState.set('spotify.isConnected', true);
-                    
-                    if (state.position !== undefined) {
-                        appState.set('playback.currentTime', state.position / 1000);
-                    }
-                    
-                    if (state.paused !== undefined) {
-                        appState.set('playback.isPlaying', !state.paused);
-                    }
-                    
-                    if (state.track_window?.current_track) {
-                        appState.set('playback.currentTrack', {
-                            uri: state.track_window.current_track.uri,
-                            name: state.track_window.current_track.name,
-                            artist: state.track_window.current_track.artists[0]?.name || 'Unknown'
-                        });
-                    }
                 }
+                
+                // DO NOT update track info, position, or playing state
+                // Let the normal player state handlers manage this to avoid conflicts
             }
             
             return isHealthy;
@@ -711,34 +698,46 @@ class PlayerStateGuard {
         const state = this.lastValidState;
         console.log('🔄 Restoring from saved state:', state);
         
-        // Restore AppState
+        // Get current actual player state to compare
+        let currentState = null;
+        try {
+            currentState = await spotifyPlayer.getCurrentState();
+        } catch (error) {
+            console.warn('Could not get current state for restoration comparison');
+        }
+        
+        // ONLY restore connection status - never override current track info
         appState.update({
-            'spotify.isConnected': state.spotify.isConnected,
-            'playback.currentTrack': state.playback.currentTrack,
-            'playback.isPlaying': state.playback.isPlaying,
-            'playback.currentTime': state.playback.currentTime,
-            'playback.duration': state.playback.duration,
-            'loop.enabled': state.loop.enabled,
-            'loop.start': state.loop.start,
-            'loop.end': state.loop.end,
-            'loop.count': state.loop.count,
-            'loop.target': state.loop.target
+            'spotify.isConnected': state.spotify.isConnected
         });
         
-        // Update UI to reflect restored state
-        if (state.playback.currentTrack) {
-            if (els.currentTrack) els.currentTrack.textContent = state.playback.currentTrack.name;
-            if (els.currentArtist) els.currentArtist.textContent = state.playback.currentTrack.artist;
-            updateMiniPlayer(state.playback.currentTrack);
+        // ONLY restore loop settings if we're still on the same track
+        if (currentState && currentState.track_window?.current_track) {
+            const currentTrackUri = currentState.track_window.current_track.uri;
+            const savedTrackUri = state.playback.currentTrack?.uri;
+            
+            if (currentTrackUri === savedTrackUri) {
+                console.log('🔄 Same track - restoring loop settings');
+                appState.update({
+                    'loop.enabled': state.loop.enabled,
+                    'loop.start': state.loop.start,
+                    'loop.end': state.loop.end,
+                    'loop.count': state.loop.count,
+                    'loop.target': state.loop.target
+                });
+                
+                if (state.loop.enabled) {
+                    if (els.loopToggle) els.loopToggle.checked = true;
+                    updateLoopVisuals();
+                }
+            } else {
+                console.log('🔄 Different track - NOT restoring loop settings');
+            }
         }
         
-        if (state.loop.enabled) {
-            if (els.loopToggle) els.loopToggle.checked = true;
-            updateLoopVisuals();
-        }
-        
+        // Never restore playback position or track info - let the player handle this naturally
         updatePlayPauseButton();
-        showStatus('✅ Player state restored');
+        showStatus('✅ Connection state restored');
     }
     
     signalRecoveryNeeded() {
