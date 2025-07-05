@@ -83,19 +83,68 @@ function setupMediaSession() {
         console.log('⚠️ Media Session API not supported');
     }
     
-    // Simple focus handler - just restart updates if playing
-    window.addEventListener('focus', () => {
-        if (isPlaying && spotifyPlayer) {
-            console.log('📱 Window focused - resuming updates');
-            startProgressUpdates();
+    // Focus handler - restore minimal state if needed
+    window.addEventListener('focus', async () => {
+        if (spotifyPlayer) {
+            console.log('📱 Window focused');
+            
+            // Quick check if we lost track info
+            if (!currentTrack && isConnected) {
+                try {
+                    const state = await spotifyPlayer.getCurrentState();
+                    if (state && state.track_window?.current_track) {
+                        // Restore just the essential track info
+                        currentTrack = {
+                            uri: state.track_window.current_track.uri,
+                            name: state.track_window.current_track.name,
+                            artist: state.track_window.current_track.artists[0]?.name || 'Unknown',
+                            duration: state.track_window.current_track.duration_ms
+                        };
+                        duration = currentTrack.duration;
+                        console.log('📱 Restored track info:', currentTrack.name);
+                        
+                        // Update display
+                        if (els.currentTrack) els.currentTrack.textContent = currentTrack.name;
+                        if (els.currentArtist) els.currentArtist.textContent = currentTrack.artist;
+                    }
+                } catch (error) {
+                    console.warn('📱 Could not restore track info:', error);
+                }
+            }
+            
+            if (isPlaying) {
+                startProgressUpdates();
+            }
         }
     });
     
-    // Simple visibility handler - just restart updates if playing
-    document.addEventListener('visibilitychange', () => {
-        if (!document.hidden && isPlaying && spotifyPlayer) {
-            console.log('📱 Page visible - resuming updates');
-            startProgressUpdates();
+    // Visibility handler - same minimal restoration
+    document.addEventListener('visibilitychange', async () => {
+        if (!document.hidden && spotifyPlayer) {
+            console.log('📱 Page visible');
+            
+            // Quick check if we lost track info
+            if (!currentTrack && isConnected) {
+                try {
+                    const state = await spotifyPlayer.getCurrentState();
+                    if (state && state.track_window?.current_track) {
+                        currentTrack = {
+                            uri: state.track_window.current_track.uri,
+                            name: state.track_window.current_track.name,
+                            artist: state.track_window.current_track.artists[0]?.name || 'Unknown',
+                            duration: state.track_window.current_track.duration_ms
+                        };
+                        duration = currentTrack.duration;
+                        console.log('📱 Restored track info:', currentTrack.name);
+                    }
+                } catch (error) {
+                    console.warn('📱 Could not restore track info:', error);
+                }
+            }
+            
+            if (isPlaying) {
+                startProgressUpdates();
+            }
         }
     });
 }
