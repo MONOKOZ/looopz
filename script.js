@@ -93,19 +93,26 @@ function setupMediaSession() {
                 try {
                     const state = await spotifyPlayer.getCurrentState();
                     if (state && state.track_window?.current_track) {
-                        // Restore just the essential track info
+                        // Restore just the essential track info including cover image
+                        const track = state.track_window.current_track;
                         currentTrack = {
-                            uri: state.track_window.current_track.uri,
-                            name: state.track_window.current_track.name,
-                            artist: state.track_window.current_track.artists[0]?.name || 'Unknown',
-                            duration: state.track_window.current_track.duration_ms
+                            uri: track.uri,
+                            name: track.name,
+                            artist: track.artists[0]?.name || 'Unknown',
+                            duration: track.duration_ms,
+                            image: track.album?.images?.[0]?.url || '',
+                            album: track.album?.name || 'Unknown Album'
                         };
                         duration = currentTrack.duration;
                         console.log('📱 Restored track info:', currentTrack.name);
                         
-                        // Update display
+                        // Update display including cover
                         if (els.currentTrack) els.currentTrack.textContent = currentTrack.name;
                         if (els.currentArtist) els.currentArtist.textContent = currentTrack.artist;
+                        updateMiniPlayer(currentTrack);
+                        
+                        // Update lock screen with restored info
+                        updateMediaSession(currentTrack);
                     }
                 } catch (error) {
                     console.warn('📱 Could not restore track info:', error);
@@ -128,14 +135,25 @@ function setupMediaSession() {
                 try {
                     const state = await spotifyPlayer.getCurrentState();
                     if (state && state.track_window?.current_track) {
+                        const track = state.track_window.current_track;
                         currentTrack = {
-                            uri: state.track_window.current_track.uri,
-                            name: state.track_window.current_track.name,
-                            artist: state.track_window.current_track.artists[0]?.name || 'Unknown',
-                            duration: state.track_window.current_track.duration_ms
+                            uri: track.uri,
+                            name: track.name,
+                            artist: track.artists[0]?.name || 'Unknown',
+                            duration: track.duration_ms,
+                            image: track.album?.images?.[0]?.url || '',
+                            album: track.album?.name || 'Unknown Album'
                         };
                         duration = currentTrack.duration;
                         console.log('📱 Restored track info:', currentTrack.name);
+                        
+                        // Update display including cover
+                        if (els.currentTrack) els.currentTrack.textContent = currentTrack.name;
+                        if (els.currentArtist) els.currentArtist.textContent = currentTrack.artist;
+                        updateMiniPlayer(currentTrack);
+                        
+                        // Update lock screen with restored info
+                        updateMediaSession(currentTrack);
                     }
                 } catch (error) {
                     console.warn('📱 Could not restore track info:', error);
@@ -154,31 +172,35 @@ function updateMediaSession(trackData) {
         try {
             console.log('📱 Updating Media Session with track data:', trackData);
             
-            // Prepare artwork array with different sizes
+            // Prepare artwork array with actual album cover
             const artwork = [];
             
-            // Always start with LOOOPZ logo as primary (works reliably on iOS)
-            artwork.push(
-                { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
-                { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }
-            );
-            
             if (trackData.image) {
-                console.log('📱 Original image URL:', trackData.image);
+                console.log('📱 Setting album cover for lock screen:', trackData.image);
                 
-                // Add Spotify image as secondary option
-                artwork.push({ src: trackData.image, sizes: '640x640', type: 'image/jpeg' });
-                
-                console.log('📱 Media Session artwork URLs:', artwork.map(a => a.src));
+                // Use actual album cover as primary
+                artwork.push(
+                    { src: trackData.image, sizes: '640x640', type: 'image/jpeg' },
+                    { src: trackData.image, sizes: '512x512', type: 'image/jpeg' },
+                    { src: trackData.image, sizes: '256x256', type: 'image/jpeg' },
+                    { src: trackData.image, sizes: '192x192', type: 'image/jpeg' },
+                    { src: trackData.image, sizes: '128x128', type: 'image/jpeg' },
+                    { src: trackData.image, sizes: '96x96', type: 'image/jpeg' }
+                );
             } else {
-                console.log('⚠️ No image URL available for track');
+                console.log('⚠️ No album cover - using MOMENTURY logo');
+                // Fallback to app logo only if no album cover
+                artwork.push(
+                    { src: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+                    { src: '/icon-512.png', sizes: '512x512', type: 'image/png' }
+                );
             }
             
             // Create metadata
             const metadata = new MediaMetadata({
                 title: trackData.name || 'Unknown Track',
                 artist: trackData.artist || 'Unknown Artist',
-                album: 'LOOOPZ', // Could be enhanced with actual album name later
+                album: trackData.album || 'MOMENTURY', // Use actual album or app name
                 artwork: artwork
             });
             
@@ -883,7 +905,9 @@ async function syncPlayerState() {
                     uri: state.track_window.current_track.uri,
                     name: state.track_window.current_track.name,
                     artist: state.track_window.current_track.artists[0]?.name || 'Unknown',
-                    duration: state.track_window.current_track.duration_ms
+                    duration: state.track_window.current_track.duration_ms,
+                    image: state.track_window.current_track.album?.images?.[0]?.url || '',
+                    album: state.track_window.current_track.album?.name || 'Unknown Album'
                 };
                 
                 duration = currentTrack.duration;
@@ -892,6 +916,9 @@ async function syncPlayerState() {
                 // Update track display
                 if (els.currentTrack) els.currentTrack.textContent = currentTrack.name;
                 if (els.currentArtist) els.currentArtist.textContent = currentTrack.artist;
+                
+                // Update lock screen with current track
+                updateMediaSession(currentTrack);
             }
             
             // Re-enable loop detection if it was enabled
