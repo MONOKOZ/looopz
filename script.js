@@ -37,26 +37,24 @@ function setupMediaSession() {
         }
         
         // Set action handlers for lock screen controls
-        navigator.mediaSession.setActionHandler('play', async () => {
+        navigator.mediaSession.setActionHandler('play', () => {
             console.log('📱 Media Session: Play pressed');
             if (spotifyPlayer) {
-                await spotifyPlayer.resume();
-                // Force state sync after resume
-                setTimeout(async () => {
-                    await syncPlayerState();
-                    startProgressUpdates();
-                }, 500);
+                spotifyPlayer.resume();
+                // Just update the UI state immediately
+                isPlaying = true;
+                updatePlayPauseButton();
+                startProgressUpdates();
             }
         });
         
-        navigator.mediaSession.setActionHandler('pause', async () => {
+        navigator.mediaSession.setActionHandler('pause', () => {
             console.log('📱 Media Session: Pause pressed');
             if (spotifyPlayer) {
-                await spotifyPlayer.pause();
-                // Force state sync after pause
-                setTimeout(async () => {
-                    await syncPlayerState();
-                }, 500);
+                spotifyPlayer.pause();
+                // Just update the UI state immediately
+                isPlaying = false;
+                updatePlayPauseButton();
             }
         });
         
@@ -85,30 +83,19 @@ function setupMediaSession() {
         console.log('⚠️ Media Session API not supported');
     }
     
-    // Add focus listener for returning from locked screen
-    window.addEventListener('focus', async () => {
-        console.log('📱 Window gained focus - syncing state');
-        if (spotifyPlayer && isConnected) {
-            setTimeout(async () => {
-                await syncPlayerState();
-                // Restart progress updates if we were playing
-                if (isPlaying) {
-                    startProgressUpdates();
-                }
-            }, 1000); // Give a moment for the player to stabilize
+    // Simple focus handler - just restart updates if playing
+    window.addEventListener('focus', () => {
+        if (isPlaying && spotifyPlayer) {
+            console.log('📱 Window focused - resuming updates');
+            startProgressUpdates();
         }
     });
     
-    // Also listen for page visibility changes
-    document.addEventListener('visibilitychange', async () => {
-        if (!document.hidden && spotifyPlayer && isConnected) {
-            console.log('📱 Page became visible - syncing state');
-            setTimeout(async () => {
-                await syncPlayerState();
-                if (isPlaying) {
-                    startProgressUpdates();
-                }
-            }, 500);
+    // Simple visibility handler - just restart updates if playing
+    document.addEventListener('visibilitychange', () => {
+        if (!document.hidden && isPlaying && spotifyPlayer) {
+            console.log('📱 Page visible - resuming updates');
+            startProgressUpdates();
         }
     });
 }
