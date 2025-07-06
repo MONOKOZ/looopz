@@ -6247,11 +6247,10 @@ function renderPlaylistsOverview() {
   els.playlistsList.innerHTML = savedPlaylists.map((playlist) => {
     const isCurrentlyPlaying = isPlaylistMode && currentPlaylist && playlist.id === currentPlaylist.id;
     
-    // Find first track with an album cover
-    // Check both 'image' property and potential 'albumImage' property for backwards compatibility
+    // Find first item (track or loop) with an album cover
+    // Loops store their track's album art in the image property too
     const firstTrackCover = playlist.items
-      .find(item => item.type === 'track' && (item.image || item.albumImage))?.image || 
-      playlist.items.find(item => item.type === 'track' && (item.image || item.albumImage))?.albumImage;
+      .find(item => (item.type === 'track' || item.type === 'loop') && item.image)?.image;
     
     return `
       <div class="playlist-card ${isCurrentlyPlaying ? 'currently-playing' : ''}" data-playlist-id="${playlist.id}">
