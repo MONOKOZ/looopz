@@ -6138,11 +6138,12 @@ function renderPlaylistItemsAsCards(playlist) {
                       <label class="edit-label">Repeat Count</label>
                       <input type="number" class="edit-input" id="edit-repeat-${playlist.id}-${index}" value="${item.playCount}" min="1" max="99">
                   </div>
-                  ` : ''}
+                  ` : `
                   <div class="edit-field">
                       <label class="edit-label">Play Count</label>
                       <input type="number" class="edit-input" id="edit-playcount-${playlist.id}-${index}" value="${item.playCount}" min="1" max="99">
                   </div>
+                  `}
               </div>
               <div class="edit-actions">
                   <button class="btn secondary" onclick="updatePlaylistItem('${playlist.id}', ${index})">💾 Update</button>
@@ -6412,9 +6413,6 @@ function updatePlaylistItem(playlistId, itemIndex) {
   const item = playlist.items[itemIndex];
   const isLoop = item.type === 'loop';
 
-  // Update play count
-  const newPlayCount = parseInt(document.getElementById(`edit-playcount-${playlistId}-${itemIndex}`).value);
-  
   if (isLoop) {
       // Update loop name, times, and repeat count
       const newName = document.getElementById(`edit-name-${playlistId}-${itemIndex}`).value.trim();
@@ -6422,12 +6420,12 @@ function updatePlaylistItem(playlistId, itemIndex) {
       const newEnd = parseTimeInput(document.getElementById(`edit-end-${playlistId}-${itemIndex}`).value);
       const newRepeat = parseInt(document.getElementById(`edit-repeat-${playlistId}-${itemIndex}`).value);
       
-      if (newStart >= 0 && newEnd > newStart && newRepeat >= 1 && newRepeat <= 99 && newPlayCount >= 1 && newPlayCount <= 99) {
+      if (newStart >= 0 && newEnd > newStart && newRepeat >= 1 && newRepeat <= 99) {
           // Update playlist item
           item.customName = newName || null;
           item.start = newStart;
           item.end = newEnd;
-          item.playCount = newRepeat;  // Use repeat count for loops
+          item.playCount = newRepeat;
           
           // Sync with original saved loop if it exists
           const savedLoop = savedLoops.find(l => l.id === item.id);
@@ -6444,6 +6442,7 @@ function updatePlaylistItem(playlistId, itemIndex) {
       }
   } else {
       // For full tracks, just update play count
+      const newPlayCount = parseInt(document.getElementById(`edit-playcount-${playlistId}-${itemIndex}`).value);
       if (newPlayCount >= 1 && newPlayCount <= 99) {
           item.playCount = newPlayCount;
       } else {
