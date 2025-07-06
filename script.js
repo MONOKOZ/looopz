@@ -6260,10 +6260,11 @@ function renderPlaylistsOverview() {
           ${isCurrentlyPlaying ? '<div class="playlist-playing-indicator">🎵 Now Playing</div>' : ''}
           
           <div class="playlist-header">
-              <div class="playlist-icon">
+              <div class="playlist-icon playlist-stack">
                   ${firstTrackCover 
-                    ? `<img src="${firstTrackCover}" class="playlist-cover" alt="${playlist.name}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
-                       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-music" style="display:none;"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>`
+                    ? `<div class="playlist-stack-bg"></div>
+                       <div class="playlist-stack-mid"></div>
+                       <img src="${firstTrackCover}" class="playlist-cover playlist-cover-top" alt="${playlist.name}" onerror="this.style.display='none'; this.parentElement.innerHTML='<svg xmlns=\\"http://www.w3.org/2000/svg\\" width=\\"20\\" height=\\"20\\" viewBox=\\"0 0 24 24\\" fill=\\"none\\" stroke=\\"currentColor\\" stroke-width=\\"2\\" stroke-linecap=\\"round\\" stroke-linejoin=\\"round\\" class=\\"feather feather-music\\"><path d=\\"M9 18V5l12-2v13\\"></path><circle cx=\\"6\\" cy=\\"18\\" r=\\"3\\"></circle><circle cx=\\"18\\" cy=\\"16\\" r=\\"3\\"></circle></svg>';">`
                     : `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-music"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>`
                   }
               </div>
