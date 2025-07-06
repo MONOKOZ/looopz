@@ -6244,6 +6244,10 @@ function renderPlaylistsOverview() {
   els.playlistsList.innerHTML = savedPlaylists.map((playlist) => {
     const isCurrentlyPlaying = isPlaylistMode && currentPlaylist && playlist.id === currentPlaylist.id;
     
+    // Find first track with an album cover
+    const firstTrackCover = playlist.items
+      .find(item => item.type === 'track' && item.image)?.image;
+    
     return `
       <div class="playlist-card ${isCurrentlyPlaying ? 'currently-playing' : ''}" data-playlist-id="${playlist.id}">
           <button class="delete-x-btn" data-playlist-id="${playlist.id}" title="Delete playlist">
@@ -6253,7 +6257,11 @@ function renderPlaylistsOverview() {
           
           <div class="playlist-header">
               <div class="playlist-icon">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-music"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>
+                  ${firstTrackCover 
+                    ? `<img src="${firstTrackCover}" class="playlist-cover" alt="${playlist.name}" onerror="this.style.display='none'; this.nextElementSibling.style.display='block';">
+                       <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-music" style="display:none;"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>`
+                    : `<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-music"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>`
+                  }
               </div>
               <div class="playlist-details">
                   <div class="playlist-name" contenteditable="false" onblur="updatePlaylistName('${playlist.id}', this)" onclick="enablePlaylistNameEdit(this)">${playlist.name}</div>
