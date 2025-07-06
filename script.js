@@ -1559,6 +1559,9 @@ async function loadTrackSafely(trackData, startPositionMs = 0, preserveLoopPoint
     // Update current track info
     appState.set('playback.currentTrack', trackData);
     
+    // Update global currentTrack to ensure image is included
+    currentTrack = trackData;
+    
     // Update Media Session for lock screen controls
     updateMediaSession(trackData);
     
