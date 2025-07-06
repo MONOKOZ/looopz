@@ -6245,8 +6245,10 @@ function renderPlaylistsOverview() {
     const isCurrentlyPlaying = isPlaylistMode && currentPlaylist && playlist.id === currentPlaylist.id;
     
     // Find first track with an album cover
+    // Check both 'image' property and potential 'albumImage' property for backwards compatibility
     const firstTrackCover = playlist.items
-      .find(item => item.type === 'track' && item.image)?.image;
+      .find(item => item.type === 'track' && (item.image || item.albumImage))?.image || 
+      playlist.items.find(item => item.type === 'track' && (item.image || item.albumImage))?.albumImage;
     
     return `
       <div class="playlist-card ${isCurrentlyPlaying ? 'currently-playing' : ''}" data-playlist-id="${playlist.id}">
