@@ -1611,9 +1611,11 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
     font-size: 16px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1);
     position: relative;
     overflow: hidden;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
 }
 
 .connect-btn:hover {
@@ -1621,8 +1623,18 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
     box-shadow: 0 8px 24px rgba(139, 92, 246, 0.3);
 }
 
-.connect-btn:active {
+.connect-btn:active,
+.connect-btn:focus {
     transform: translateY(0);
+    box-shadow: 0 4px 16px rgba(139, 92, 246, 0.4);
+    outline: none;
+}
+
+.connect-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+    transform: translateY(0);
+    box-shadow: none;
 }
 
 .connect-subtitle {
