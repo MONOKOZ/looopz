@@ -6069,7 +6069,7 @@ function renderPlaylistItemsAsCards(playlist) {
   return playlist.items.map((item, index) => {
       const isLoop = item.type === 'loop';
       const savedLoop = isLoop ? savedLoops.find(l => l.id === item.id) : null;
-      const customName = savedLoop?.name;
+      const customName = item.customName || savedLoop?.name;
       
       return `
       <div class="saved-loop playlist-item" data-playlist-id="${playlist.id}" data-item-index="${index}" draggable="true">
@@ -6086,7 +6086,7 @@ function renderPlaylistItemsAsCards(playlist) {
           <div class="loop-header">
               <img src="${item.image || ''}" alt="${item.name}" class="loop-thumbnail" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 60 60\"%3E%3Crect width=\"60\" height=\"60\" fill=\"%23333\"/%3E%3C/svg%3E'">
               <div class="loop-details">
-                  ${customName ? `<div class="loop-custom-name">${customName}</div>` : ''}
+                  ${isLoop ? `<div class="loop-custom-name" contenteditable="true" onblur="updatePlaylistItemName('${playlist.id}', ${index}, this)" onclick="selectAllText(this)" title="Click to edit name">${customName || 'Untitled Loop'}</div>` : ''}
                   <div class="loop-track-name">${item.name}</div>
                   <div class="loop-artist">${item.artist}</div>
               </div>
@@ -6360,6 +6360,45 @@ function updatePlaylistName(playlistId, element) {
       }
   }
   element.contentEditable = false;
+}
+
+function updatePlaylistItemName(playlistId, itemIndex, element) {
+  const playlist = savedPlaylists.find(p => p.id === playlistId);
+  if (!playlist || !playlist.items[itemIndex]) return;
+
+  const newName = element.textContent.trim();
+  const item = playlist.items[itemIndex];
+  
+  if (newName && item.type === 'loop') {
+      // Update the playlist item's custom name
+      item.customName = newName;
+      
+      // Also update the saved loop if it exists
+      if (item.id) {
+          const savedLoop = savedLoops.find(l => l.id === item.id);
+          if (savedLoop) {
+              savedLoop.name = newName;
+              saveLoopsToStorage();
+          }
+      }
+      
+      playlist.updatedAt = new Date().toISOString();
+      savePlaylistsToStorage();
+      showStatus(`✅ Renamed loop to "${newName}"`);
+  } else if (!newName) {
+      // Restore original name if empty
+      element.textContent = item.customName || 'Untitled Loop';
+  }
+}
+
+function selectAllText(element) {
+  if (window.getSelection && document.createRange) {
+      const range = document.createRange();
+      range.selectNodeContents(element);
+      const selection = window.getSelection();
+      selection.removeAllRanges();
+      selection.addRange(range);
+  }
 }
 
 function editPlaylist(playlistId) {
@@ -7229,8 +7268,10 @@ async function addCurrentToPlaylist() {
   if (loopEnabled) {
       appState.set('playlist.pendingItem', {
           type: 'loop',
+          id: `temp_${Date.now()}`, // Temporary ID for unsaved loops
           trackUri: currentTrack.uri,
           name: currentTrack.name,
+          customName: null, // Will show "Untitled Loop" until named
           artist: currentTrack.artist,
           duration: currentTrack.duration,
           image: currentTrack.image,
@@ -7260,8 +7301,10 @@ function addLoopToPlaylist(loopId) {
 
   appState.set('playlist.pendingItem', {
       type: 'loop',
+      id: loop.id,
       trackUri: loop.track.uri,
       name: loop.track.name,
+      customName: loop.name,
       artist: loop.track.artist,
       duration: loop.track.duration,
       image: loop.track.image,
