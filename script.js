@@ -6086,7 +6086,7 @@ function renderPlaylistItemsAsCards(playlist) {
           <div class="loop-header">
               <img src="${item.image || ''}" alt="${item.name}" class="loop-thumbnail" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 60 60\"%3E%3Crect width=\"60\" height=\"60\" fill=\"%23333\"/%3E%3C/svg%3E'">
               <div class="loop-details">
-                  ${isLoop ? `<div class="loop-custom-name" contenteditable="true" onblur="updatePlaylistItemName('${playlist.id}', ${index}, this)" onclick="selectAllText(this)" title="Click to edit name">${customName || 'Untitled Loop'}</div>` : ''}
+                  ${isLoop ? `<div class="loop-custom-name">${customName || 'Untitled Loop'}</div>` : ''}
                   <div class="loop-track-name">${item.name}</div>
                   <div class="loop-artist">${item.artist}</div>
               </div>
@@ -6123,12 +6123,20 @@ function renderPlaylistItemsAsCards(playlist) {
               <div class="edit-grid">
                   ${isLoop ? `
                   <div class="edit-field">
+                      <label class="edit-label">Loop Name</label>
+                      <input type="text" class="edit-input" id="edit-name-${playlist.id}-${index}" value="${customName || ''}" placeholder="Enter custom name">
+                  </div>
+                  <div class="edit-field">
                       <label class="edit-label">Start Time</label>
                       <input type="text" class="edit-input" id="edit-start-${playlist.id}-${index}" value="${formatTime(item.start)}">
                   </div>
                   <div class="edit-field">
                       <label class="edit-label">End Time</label>
                       <input type="text" class="edit-input" id="edit-end-${playlist.id}-${index}" value="${formatTime(item.end)}">
+                  </div>
+                  <div class="edit-field">
+                      <label class="edit-label">Repeat Count</label>
+                      <input type="number" class="edit-input" id="edit-repeat-${playlist.id}-${index}" value="${item.playCount}" min="1" max="99">
                   </div>
                   ` : ''}
                   <div class="edit-field">
@@ -6362,44 +6370,6 @@ function updatePlaylistName(playlistId, element) {
   element.contentEditable = false;
 }
 
-function updatePlaylistItemName(playlistId, itemIndex, element) {
-  const playlist = savedPlaylists.find(p => p.id === playlistId);
-  if (!playlist || !playlist.items[itemIndex]) return;
-
-  const newName = element.textContent.trim();
-  const item = playlist.items[itemIndex];
-  
-  if (newName && item.type === 'loop') {
-      // Update the playlist item's custom name
-      item.customName = newName;
-      
-      // Also update the saved loop if it exists
-      if (item.id) {
-          const savedLoop = savedLoops.find(l => l.id === item.id);
-          if (savedLoop) {
-              savedLoop.name = newName;
-              saveLoopsToStorage();
-          }
-      }
-      
-      playlist.updatedAt = new Date().toISOString();
-      savePlaylistsToStorage();
-      showStatus(`✅ Renamed loop to "${newName}"`);
-  } else if (!newName) {
-      // Restore original name if empty
-      element.textContent = item.customName || 'Untitled Loop';
-  }
-}
-
-function selectAllText(element) {
-  if (window.getSelection && document.createRange) {
-      const range = document.createRange();
-      range.selectNodeContents(element);
-      const selection = window.getSelection();
-      selection.removeAllRanges();
-      selection.addRange(range);
-  }
-}
 
 function editPlaylist(playlistId) {
   // Switch to tracklist view mode and show the playlist items
@@ -6446,22 +6416,27 @@ function updatePlaylistItem(playlistId, itemIndex) {
   const newPlayCount = parseInt(document.getElementById(`edit-playcount-${playlistId}-${itemIndex}`).value);
   
   if (isLoop) {
-      // Update loop times
+      // Update loop name, times, and repeat count
+      const newName = document.getElementById(`edit-name-${playlistId}-${itemIndex}`).value.trim();
       const newStart = parseTimeInput(document.getElementById(`edit-start-${playlistId}-${itemIndex}`).value);
       const newEnd = parseTimeInput(document.getElementById(`edit-end-${playlistId}-${itemIndex}`).value);
+      const newRepeat = parseInt(document.getElementById(`edit-repeat-${playlistId}-${itemIndex}`).value);
       
-      if (newStart >= 0 && newEnd > newStart && newPlayCount >= 1 && newPlayCount <= 99) {
+      if (newStart >= 0 && newEnd > newStart && newRepeat >= 1 && newRepeat <= 99 && newPlayCount >= 1 && newPlayCount <= 99) {
+          // Update playlist item
+          item.customName = newName || null;
           item.start = newStart;
           item.end = newEnd;
-          item.playCount = newPlayCount;
+          item.playCount = newRepeat;  // Use repeat count for loops
           
-          // If it's updating the original loop, save it
+          // Sync with original saved loop if it exists
           const savedLoop = savedLoops.find(l => l.id === item.id);
           if (savedLoop) {
+              savedLoop.name = newName || null;
               savedLoop.loop.start = newStart;
               savedLoop.loop.end = newEnd;
-              savedLoop.loop.repeat = newPlayCount;
-              saveLooopsToStorage();
+              savedLoop.loop.repeat = newRepeat;
+              saveLoopsToStorage();
           }
       } else {
           showStatus('❌ Invalid values');
@@ -6484,6 +6459,11 @@ function updatePlaylistItem(playlistId, itemIndex) {
   if (itemsContainer) {
       itemsContainer.innerHTML = renderPlaylistItems(playlist);
       setupPlaylistDragAndDrop(playlistId); // Re-setup drag and drop
+  }
+  
+  // Refresh library view if open to sync changes back to "My Moments"
+  if (currentView === 'library') {
+      renderLibrary();
   }
   
   showStatus('✅ Item updated!');
