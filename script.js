@@ -88,6 +88,35 @@ function setupMediaSession() {
         if (spotifyPlayer) {
             console.log('📱 Window focused');
             
+            // Debug info for phone
+            showStatus(`🔍 Focus: PL=${isPlaylistMode ? 'Y' : 'N'} IDX=${currentPlaylistIndex || 'null'} ENG=${playlistEngine ? 'Y' : 'N'}`);
+            
+            // Check if playlist state was lost
+            if (isPlaylistMode && (!currentPlaylist || !playlistEngine)) {
+                showStatus('⚠️ Playlist state lost - attempting recovery');
+                
+                // Try to recover from saved state
+                const savedPlaylistState = localStorage.getItem('active_playlist_state');
+                if (savedPlaylistState) {
+                    try {
+                        const state = JSON.parse(savedPlaylistState);
+                        currentPlaylist = savedPlaylists.find(p => p.id === state.playlistId);
+                        currentPlaylistIndex = state.index || 0;
+                        
+                        if (currentPlaylist) {
+                            showStatus('✅ Playlist recovered');
+                            // Reinitialize playlist engine
+                            if (!playlistEngine) {
+                                playlistEngine = new PlaylistEngine();
+                                appState.set('playlist.engine', playlistEngine);
+                            }
+                        }
+                    } catch (e) {
+                        showStatus('❌ Recovery failed');
+                    }
+                }
+            }
+            
             // Quick check if we lost track info
             if (!currentTrack && isConnected) {
                 try {
@@ -5901,6 +5930,13 @@ async function playPlaylist(playlistId, startIndex = 0) {
       isPlaylistMode = true;
       currentPlaylist = playlist;
       currentPlaylistIndex = startIndex;
+      
+      // Save playlist state for recovery
+      localStorage.setItem('active_playlist_state', JSON.stringify({
+          playlistId: playlist.id,
+          index: startIndex,
+          timestamp: Date.now()
+      }));
 
       // Load playlist into engine
       await playlistEngine.loadPlaylist(playlist, startIndex);
@@ -5923,6 +5959,9 @@ function stopPlaylistMode() {
   isPlaylistMode = false;
   currentPlaylist = null;
   currentPlaylistIndex = 0;
+  
+  // Clear saved state
+  localStorage.removeItem('active_playlist_state');
 
   if (playlistEngine) {
       playlistEngine.stopPlaylist();
