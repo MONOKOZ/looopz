@@ -3620,7 +3620,10 @@ class PlaylistTransitionEngine {
         );
 
         for (const item of upcomingItems) {
-            const trackId = this.extractTrackId(item.type === 'loop' ? item.trackUri : item.uri);
+            const resolvedItem = resolvePlaylistItem(item);
+            if (!resolvedItem) continue;
+            
+            const trackId = this.extractTrackId(resolvedItem.type === 'loop' ? resolvedItem.trackUri : resolvedItem.uri);
             if (trackId) {
                 // Fetch analysis and features in background (fire and forget)
                 getAudioAnalysis(trackId).catch(() => {});
@@ -3638,9 +3641,17 @@ class PlaylistTransitionEngine {
         try {
             const fromItem = this.currentPlaylist.items[fromIndex];
             const toItem = this.currentPlaylist.items[toIndex];
+            
+            const resolvedFromItem = resolvePlaylistItem(fromItem);
+            const resolvedToItem = resolvePlaylistItem(toItem);
+            
+            if (!resolvedFromItem || !resolvedToItem) {
+                console.log('📊 [SMART TRANSITION] Could not resolve items, using basic transition');
+                return;
+            }
 
-            const fromTrackId = this.extractTrackId(fromItem.type === 'loop' ? fromItem.trackUri : fromItem.uri);
-            const toTrackId = this.extractTrackId(toItem.type === 'loop' ? toItem.trackUri : toItem.uri);
+            const fromTrackId = this.extractTrackId(resolvedFromItem.type === 'loop' ? resolvedFromItem.trackUri : resolvedFromItem.uri);
+            const toTrackId = this.extractTrackId(resolvedToItem.type === 'loop' ? resolvedToItem.trackUri : resolvedToItem.uri);
 
             if (!fromTrackId || !toTrackId) return;
 
@@ -3664,15 +3675,15 @@ class PlaylistTransitionEngine {
                 const transitionQuality = assessTransitionQuality(fromFeatures, toFeatures);
 
                 // Calculate beat-aligned points
-                const fromEndTime = fromItem.type === 'loop' ? fromItem.end : fromItem.duration;
-                const toStartTime = toItem.type === 'loop' ? toItem.start : 0;
+                const fromEndTime = resolvedFromItem.type === 'loop' ? resolvedFromItem.end : resolvedFromItem.duration;
+                const toStartTime = resolvedToItem.type === 'loop' ? resolvedToItem.start : 0;
 
                 const optimalFromEnd = findBeatAlignedEndPoint(fromAnalysis, fromEndTime);
                 const optimalToStart = findBeatAlignedStartPoint(toAnalysis, toStartTime);
 
                 this.currentTransitionData = {
-                    fromItem,
-                    toItem,
+                    fromItem: resolvedFromItem,
+                    toItem: resolvedToItem,
                     fromEndTime: optimalFromEnd,
                     toStartTime: optimalToStart,
                     crossfadeDuration,
@@ -3977,12 +3988,20 @@ class PlaylistTransitionEngine {
         }
 
         const item = this.currentPlaylist.items[itemIndex];
-        console.log('🔄 Loading playlist item:', item);
+        const resolvedItem = resolvePlaylistItem(item);
+        
+        if (!resolvedItem) {
+            console.error('❌ Could not resolve playlist item:', item);
+            await this.skipToNext();
+            return;
+        }
+        
+        console.log('🔄 Loading playlist item:', resolvedItem);
 
         try {
             // Reset loop state
             this.currentLoopCount = 0;
-            this.currentLoopTarget = item.playCount || 1;
+            this.currentLoopTarget = resolvedItem.playCount || 1;
             this.loopStartTime = Date.now();
             
             // Reset seamless transition state for new track
@@ -3992,21 +4011,21 @@ class PlaylistTransitionEngine {
             console.log('🎵 [TRANSITION] Using basic transition to avoid API calls');
 
             // Load track into Spotify
-            const startPosition = item.type === 'loop' ? item.start * 1000 : 0;
+            const startPosition = resolvedItem.type === 'loop' ? resolvedItem.start * 1000 : 0;
             const trackData = {
-                uri: item.type === 'loop' ? item.trackUri : item.uri,
-                name: item.name || 'Unknown Track',
-                artist: item.artist || 'Unknown Artist',
-                duration: item.duration || 180,
-                image: item.image || ''
+                uri: resolvedItem.type === 'loop' ? resolvedItem.trackUri : resolvedItem.uri,
+                name: resolvedItem.name || 'Unknown Track',
+                artist: resolvedItem.artist || 'Unknown Artist',
+                duration: resolvedItem.duration || 180,
+                image: resolvedItem.image || ''
             };
 
             // Set up loop parameters BEFORE loading track if this is a loop item
-            if (item.type === 'loop') {
-                this.setupLoopItem(item);
+            if (resolvedItem.type === 'loop') {
+                this.setupLoopItem(resolvedItem);
             }
 
-            const loadSuccess = await loadTrackSafely(trackData, startPosition, item.type === 'loop');
+            const loadSuccess = await loadTrackSafely(trackData, startPosition, resolvedItem.type === 'loop');
             if (!loadSuccess) {
                 console.log('🚫 Playlist item load cancelled or failed');
                 return; // Exit early if load was cancelled
@@ -4038,7 +4057,7 @@ class PlaylistTransitionEngine {
 
             // Notify UI of track change
             if (this.onItemChange) {
-                this.onItemChange(item, itemIndex);
+                this.onItemChange(resolvedItem, itemIndex);
             }
 
             console.log('✅ Playlist item loaded');
@@ -6207,9 +6226,15 @@ function renderPlaylistItemsAsCards(playlist) {
   }
 
   return playlist.items.map((item, index) => {
-      const isLoop = item.type === 'loop';
-      const savedLoop = isLoop ? savedLoops.find(l => l.id === item.id) : null;
-      const customName = item.customName || savedLoop?.name;
+      // Use resolvePlaylistItem to get the effective item data
+      const resolvedItem = resolvePlaylistItem(item);
+      if (!resolvedItem) {
+          console.warn('⚠️ Could not resolve playlist item:', item);
+          return '';
+      }
+      
+      const isLoop = resolvedItem.type === 'loop';
+      const customName = resolvedItem.customName;
       
       return `
       <div class="saved-loop playlist-item" data-playlist-id="${playlist.id}" data-item-index="${index}" draggable="true">
@@ -6224,11 +6249,11 @@ function renderPlaylistItemsAsCards(playlist) {
               </svg>
           </div>
           <div class="loop-header">
-              <img src="${item.image || ''}" alt="${item.name}" class="loop-thumbnail" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 60 60\"%3E%3Crect width=\"60\" height=\"60\" fill=\"%23333\"/%3E%3C/svg%3E'">
+              <img src="${resolvedItem.image || ''}" alt="${resolvedItem.name}" class="loop-thumbnail" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 60 60\"%3E%3Crect width=\"60\" height=\"60\" fill=\"%23333\"/%3E%3C/svg%3E'">
               <div class="loop-details">
                   ${isLoop ? `<div class="loop-custom-name">${customName || 'Untitled Loop'}</div>` : ''}
-                  <div class="loop-track-name">${item.name}</div>
-                  <div class="loop-artist">${item.artist}</div>
+                  <div class="loop-track-name">${resolvedItem.name}</div>
+                  <div class="loop-artist">${resolvedItem.artist}</div>
               </div>
           </div>
 
@@ -6237,14 +6262,14 @@ function renderPlaylistItemsAsCards(playlist) {
                   <span class="loop-stat-icon">
                       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-clock"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                   </span>
-                  <span>${isLoop ? `${formatTime(item.start, false)} - ${formatTime(item.end, false)}` : `Full: ${formatTime(item.duration, false)}`}</span>
+                  <span>${isLoop ? `${formatTime(resolvedItem.start, false)} - ${formatTime(resolvedItem.end, false)}` : `Full: ${formatTime(resolvedItem.duration, false)}`}</span>
               </div>
               ${isLoop ? `
               <div class="loop-stat">
                   <span class="loop-stat-icon">
                       <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-repeat"><polyline points="17 1 21 5 17 9"></polyline><path d="M3 11V9a4 4 0 0 1 4-4h14"></path><polyline points="7 23 3 19 7 15"></polyline><path d="M21 13v2a4 4 0 0 1-4 4H3"></path></svg>
                   </span>
-                  <span>${item.playCount}×</span>
+                  <span>${resolvedItem.playCount}×</span>
               </div>
               ` : ''}
               <div class="loop-stat">
@@ -6256,7 +6281,7 @@ function renderPlaylistItemsAsCards(playlist) {
           <div class="loop-actions">
               <button class="loop-action-btn load-playlist-item-btn" data-playlist-id="${playlist.id}" data-item-index="${index}">Load</button>
               <button class="loop-action-btn edit-playlist-item-btn" data-playlist-id="${playlist.id}" data-item-index="${index}">Edit</button>
-              <button class="loop-action-btn share-btn" data-item='${JSON.stringify(item).replace(/'/g, '&apos;')}'>Share</button>
+              <button class="loop-action-btn share-btn" data-item='${JSON.stringify(resolvedItem).replace(/'/g, '&apos;')}'>Share</button>
           </div>
 
           <div class="loop-edit-form" id="edit-playlist-item-${playlist.id}-${index}">
@@ -6268,20 +6293,20 @@ function renderPlaylistItemsAsCards(playlist) {
                   </div>
                   <div class="edit-field">
                       <label class="edit-label">Start Time</label>
-                      <input type="text" class="edit-input" id="edit-start-${playlist.id}-${index}" value="${formatTime(item.start)}">
+                      <input type="text" class="edit-input" id="edit-start-${playlist.id}-${index}" value="${formatTime(resolvedItem.start)}">
                   </div>
                   <div class="edit-field">
                       <label class="edit-label">End Time</label>
-                      <input type="text" class="edit-input" id="edit-end-${playlist.id}-${index}" value="${formatTime(item.end)}">
+                      <input type="text" class="edit-input" id="edit-end-${playlist.id}-${index}" value="${formatTime(resolvedItem.end)}">
                   </div>
                   <div class="edit-field">
                       <label class="edit-label">Repeat Count</label>
-                      <input type="number" class="edit-input" id="edit-repeat-${playlist.id}-${index}" value="${item.playCount}" min="1" max="99">
+                      <input type="number" class="edit-input" id="edit-repeat-${playlist.id}-${index}" value="${resolvedItem.playCount}" min="1" max="99">
                   </div>
                   ` : `
                   <div class="edit-field">
                       <label class="edit-label">Play Count</label>
-                      <input type="number" class="edit-input" id="edit-playcount-${playlist.id}-${index}" value="${item.playCount}" min="1" max="99">
+                      <input type="number" class="edit-input" id="edit-playcount-${playlist.id}-${index}" value="${resolvedItem.playCount}" min="1" max="99">
                   </div>
                   `}
               </div>
@@ -6397,9 +6422,10 @@ function renderPlaylistsOverview() {
     const isCurrentlyPlaying = isPlaylistMode && currentPlaylist && playlist.id === currentPlaylist.id;
     
     // Find first item (track or loop) with an album cover
-    // Loops store their track's album art in the image property too
+    // Use resolvePlaylistItem to properly handle both tracks and loops
     const firstTrackCover = playlist.items
-      .find(item => (item.type === 'track' || item.type === 'loop') && item.image)?.image;
+      .map(item => resolvePlaylistItem(item))
+      .find(resolvedItem => resolvedItem && (resolvedItem.type === 'track' || resolvedItem.type === 'loop') && resolvedItem.image)?.image;
     
     return `
       <div class="playlist-card ${isCurrentlyPlaying ? 'currently-playing' : ''}" data-playlist-id="${playlist.id}">
@@ -6551,8 +6577,15 @@ function updatePlaylistItem(playlistId, itemIndex) {
   if (!playlist || !playlist.items[itemIndex]) return;
 
   const item = playlist.items[itemIndex];
-  const isLoop = item.type === 'loop';
-  let newName = ''; // Declare newName outside the if block so it's accessible throughout
+  const resolvedItem = resolvePlaylistItem(item);
+  
+  if (!resolvedItem) {
+      showStatus('❌ Could not resolve playlist item');
+      return;
+  }
+  
+  const isLoop = resolvedItem.type === 'loop';
+  let newName = '';
 
   if (isLoop) {
       // Update loop name, times, and repeat count
@@ -6562,31 +6595,36 @@ function updatePlaylistItem(playlistId, itemIndex) {
       const newRepeat = parseInt(document.getElementById(`edit-repeat-${playlistId}-${itemIndex}`).value);
       
       if (newStart >= 0 && newEnd > newStart && newRepeat >= 1 && newRepeat <= 99) {
-          // Update playlist item
-          item.customName = newName || null;
-          item.start = newStart;
-          item.end = newEnd;
-          item.playCount = newRepeat;
-          
-          // Sync with original saved loop if it exists
-          const savedLoop = savedLoops.find(l => l.id === item.id);
-          console.log('🔍 Update debug:', {
-              itemId: item.id,
-              savedLoopsCount: savedLoops.length,
-              savedLoop: savedLoop,
-              allSavedLoopIds: savedLoops.map(l => l.id),
-              savedLoopCustomName: savedLoop?.customName
-          });
+          // Find the original saved loop
+          const savedLoop = savedLoops.find(l => l.id === item.savedLoopId);
           
           if (savedLoop) {
-              console.log('✅ Updating saved loop:', savedLoop.customName, '->', newName);
-              savedLoop.customName = newName || null;
+              console.log('✅ Updating saved loop:', savedLoop.name, '->', newName);
+              
+              // Update the original saved loop (source of truth)
+              savedLoop.name = newName || null;
               savedLoop.loop.start = newStart;
               savedLoop.loop.end = newEnd;
               savedLoop.loop.repeat = newRepeat;
               localStorage.setItem('looopz_saved_loops', JSON.stringify(savedLoops));
+              
+              // Update playlist item overrides only if different from original
+              if (!item.overrides) item.overrides = {};
+              
+              // Only store overrides if they're different from the original
+              item.overrides.customName = (newName !== savedLoop.name) ? newName : null;
+              item.overrides.playCount = (newRepeat !== savedLoop.loop.repeat) ? newRepeat : null;
+              
+              // Clean up null overrides
+              if (!item.overrides.customName && !item.overrides.playCount) {
+                  item.overrides = {};
+              }
+              
+              newName = newName || savedLoop.name || 'Untitled Loop';
           } else {
-              console.log('❌ No saved loop found with ID:', item.id);
+              console.log('❌ No saved loop found with ID:', item.savedLoopId);
+              showStatus('❌ Referenced loop not found');
+              return;
           }
       } else {
           showStatus('❌ Invalid values');
@@ -6601,8 +6639,7 @@ function updatePlaylistItem(playlistId, itemIndex) {
           showStatus('❌ Invalid play count');
           return;
       }
-      // For non-loop items, use the original track name
-      newName = item.name || 'Untitled Track';
+      newName = resolvedItem.name || 'Untitled Track';
   }
 
   savePlaylistsToStorage();
@@ -6619,7 +6656,7 @@ function updatePlaylistItem(playlistId, itemIndex) {
   // Refresh library view if open to sync changes back to "My Moments"  
   if (currentView === 'library') {
       console.log('🔄 Refreshing library view after update');
-      renderLibrary();
+      renderLoopsList();
   } else {
       console.log('📝 Library not current view, will refresh when switched');
   }
@@ -6649,7 +6686,15 @@ async function loadPlaylistItem(playlistId, itemIndex) {
   }
 
   const item = playlist.items[itemIndex];
-  console.log('🎵 Loading individual playlist item:', item);
+  const resolvedItem = resolvePlaylistItem(item);
+  
+  if (!resolvedItem) {
+      console.error('❌ Could not resolve playlist item:', item);
+      showStatus('❌ Could not load playlist item');
+      return;
+  }
+  
+  console.log('🎵 Loading individual playlist item:', resolvedItem);
   
   try {
       showStatus('🔄 Loading individual playlist item...');
@@ -6674,21 +6719,21 @@ async function loadPlaylistItem(playlistId, itemIndex) {
           appState.set('playlist.isActive', false);
       }
 
-      if (item.type === 'loop') {
+      if (resolvedItem.type === 'loop') {
           // Load as a saved loop
           const trackData = {
-              uri: item.trackUri || item.uri, // Fix: use correct URI field
-              name: item.name,
-              artist: item.artist,
-              duration: item.duration,
-              image: item.image || ''
+              uri: resolvedItem.trackUri || resolvedItem.uri,
+              name: resolvedItem.name,
+              artist: resolvedItem.artist,
+              duration: resolvedItem.duration,
+              image: resolvedItem.image || ''
           };
 
           // Set loop state using unified function BEFORE loading track
           updateLoopState({
-              start: item.start,
-              end: item.end,
-              target: item.playCount,
+              start: resolvedItem.start,
+              end: resolvedItem.end,
+              target: resolvedItem.playCount,
               enabled: true,
               count: 0,
               startTime: Date.now()
@@ -6699,7 +6744,7 @@ async function loadPlaylistItem(playlistId, itemIndex) {
           });
 
           // Load track with preserved loop points
-          const loadSuccess = await loadTrackSafely(trackData, item.start * 1000, true);
+          const loadSuccess = await loadTrackSafely(trackData, resolvedItem.start * 1000, true);
           if (!loadSuccess) {
               console.log('🚫 Individual playlist item load cancelled or failed');
               return;
@@ -6712,16 +6757,16 @@ async function loadPlaylistItem(playlistId, itemIndex) {
           startProgressUpdates();
 
           showView('player');
-          showStatus(`✅ Loaded: ${item.name} (${item.playCount}×)`);
+          showStatus(`✅ Loaded: ${resolvedItem.name} (${resolvedItem.playCount}×)`);
           
       } else {
           // Load full track - use same pattern as individual track loading
           const trackData = {
-              uri: item.uri,
-              name: item.name,
-              artist: item.artist,
-              duration: item.duration,
-              image: item.image || ''
+              uri: resolvedItem.uri,
+              name: resolvedItem.name,
+              artist: resolvedItem.artist,
+              duration: resolvedItem.duration,
+              image: resolvedItem.image || ''
           };
 
           const loadSuccess = await loadTrackSafely(trackData, 0, false);
@@ -6737,7 +6782,7 @@ async function loadPlaylistItem(playlistId, itemIndex) {
           startProgressUpdates();
 
           showView('player');
-          showStatus(`✅ Loaded: ${item.name}`);
+          showStatus(`✅ Loaded: ${resolvedItem.name}`);
       }
       
   } catch (error) {
@@ -7269,18 +7314,37 @@ async function addCurrentToPlaylist() {
 
   // Create pending item based on current state
   if (loopEnabled) {
+      // For loops, first save the loop to create a proper reference
+      const tempLoop = {
+          id: `temp_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+          name: null, // Will show "Untitled Loop" until named
+          track: {
+              uri: currentTrack.uri,
+              name: currentTrack.name,
+              artist: currentTrack.artist,
+              duration: currentTrack.duration,
+              image: currentTrack.image
+          },
+          loop: {
+              start: loopStart,
+              end: loopEnd,
+              repeat: loopTarget
+          },
+          savedAt: new Date().toISOString(),
+          playCount: 0
+      };
+      
+      // Add to savedLoops temporarily for the reference system
+      savedLoops.push(tempLoop);
+      localStorage.setItem('looopz_saved_loops', JSON.stringify(savedLoops));
+      
       appState.set('playlist.pendingItem', {
           type: 'loop',
-          id: `temp_${Date.now()}`, // Temporary ID for unsaved loops
-          trackUri: currentTrack.uri,
-          name: currentTrack.name,
-          customName: null, // Will show "Untitled Loop" until named
-          artist: currentTrack.artist,
-          duration: currentTrack.duration,
-          image: currentTrack.image,
-          start: loopStart,
-          end: loopEnd,
-          playCount: loopTarget
+          savedLoopId: tempLoop.id,
+          overrides: {
+              customName: null,  // No override, use original loop name
+              playCount: null    // No override, use original loop repeat count
+          }
       });
   } else {
       appState.set('playlist.pendingItem', {
@@ -7297,6 +7361,39 @@ async function addCurrentToPlaylist() {
   showAddToPlaylistPopup();
 }
 
+// Helper function to resolve playlist item data from reference-based structure
+function resolvePlaylistItem(item) {
+    if (item.type === 'track') {
+        // For tracks, return the item data directly (no reference needed)
+        return item;
+    }
+    
+    if (item.type === 'loop') {
+        // For loops, merge savedLoop data with overrides
+        const savedLoop = savedLoops.find(l => l.id === item.savedLoopId);
+        if (!savedLoop) {
+            console.warn('⚠️ Referenced savedLoop not found:', item.savedLoopId);
+            return null;
+        }
+        
+        return {
+            type: 'loop',
+            id: savedLoop.id,
+            trackUri: savedLoop.track.uri,
+            name: savedLoop.track.name,
+            customName: item.overrides?.customName || savedLoop.name,
+            artist: savedLoop.track.artist,
+            duration: savedLoop.track.duration,
+            image: savedLoop.track.image,
+            start: savedLoop.loop.start,
+            end: savedLoop.loop.end,
+            playCount: item.overrides?.playCount || savedLoop.loop.repeat
+        };
+    }
+    
+    return null;
+}
+
 // Add saved loop to playlist
 function addLoopToPlaylist(loopId) {
   const loop = savedLoops.find(l => l.id === loopId);
@@ -7304,16 +7401,11 @@ function addLoopToPlaylist(loopId) {
 
   appState.set('playlist.pendingItem', {
       type: 'loop',
-      id: loop.id,
-      trackUri: loop.track.uri,
-      name: loop.track.name,
-      customName: loop.name,
-      artist: loop.track.artist,
-      duration: loop.track.duration,
-      image: loop.track.image,
-      start: loop.loop.start,
-      end: loop.loop.end,
-      playCount: loop.loop.repeat
+      savedLoopId: loop.id,
+      overrides: {
+          customName: null,  // No override, use original loop name
+          playCount: null    // No override, use original loop repeat count
+      }
   });
 
   showAddToPlaylistPopup();
