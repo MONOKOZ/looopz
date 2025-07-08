@@ -7883,6 +7883,12 @@ function setupEventListeners() {
   document.addEventListener('click', async (e) => {
       const target = e.target;
 
+      // Prevent errors when target is null
+      if (!target) {
+          console.warn('Click event target is null, ignoring');
+          return;
+      }
+
       try {
           // Playback controls
           if (target.matches('#play-pause-btn')) {
