@@ -6194,9 +6194,7 @@ function renderPlaylistEditView(playlist) {
         </div>
       </div>
       
-      <div class="playlist-items-scroll" id="playlist-items-scroll">
-        ${renderPlaylistItemsAsCards(playlist)}
-      </div>
+      ${renderPlaylistItemsAsCards(playlist)}
     </div>
   `;
   
@@ -6776,7 +6774,7 @@ function savePlaylistItemAsNew(playlistId, itemIndex) {
 
 // Working drag and drop implementation based on research
 function setupPlaylistDragAndDrop(playlistId) {
-  const container = document.getElementById('playlist-items-scroll');
+  const container = document.querySelector('.playlist-edit-view');
   if (!container) return;
 
   // Destroy existing Sortable instance if it exists
@@ -6802,16 +6800,18 @@ function setupPlaylistDragAndDrop(playlistId) {
     
     // Auto-scroll acceleration
     scrollFn: function(offsetX, offsetY, originalEvent, touchEvt, hoverTargetEl) {
-      const container = document.getElementById('playlist-items-scroll');
+      const container = document.querySelector('.playlist-edit-view');
       if (!container) return;
       
       // Get container bounds
       const rect = container.getBoundingClientRect();
+      const header = container.querySelector('.playlist-edit-header');
+      const headerHeight = header ? header.offsetHeight : 60;
       const scrollZone = 120; // Larger scroll zone
       const maxSpeed = 15; // Maximum scroll speed per frame
       
-      // Calculate distance from edges
-      const distanceFromTop = originalEvent.clientY - rect.top;
+      // Calculate distance from edges (accounting for header)
+      const distanceFromTop = originalEvent.clientY - (rect.top + headerHeight);
       const distanceFromBottom = rect.bottom - originalEvent.clientY;
       
       let scrollDelta = 0;
