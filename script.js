@@ -6204,10 +6204,8 @@ function renderPlaylistEditView(playlist) {
         </div>
       </div>
       
-      <div class="playlist-items-wrapper">
-        <div class="playlist-items-scroll-container" id="playlist-items-container">
-          ${renderPlaylistItemsAsCards(playlist)}
-        </div>
+      <div class="playlist-items-container" id="playlist-items-container">
+        ${renderPlaylistItemsAsCards(playlist)}
       </div>
     </div>
   `;
