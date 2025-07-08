@@ -6791,7 +6791,7 @@ function setupPlaylistDragAndDrop(playlistId) {
     
     // Auto-scroll configuration with larger sensitivity
     scroll: true,
-    scrollSensitivity: 120, // Larger trigger zone (120px from edges)
+    scrollSensitivity: 150, // Larger trigger zone (120px from edges)
     scrollSpeed: 10, // Default scroll speed
     bubbleScroll: true, // Allow bubble scrolling
     
