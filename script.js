@@ -6789,11 +6789,11 @@ function setupPlaylistDragAndDrop(playlistId) {
     chosenClass: 'sortable-chosen',
     dragClass: 'sortable-drag',
     
-    // Use SortableJS default auto-scroll behavior
-    scroll: true,
-    scrollSensitivity: 30, // Start scrolling within 30px of edges (default)
-    scrollSpeed: 10, // Moderate scroll speed for better control
-    bubbleScroll: true, // Allow scrolling in parent containers
+    // Use window scroll with larger sensitivity area
+    scroll: window,
+    scrollSensitivity: 150, // Much larger trigger zone (150px from edges)
+    scrollSpeed: 15, // Slightly faster scroll speed
+    bubbleScroll: false, // Don't bubble since we're using window
     
     // Force touch behavior for consistent experience across devices
     forceFallback: true, // Always use fallback for consistent behavior
