@@ -6927,8 +6927,13 @@ function setupPlaylistDragAndDrop(playlistId) {
     touchStartY = e.touches[0].clientY;
     touchItem = item;
     touchMoved = false;
-    item.style.transform = 'scale(1.02)';
+    item.style.transform = 'scale(1.05) rotate(2deg)';
     item.classList.add('touch-dragging');
+    
+    // Add haptic feedback if available
+    if (navigator.vibrate) {
+      navigator.vibrate(10);
+    }
   }, { passive: true });
   
   container.addEventListener('touchmove', (e) => {
@@ -6937,14 +6942,14 @@ function setupPlaylistDragAndDrop(playlistId) {
     const touchY = e.touches[0].clientY;
     const deltaY = touchY - touchStartY;
     
-    // Lower threshold for better responsiveness
-    if (Math.abs(deltaY) > 15) {
+    // Higher threshold to prevent accidental drags
+    if (Math.abs(deltaY) > 35) {
       e.preventDefault();
       touchMoved = true;
       
-      // Gentler throttling
+      // Smoother throttling for better control
       const now = Date.now();
-      if (now - lastTouchMove < 50) return;
+      if (now - lastTouchMove < 25) return;
       lastTouchMove = now;
       
       // Find the item to swap with
@@ -6959,7 +6964,7 @@ function setupPlaylistDragAndDrop(playlistId) {
         } else {
           container.insertBefore(touchItem, targetItem);
         }
-        touchStartY = touchY; // Reset position after move
+        // Don't reset position - maintain continuous tracking
       }
     }
   }, { passive: false });
