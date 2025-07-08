@@ -6180,21 +6180,20 @@ function renderPlaylistsList() {
 
 function renderPlaylistEditView(playlist) {
   const html = `
-    <div class="playlist-edit-view">
-      <div class="playlist-edit-header">
+    <div class="card">
+      <h2 class="card-title">
         <button class="back-btn" id="playlist-edit-back-btn">
           <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-arrow-left">
             <line x1="19" y1="12" x2="5" y2="12"></line>
             <polyline points="12 19 5 12 12 5"></polyline>
           </svg>
         </button>
-        <div class="playlist-edit-info">
-          <h2>${playlist.name}</h2>
-          <p>${playlist.items.length} items • ${formatTime(playlist.totalDuration, false)}</p>
-        </div>
+        <span>${playlist.name}</span>
+        <span style="font-size: 14px; opacity: 0.7;">${playlist.items.length} items • ${formatTime(playlist.totalDuration, false)}</span>
+      </h2>
+      <div id="playlist-items-list">
+        ${renderPlaylistItemsAsCards(playlist)}
       </div>
-      
-      ${renderPlaylistItemsAsCards(playlist)}
     </div>
   `;
   
@@ -6774,7 +6773,7 @@ function savePlaylistItemAsNew(playlistId, itemIndex) {
 
 // Working drag and drop implementation based on research
 function setupPlaylistDragAndDrop(playlistId) {
-  const container = document.querySelector('.playlist-edit-view');
+  const container = document.getElementById('playlist-items-list');
   if (!container) return;
 
   // Destroy existing Sortable instance if it exists
@@ -6800,7 +6799,7 @@ function setupPlaylistDragAndDrop(playlistId) {
     
     // Auto-scroll acceleration
     scrollFn: function(offsetX, offsetY, originalEvent, touchEvt, hoverTargetEl) {
-      const container = document.querySelector('.playlist-edit-view');
+      const container = document.getElementById('playlist-items-list');
       if (!container) return;
       
       // Get container bounds
