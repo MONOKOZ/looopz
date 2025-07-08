@@ -6574,7 +6574,7 @@ function updatePlaylistItem(playlistId, itemIndex) {
               savedLoop.loop.start = newStart;
               savedLoop.loop.end = newEnd;
               savedLoop.loop.repeat = newRepeat;
-              saveLoopsToStorage();
+              localStorage.setItem('looopz_saved_loops', JSON.stringify(savedLoops));
           }
       } else {
           showStatus('❌ Invalid values');
