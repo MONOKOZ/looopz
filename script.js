@@ -6809,10 +6809,44 @@ function setupPlaylistDragAndDrop(playlistId) {
     forceFallback: false, // Use native HTML5 on desktop, touch fallback on mobile
     fallbackTolerance: 10, // Tolerance for mobile touch
     
-    // Enhanced mobile touch experience
+    // Enhanced auto-scroll for long playlists
     scroll: true,
-    scrollSensitivity: 30,
-    scrollSpeed: 25,
+    scrollSensitivity: 100, // Trigger scrolling when within 100px of edge
+    scrollSpeed: 50, // Faster scroll speed
+    bubbleScroll: true, // Allow scrolling in nested containers
+    
+    // Auto-scroll acceleration
+    scrollFn: function(offsetX, offsetY, originalEvent, touchEvt, hoverTargetEl) {
+      const container = document.getElementById('playlist-items-container');
+      if (!container) return;
+      
+      // Get container bounds
+      const rect = container.getBoundingClientRect();
+      const scrollZone = 120; // Larger scroll zone
+      const maxSpeed = 15; // Maximum scroll speed per frame
+      
+      // Calculate distance from edges
+      const distanceFromTop = originalEvent.clientY - rect.top;
+      const distanceFromBottom = rect.bottom - originalEvent.clientY;
+      
+      let scrollDelta = 0;
+      
+      // Scroll up when near top
+      if (distanceFromTop < scrollZone && container.scrollTop > 0) {
+        const intensity = Math.max(0, (scrollZone - distanceFromTop) / scrollZone);
+        scrollDelta = -maxSpeed * intensity;
+      }
+      // Scroll down when near bottom  
+      else if (distanceFromBottom < scrollZone && 
+               container.scrollTop < container.scrollHeight - container.clientHeight) {
+        const intensity = Math.max(0, (scrollZone - distanceFromBottom) / scrollZone);
+        scrollDelta = maxSpeed * intensity;
+      }
+      
+      if (scrollDelta !== 0) {
+        container.scrollTop += scrollDelta;
+      }
+    },
     
     // Prevent conflicts with other gestures
     preventOnFilter: false,
@@ -6825,6 +6859,9 @@ function setupPlaylistDragAndDrop(playlistId) {
       if (navigator.vibrate) {
         navigator.vibrate(10);
       }
+      
+      // Show scroll zones during drag
+      container.classList.add('sortable-active');
     },
     
     onEnd: function(evt) {
@@ -6832,6 +6869,9 @@ function setupPlaylistDragAndDrop(playlistId) {
       const newIndex = evt.newIndex;
       
       console.log('SortableJS: Drag ended - moved from', oldIndex, 'to', newIndex);
+      
+      // Hide scroll zones after drag
+      container.classList.remove('sortable-active');
       
       // Only update if position actually changed
       if (oldIndex !== newIndex) {
