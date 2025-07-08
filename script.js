@@ -103,16 +103,46 @@ function setupMediaSession() {
                         currentPlaylist = savedPlaylists.find(p => p.id === state.playlistId);
                         currentPlaylistIndex = state.index || 0;
                         
-                        if (currentPlaylist) {
-                            showStatus('✅ Playlist recovered');
+                        if (currentPlaylist && state.currentItem) {
+                            // Restore playlist mode
+                            isPlaylistMode = state.isPlaylistMode;
+                            
+                            // Restore loop state for current item
+                            if (state.loopState) {
+                                loopStart = state.loopState.start;
+                                loopEnd = state.loopState.end;
+                                loopEnabled = state.loopState.enabled;
+                                loopTarget = state.loopState.target;
+                                loopCount = state.loopState.count;
+                                
+                                // Update app state
+                                appState.set('loop.start', loopStart);
+                                appState.set('loop.end', loopEnd);
+                                appState.set('loop.enabled', loopEnabled);
+                                appState.set('loop.target', loopTarget);
+                                appState.set('loop.count', loopCount);
+                            }
+                            
                             // Reinitialize playlist engine
                             if (!playlistEngine) {
                                 playlistEngine = new PlaylistEngine();
                                 appState.set('playlist.engine', playlistEngine);
+                                setupPlaylistEngineCallbacks();
                             }
+                            
+                            // Restore engine state
+                            await playlistEngine.loadPlaylist(currentPlaylist, currentPlaylistIndex);
+                            
+                            // Update visuals
+                            updateLoopVisuals();
+                            updateRepeatDisplay();
+                            showPlaylistNowPlaying();
+                            
+                            showStatus('✅ Playlist & loop state recovered');
                         }
                     } catch (e) {
                         showStatus('❌ Recovery failed');
+                        console.error('Recovery error:', e);
                     }
                 }
             }
@@ -992,12 +1022,27 @@ function initializeStateSync() {
         }
     });
     
-    // Loop state sync
-    appState.subscribe('loop.enabled', (value) => loopEnabled = value);
-    appState.subscribe('loop.start', (value) => loopStart = value);
-    appState.subscribe('loop.end', (value) => loopEnd = value);
-    appState.subscribe('loop.count', (value) => loopCount = value);
-    appState.subscribe('loop.target', (value) => loopTarget = value);
+    // Loop state sync with playlist state persistence
+    appState.subscribe('loop.enabled', (value) => {
+        loopEnabled = value;
+        updatePlaylistStateIfActive();
+    });
+    appState.subscribe('loop.start', (value) => {
+        loopStart = value;
+        updatePlaylistStateIfActive();
+    });
+    appState.subscribe('loop.end', (value) => {
+        loopEnd = value;
+        updatePlaylistStateIfActive();
+    });
+    appState.subscribe('loop.count', (value) => {
+        loopCount = value;
+        updatePlaylistStateIfActive();
+    });
+    appState.subscribe('loop.target', (value) => {
+        loopTarget = value;
+        updatePlaylistStateIfActive();
+    });
     appState.subscribe('loop.startTime', (value) => loopStartTime = value);
     appState.subscribe('loop.isLooping', (value) => isLooping = value);
     appState.subscribe('loop.isDragging', (value) => isDragging = value);
@@ -4331,6 +4376,28 @@ function setupPlaylistEngineCallbacks() {
 
   playlistEngine.onItemChange = (item, index) => {
       console.log('🎵 Playlist item changed:', item);
+      
+      // Update current index
+      currentPlaylistIndex = index;
+      
+      // Update saved state with new item
+      if (currentPlaylist) {
+          localStorage.setItem('active_playlist_state', JSON.stringify({
+              playlistId: currentPlaylist.id,
+              index: index,
+              currentItem: item,
+              isPlaylistMode: true,
+              timestamp: Date.now(),
+              loopState: {
+                  start: item?.start || 0,
+                  end: item?.end || 0,
+                  enabled: item?.type === 'loop',
+                  target: item?.playCount || 1,
+                  count: 0
+              }
+          }));
+      }
+      
       updatePlaylistNowPlaying(item, index);
       
       // Update playlist display to show new current track
@@ -4823,10 +4890,26 @@ async function searchTracks(query) {
           headers: { 'Authorization': `Bearer ${spotifyAccessToken}` }
       });
 
+      // Debug info
+      if (!response.ok) {
+          showStatus(`Search error: ${response.status} ${response.statusText}`);
+          console.error('Search failed:', response.status, await response.text());
+      }
+
       if (response.status === 401) {
           localStorage.removeItem('spotify_access_token');
           showView('login');
           showStatus('Session expired. Please reconnect.');
+          return;
+      }
+      
+      if (response.status === 429) {
+          showStatus('Rate limited. Please wait a moment.');
+          return;
+      }
+      
+      if (response.status === 403) {
+          showStatus('Access denied. Check account permissions.');
           return;
       }
 
@@ -5931,11 +6014,21 @@ async function playPlaylist(playlistId, startIndex = 0) {
       currentPlaylist = playlist;
       currentPlaylistIndex = startIndex;
       
-      // Save playlist state for recovery
+      // Save comprehensive playlist state for recovery
+      const currentItem = playlist.items[startIndex];
       localStorage.setItem('active_playlist_state', JSON.stringify({
           playlistId: playlist.id,
           index: startIndex,
-          timestamp: Date.now()
+          currentItem: currentItem,
+          isPlaylistMode: true,
+          timestamp: Date.now(),
+          loopState: {
+              start: currentItem?.start || 0,
+              end: currentItem?.end || 0,
+              enabled: currentItem?.type === 'loop',
+              target: currentItem?.playCount || 1,
+              count: 0
+          }
       }));
 
       // Load playlist into engine
@@ -5953,6 +6046,29 @@ async function playPlaylist(playlistId, startIndex = 0) {
       showStatus('Failed to play playlist');
       isPlaylistMode = false;
   }
+}
+
+// Helper function to update playlist state when loop parameters change
+function updatePlaylistStateIfActive() {
+    if (isPlaylistMode && currentPlaylist && currentPlaylistIndex !== undefined) {
+        const currentItem = currentPlaylist.items[currentPlaylistIndex];
+        if (currentItem) {
+            localStorage.setItem('active_playlist_state', JSON.stringify({
+                playlistId: currentPlaylist.id,
+                index: currentPlaylistIndex,
+                currentItem: currentItem,
+                isPlaylistMode: true,
+                timestamp: Date.now(),
+                loopState: {
+                    start: loopStart,
+                    end: loopEnd,
+                    enabled: loopEnabled,
+                    target: loopTarget,
+                    count: loopCount
+                }
+            }));
+        }
+    }
 }
 
 function stopPlaylistMode() {
@@ -7677,7 +7793,17 @@ async function validateToken(token) {
       });
 
       if (response.ok) {
+          const userData = await response.json();
           console.log('✅ Token valid, initializing player');
+          console.log('🎵 Account type:', userData.product);
+          
+          // Show account type to user
+          if (userData.product !== 'premium') {
+              showStatus(`⚠️ Account type: ${userData.product || 'free'} - Limited features`);
+          } else {
+              showStatus(`✅ Premium account: ${userData.display_name}`);
+          }
+          
           initializeSpotifyPlayer();
       } else if (response.status === 401) {
           // Token expired - try to refresh
