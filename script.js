@@ -6781,61 +6781,23 @@ function setupPlaylistDragAndDrop(playlistId) {
     container.sortableInstance.destroy();
   }
 
-  // Initialize SortableJS
+  // Initialize SortableJS with default auto-scroll configuration
   container.sortableInstance = Sortable.create(container, {
     animation: 150,
     handle: '.drag-handle',
     ghostClass: 'sortable-ghost',
     chosenClass: 'sortable-chosen',
     dragClass: 'sortable-drag',
-    forceFallback: false, // Use native HTML5 on desktop, touch fallback on mobile
-    fallbackTolerance: 10, // Tolerance for mobile touch
     
-    // Enhanced auto-scroll for long playlists
+    // Use SortableJS default auto-scroll behavior
     scroll: true,
-    scrollSensitivity: 100, // Trigger scrolling when within 100px of edge
-    scrollSpeed: 50, // Faster scroll speed
-    bubbleScroll: true, // Allow scrolling in nested containers
+    scrollSensitivity: 30, // Start scrolling within 30px of edges (default)
+    scrollSpeed: 10, // Moderate scroll speed for better control
+    bubbleScroll: true, // Allow scrolling in parent containers
     
-    // Viewport edge scroll zones
-    scrollFn: function(offsetX, offsetY, originalEvent, touchEvt, hoverTargetEl) {
-      const header = document.querySelector('.app-header');
-      const nav = document.querySelector('.mobile-nav');
-      const headerHeight = header ? header.offsetHeight : 80;
-      const navHeight = nav ? nav.offsetHeight : 80;
-      
-      const topZone = 60; // 60px below header
-      const bottomZone = 60; // 60px above nav
-      const maxSpeed = 20; // Scroll speed
-      
-      const mouseY = originalEvent.clientY;
-      const viewportHeight = window.innerHeight;
-      
-      // Top scroll zone (below header)
-      const topZoneStart = headerHeight;
-      const topZoneEnd = headerHeight + topZone;
-      
-      // Bottom scroll zone (above nav)  
-      const bottomZoneStart = viewportHeight - navHeight - bottomZone;
-      const bottomZoneEnd = viewportHeight - navHeight;
-      
-      let scrollDelta = 0;
-      
-      // Scroll up when in top zone
-      if (mouseY >= topZoneStart && mouseY <= topZoneEnd && window.scrollY > 0) {
-        const intensity = Math.max(0, (topZoneEnd - mouseY) / topZone);
-        scrollDelta = -maxSpeed * intensity;
-      }
-      // Scroll down when in bottom zone
-      else if (mouseY >= bottomZoneStart && mouseY <= bottomZoneEnd) {
-        const intensity = Math.max(0, (mouseY - bottomZoneStart) / bottomZone);
-        scrollDelta = maxSpeed * intensity;
-      }
-      
-      if (scrollDelta !== 0) {
-        window.scrollBy(0, scrollDelta);
-      }
-    },
+    // Force touch behavior for consistent experience across devices
+    forceFallback: true, // Always use fallback for consistent behavior
+    fallbackTolerance: 3, // Lower tolerance for more responsive dragging
     
     // Prevent conflicts with other gestures
     preventOnFilter: false,
