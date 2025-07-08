@@ -7369,7 +7369,7 @@ function resolvePlaylistItem(item) {
     }
     
     if (item.type === 'loop') {
-        // For loops, merge savedLoop data with overrides
+        // Reference-based format only - clean and simple
         const savedLoop = savedLoops.find(l => l.id === item.savedLoopId);
         if (!savedLoop) {
             console.warn('⚠️ Referenced savedLoop not found:', item.savedLoopId);
