@@ -5926,13 +5926,43 @@ function addItemToPlaylist(playlistId, item) {
   const playlist = savedPlaylists.find(p => p.id === playlistId);
   if (!playlist) return;
 
-  // Check if item already exists
-  const exists = playlist.items.some(i =>
-      i.type === item.type &&
-      i.uri === item.uri &&
-      i.start === item.start &&
-      i.end === item.end
-  );
+  // Check if item already exists - resolve items to compare properly
+  const exists = playlist.items.some(i => {
+      const resolvedI = resolvePlaylistItem(i);
+      const resolvedItem = resolvePlaylistItem(item);
+      
+      if (!resolvedI || !resolvedItem) {
+          console.log('🔍 Could not resolve items for comparison:', { i, item, resolvedI, resolvedItem });
+          return false;
+      }
+      
+      // Get URIs for comparison
+      const iUri = resolvedI.type === 'loop' ? resolvedI.trackUri : resolvedI.uri;
+      const itemUri = resolvedItem.type === 'loop' ? resolvedItem.trackUri : resolvedItem.uri;
+      
+      // For tracks, only compare URI and type (no start/end)
+      if (resolvedI.type === 'track' && resolvedItem.type === 'track') {
+          const isDuplicate = iUri === itemUri;
+          console.log('🔍 Track comparison:', { iUri, itemUri, isDuplicate });
+          return isDuplicate;
+      }
+      
+      // For loops, compare URI, start, and end times
+      if (resolvedI.type === 'loop' && resolvedItem.type === 'loop') {
+          const isDuplicate = iUri === itemUri && 
+                              resolvedI.start === resolvedItem.start && 
+                              resolvedI.end === resolvedItem.end;
+          console.log('🔍 Loop comparison:', { 
+              iUri, itemUri, 
+              iStart: resolvedI.start, itemStart: resolvedItem.start,
+              iEnd: resolvedI.end, itemEnd: resolvedItem.end,
+              isDuplicate 
+          });
+          return isDuplicate;
+      }
+      
+      return false; // Different types
+  });
 
   if (exists) {
       showStatus('This item is already in the playlist');
@@ -5942,10 +5972,11 @@ function addItemToPlaylist(playlistId, item) {
   playlist.items.push(item);
   playlist.updatedAt = new Date().toISOString();
 
-  // Update total duration
-  const itemDuration = item.type === 'loop'
-      ? (item.end - item.start) * item.playCount
-      : item.duration * item.playCount;
+  // Update total duration using resolved item data
+  const resolvedItem = resolvePlaylistItem(item);
+  const itemDuration = resolvedItem && resolvedItem.type === 'loop'
+      ? (resolvedItem.end - resolvedItem.start) * resolvedItem.playCount
+      : resolvedItem?.duration * resolvedItem?.playCount || 0;
   playlist.totalDuration += itemDuration;
 
   savePlaylistsToStorage();
