@@ -6794,208 +6794,62 @@ function setupPlaylistDragAndDrop(playlistId) {
   const container = document.getElementById('playlist-items-container');
   if (!container) return;
 
-  // Remove existing listeners to avoid duplicates
-  container.removeEventListener('dragstart', container._dragStart);
-  container.removeEventListener('dragover', container._dragOver);
-  container.removeEventListener('drop', container._drop);
-  container.removeEventListener('dragend', container._dragEnd);
-
-  let draggedElement = null;
-  let originalIndex = null;
-
-  // Drag start handler
-  function handleDragStart(e) {
-    const item = e.target.closest('.playlist-item');
-    if (!item) return;
-
-    // Only allow dragging from drag handle or if no buttons are clicked
-    const isButton = e.target.closest('button');
-    const isDragHandle = e.target.closest('.drag-handle');
-    
-    if (isButton && !isDragHandle) {
-      e.preventDefault();
-      return;
-    }
-
-    draggedElement = item;
-    originalIndex = parseInt(item.dataset.itemIndex);
-    
-    item.classList.add('dragging');
-    e.dataTransfer.effectAllowed = 'move';
-    e.dataTransfer.setData('text/html', '');
-    
-    console.log('Drag started for item at index:', originalIndex);
+  // Destroy existing Sortable instance if it exists
+  if (container.sortableInstance) {
+    container.sortableInstance.destroy();
   }
 
-  // Drag over handler - working version with gentle throttling
-  let lastDragOver = 0;
-  function handleDragOver(e) {
-    e.preventDefault();
-    e.dataTransfer.dropEffect = 'move';
+  // Initialize SortableJS
+  container.sortableInstance = Sortable.create(container, {
+    animation: 150,
+    handle: '.drag-handle',
+    ghostClass: 'sortable-ghost',
+    chosenClass: 'sortable-chosen',
+    dragClass: 'sortable-drag',
+    forceFallback: false, // Use native HTML5 on desktop, touch fallback on mobile
+    fallbackTolerance: 10, // Tolerance for mobile touch
     
-    if (!draggedElement) return;
+    // Enhanced mobile touch experience
+    scroll: true,
+    scrollSensitivity: 30,
+    scrollSpeed: 25,
     
-    // Light throttling to smooth out but not break functionality
-    const now = Date.now();
-    if (now - lastDragOver < 16) return; // ~60fps throttle
-    lastDragOver = now;
-
-    const afterElement = getDragAfterElement(container, e.clientY);
+    // Prevent conflicts with other gestures
+    preventOnFilter: false,
+    filter: 'button:not(.drag-handle)',
     
-    if (afterElement == null) {
-      container.appendChild(draggedElement);
-    } else {
-      container.insertBefore(draggedElement, afterElement);
-    }
-  }
-
-  // Drop handler
-  function handleDrop(e) {
-    e.preventDefault();
-    
-    if (!draggedElement) return;
-
-    // Calculate new index
-    const allItems = [...container.querySelectorAll('.playlist-item')];
-    const newIndex = allItems.indexOf(draggedElement);
-    
-    console.log('Drop: moving from', originalIndex, 'to', newIndex);
-    
-    if (newIndex !== originalIndex && newIndex !== -1) {
-      // Update the backend data
-      reorderPlaylistItems(playlistId, originalIndex, newIndex);
+    onStart: function(evt) {
+      console.log('SortableJS: Drag started from index:', evt.oldIndex);
       
-      // Update all item indices
-      allItems.forEach((item, index) => {
-        item.dataset.itemIndex = index;
-      });
-      
-      console.log('Reorder successful');
-    }
-  }
-
-  // Drag end handler
-  function handleDragEnd(e) {
-    if (draggedElement) {
-      draggedElement.classList.remove('dragging');
-    }
-    draggedElement = null;
-    originalIndex = null;
-  }
-
-  // Helper function to find insertion point with better sensitivity
-  function getDragAfterElement(container, y) {
-    const draggableElements = [...container.querySelectorAll('.playlist-item:not(.dragging)')];
-    
-    return draggableElements.reduce((closest, child) => {
-      const box = child.getBoundingClientRect();
-      const offset = y - box.top - box.height / 2;
-      
-      if (offset < 0 && offset > closest.offset) {
-        return { offset: offset, element: child };
-      } else {
-        return closest;
+      // Add haptic feedback on mobile
+      if (navigator.vibrate) {
+        navigator.vibrate(10);
       }
-    }, { offset: Number.NEGATIVE_INFINITY }).element;
-  }
-
-  // Store references for cleanup
-  container._dragStart = handleDragStart;
-  container._dragOver = handleDragOver;
-  container._drop = handleDrop;
-  container._dragEnd = handleDragEnd;
-
-  // Add event listeners
-  container.addEventListener('dragstart', handleDragStart);
-  container.addEventListener('dragover', handleDragOver);
-  container.addEventListener('drop', handleDrop);
-  container.addEventListener('dragend', handleDragEnd);
-  
-  // Add touch support for mobile with better sensitivity
-  let touchStartY = 0;
-  let touchItem = null;
-  let touchMoved = false;
-  let lastTouchMove = 0;
-  
-  container.addEventListener('touchstart', (e) => {
-    const item = e.target.closest('.playlist-item');
-    if (!item) return;
+    },
     
-    // Only allow from drag handle on touch
-    if (!e.target.closest('.drag-handle')) return;
-    
-    touchStartY = e.touches[0].clientY;
-    touchItem = item;
-    touchMoved = false;
-    item.style.transform = 'scale(1.05) rotate(2deg)';
-    item.classList.add('touch-dragging');
-    
-    // Add haptic feedback if available
-    if (navigator.vibrate) {
-      navigator.vibrate(10);
-    }
-  }, { passive: true });
-  
-  container.addEventListener('touchmove', (e) => {
-    if (!touchItem) return;
-    
-    const touchY = e.touches[0].clientY;
-    const deltaY = touchY - touchStartY;
-    
-    // Higher threshold to prevent accidental drags
-    if (Math.abs(deltaY) > 35) {
-      e.preventDefault();
-      touchMoved = true;
+    onEnd: function(evt) {
+      const oldIndex = evt.oldIndex;
+      const newIndex = evt.newIndex;
       
-      // Smoother throttling for better control
-      const now = Date.now();
-      if (now - lastTouchMove < 25) return;
-      lastTouchMove = now;
+      console.log('SortableJS: Drag ended - moved from', oldIndex, 'to', newIndex);
       
-      // Find the item to swap with
-      const items = [...container.querySelectorAll('.playlist-item')];
-      const currentIndex = items.indexOf(touchItem);
-      const targetIndex = deltaY > 0 ? currentIndex + 1 : currentIndex - 1;
-      
-      if (targetIndex >= 0 && targetIndex < items.length) {
-        const targetItem = items[targetIndex];
-        if (deltaY > 0) {
-          container.insertBefore(touchItem, targetItem.nextSibling);
-        } else {
-          container.insertBefore(touchItem, targetItem);
-        }
-        // Don't reset position - maintain continuous tracking
-      }
-    }
-  }, { passive: false });
-  
-  container.addEventListener('touchend', (e) => {
-    if (!touchItem) return;
-    
-    touchItem.style.transform = '';
-    touchItem.classList.remove('touch-dragging');
-    
-    // Only save if actually moved
-    if (touchMoved) {
-      const items = [...container.querySelectorAll('.playlist-item')];
-      const newIndex = items.indexOf(touchItem);
-      const oldIndex = parseInt(touchItem.dataset.itemIndex);
-      
-      if (newIndex !== oldIndex) {
+      // Only update if position actually changed
+      if (oldIndex !== newIndex) {
+        // Update the backend data using existing function
         reorderPlaylistItems(playlistId, oldIndex, newIndex);
-        items.forEach((item, index) => {
+        
+        // Update all item indices
+        const allItems = [...container.querySelectorAll('.playlist-item')];
+        allItems.forEach((item, index) => {
           item.dataset.itemIndex = index;
         });
+        
+        console.log('Playlist reorder successful');
       }
     }
-    
-    touchItem = null;
-    touchStartY = 0;
-    touchMoved = false;
-    lastTouchMove = 0;
-  }, { passive: true });
+  });
   
-  console.log('Drag and drop setup complete for playlist:', playlistId);
+  console.log('SortableJS setup complete for playlist:', playlistId);
 }
 
 // Removed getDragAfterElement - using simpler approach
