@@ -6610,9 +6610,12 @@ function updatePlaylistItem(playlistId, itemIndex) {
       setupPlaylistDragAndDrop(playlistId);
   }
   
-  // Refresh library view if open to sync changes back to "My Moments"
+  // Refresh library view if open to sync changes back to "My Moments"  
   if (currentView === 'library') {
+      console.log('🔄 Refreshing library view after update');
       renderLibrary();
+  } else {
+      console.log('📝 Library not current view, will refresh when switched');
   }
   
   showStatus('✅ Item updated!');
