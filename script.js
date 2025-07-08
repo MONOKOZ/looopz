@@ -6194,7 +6194,9 @@ function renderPlaylistEditView(playlist) {
         </div>
       </div>
       
-      ${renderPlaylistItemsAsCards(playlist)}
+      <div class="playlist-items-scroll" id="playlist-items-scroll">
+        ${renderPlaylistItemsAsCards(playlist)}
+      </div>
     </div>
   `;
   
@@ -6774,7 +6776,7 @@ function savePlaylistItemAsNew(playlistId, itemIndex) {
 
 // Working drag and drop implementation based on research
 function setupPlaylistDragAndDrop(playlistId) {
-  const container = document.querySelector('.playlist-edit-view');
+  const container = document.getElementById('playlist-items-scroll');
   if (!container) return;
 
   // Destroy existing Sortable instance if it exists
@@ -6800,7 +6802,7 @@ function setupPlaylistDragAndDrop(playlistId) {
     
     // Auto-scroll acceleration
     scrollFn: function(offsetX, offsetY, originalEvent, touchEvt, hoverTargetEl) {
-      const container = document.querySelector('.playlist-edit-view');
+      const container = document.getElementById('playlist-items-scroll');
       if (!container) return;
       
       // Get container bounds
