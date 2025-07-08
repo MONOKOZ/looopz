@@ -6174,16 +6174,6 @@ function renderPlaylistsList() {
               <button class="playlist-action-btn share-playlist-btn" data-playlist-id="${playlist.id}">Share</button>
               <button class="playlist-action-btn danger delete-playlist-btn" data-playlist-id="${playlist.id}">Delete</button>
           </div>
-
-          <div class="playlist-editor" id="playlist-editor-${playlist.id}">
-              <div class="playlist-items" id="playlist-items-${playlist.id}">
-                  ${renderPlaylistItems(playlist)}
-              </div>
-              <div class="edit-actions">
-                  <button class="btn secondary" onclick="savePlaylistEdits('${playlist.id}')">💾 Save Changes</button>
-                  <button class="btn" onclick="cancelPlaylistEdit('${playlist.id}')">❌ Cancel</button>
-              </div>
-          </div>
       </div>
   `).join('');
 }
