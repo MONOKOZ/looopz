@@ -6570,7 +6570,7 @@ function updatePlaylistItem(playlistId, itemIndex) {
           // Sync with original saved loop if it exists
           const savedLoop = savedLoops.find(l => l.id === item.id);
           if (savedLoop) {
-              savedLoop.name = newName || null;
+              savedLoop.customName = newName || null;
               savedLoop.loop.start = newStart;
               savedLoop.loop.end = newEnd;
               savedLoop.loop.repeat = newRepeat;
@@ -6593,11 +6593,12 @@ function updatePlaylistItem(playlistId, itemIndex) {
 
   savePlaylistsToStorage();
   
-  // Re-render the playlist items
-  const itemsContainer = document.getElementById(`playlist-items-${playlistId}`);
-  if (itemsContainer) {
-      itemsContainer.innerHTML = renderPlaylistItems(playlist);
-      setupPlaylistDragAndDrop(playlistId); // Re-setup drag and drop
+  // Close the edit form
+  cancelPlaylistItemEdit(playlistId, itemIndex);
+  
+  // Re-render the playlist view to show updated items
+  if (playlistViewMode === 'editing') {
+      renderPlaylistEditView(playlist);
   }
   
   // Refresh library view if open to sync changes back to "My Moments"
@@ -6791,7 +6792,7 @@ function setupPlaylistDragAndDrop(playlistId) {
     
     // Auto-scroll configuration with larger sensitivity
     scroll: true,
-    scrollSensitivity: 150, // Larger trigger zone (120px from edges)
+    scrollSensitivity: 150, // Larger trigger zone (150px from edges)
     scrollSpeed: 10, // Default scroll speed
     bubbleScroll: true, // Allow bubble scrolling
     
