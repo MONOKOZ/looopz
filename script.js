@@ -6593,15 +6593,17 @@ function updatePlaylistItem(playlistId, itemIndex) {
 
   savePlaylistsToStorage();
   
-  // Close the edit form
-  cancelPlaylistItemEdit(playlistId, itemIndex);
-  
   // Re-render just the playlist items container to show updated items
   const itemsContainer = document.getElementById('playlist-items-list');
   if (itemsContainer) {
       itemsContainer.innerHTML = renderPlaylistItems(playlist);
       setupPlaylistDragAndDrop(playlistId);
   }
+  
+  // Close the edit form after re-render (elements are recreated)
+  setTimeout(() => {
+      cancelPlaylistItemEdit(playlistId, itemIndex);
+  }, 10);
   
   // Refresh library view if open to sync changes back to "My Moments"
   if (currentView === 'library') {
