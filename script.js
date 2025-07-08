@@ -6573,7 +6573,8 @@ function updatePlaylistItem(playlistId, itemIndex) {
               itemId: item.id,
               savedLoopsCount: savedLoops.length,
               savedLoop: savedLoop,
-              allSavedLoopIds: savedLoops.map(l => l.id)
+              allSavedLoopIds: savedLoops.map(l => l.id),
+              savedLoopCustomName: savedLoop?.customName
           });
           
           if (savedLoop) {
@@ -6603,11 +6604,13 @@ function updatePlaylistItem(playlistId, itemIndex) {
 
   savePlaylistsToStorage();
   
-  // Re-render just the playlist items container to show updated items
-  const itemsContainer = document.getElementById('playlist-items-list');
-  if (itemsContainer) {
-      itemsContainer.innerHTML = renderPlaylistItems(playlist);
-      setupPlaylistDragAndDrop(playlistId);
+  // Close the edit form
+  cancelPlaylistItemEdit(playlistId, itemIndex);
+  
+  // Update the displayed name directly without re-rendering
+  const nameElement = document.querySelector(`[data-playlist-id="${playlistId}"][data-item-index="${itemIndex}"] .loop-custom-name`);
+  if (nameElement) {
+      nameElement.textContent = newName || 'Untitled Loop';
   }
   
   // Refresh library view if open to sync changes back to "My Moments"  
