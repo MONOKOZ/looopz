@@ -6552,10 +6552,11 @@ function updatePlaylistItem(playlistId, itemIndex) {
 
   const item = playlist.items[itemIndex];
   const isLoop = item.type === 'loop';
+  let newName = ''; // Declare newName outside the if block so it's accessible throughout
 
   if (isLoop) {
       // Update loop name, times, and repeat count
-      const newName = document.getElementById(`edit-name-${playlistId}-${itemIndex}`).value.trim();
+      newName = document.getElementById(`edit-name-${playlistId}-${itemIndex}`).value.trim();
       const newStart = parseTimeInput(document.getElementById(`edit-start-${playlistId}-${itemIndex}`).value);
       const newEnd = parseTimeInput(document.getElementById(`edit-end-${playlistId}-${itemIndex}`).value);
       const newRepeat = parseInt(document.getElementById(`edit-repeat-${playlistId}-${itemIndex}`).value);
@@ -6600,6 +6601,8 @@ function updatePlaylistItem(playlistId, itemIndex) {
           showStatus('❌ Invalid play count');
           return;
       }
+      // For non-loop items, use the original track name
+      newName = item.name || 'Untitled Track';
   }
 
   savePlaylistsToStorage();
