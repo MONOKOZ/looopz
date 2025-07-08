@@ -6797,38 +6797,43 @@ function setupPlaylistDragAndDrop(playlistId) {
     scrollSpeed: 50, // Faster scroll speed
     bubbleScroll: true, // Allow scrolling in nested containers
     
-    // Auto-scroll acceleration
+    // Viewport edge scroll zones
     scrollFn: function(offsetX, offsetY, originalEvent, touchEvt, hoverTargetEl) {
-      const container = document.getElementById('playlist-items-list');
-      if (!container) return;
+      const header = document.querySelector('.app-header');
+      const nav = document.querySelector('.mobile-nav');
+      const headerHeight = header ? header.offsetHeight : 80;
+      const navHeight = nav ? nav.offsetHeight : 80;
       
-      // Get container bounds
-      const rect = container.getBoundingClientRect();
-      const header = container.querySelector('.playlist-edit-header');
-      const headerHeight = header ? header.offsetHeight : 60;
-      const scrollZone = 120; // Larger scroll zone
-      const maxSpeed = 15; // Maximum scroll speed per frame
+      const topZone = 60; // 60px below header
+      const bottomZone = 60; // 60px above nav
+      const maxSpeed = 20; // Scroll speed
       
-      // Calculate distance from edges (accounting for header)
-      const distanceFromTop = originalEvent.clientY - (rect.top + headerHeight);
-      const distanceFromBottom = rect.bottom - originalEvent.clientY;
+      const mouseY = originalEvent.clientY;
+      const viewportHeight = window.innerHeight;
+      
+      // Top scroll zone (below header)
+      const topZoneStart = headerHeight;
+      const topZoneEnd = headerHeight + topZone;
+      
+      // Bottom scroll zone (above nav)  
+      const bottomZoneStart = viewportHeight - navHeight - bottomZone;
+      const bottomZoneEnd = viewportHeight - navHeight;
       
       let scrollDelta = 0;
       
-      // Scroll up when near top
-      if (distanceFromTop < scrollZone && container.scrollTop > 0) {
-        const intensity = Math.max(0, (scrollZone - distanceFromTop) / scrollZone);
+      // Scroll up when in top zone
+      if (mouseY >= topZoneStart && mouseY <= topZoneEnd && window.scrollY > 0) {
+        const intensity = Math.max(0, (topZoneEnd - mouseY) / topZone);
         scrollDelta = -maxSpeed * intensity;
       }
-      // Scroll down when near bottom  
-      else if (distanceFromBottom < scrollZone && 
-               container.scrollTop < container.scrollHeight - container.clientHeight) {
-        const intensity = Math.max(0, (scrollZone - distanceFromBottom) / scrollZone);
+      // Scroll down when in bottom zone
+      else if (mouseY >= bottomZoneStart && mouseY <= bottomZoneEnd) {
+        const intensity = Math.max(0, (mouseY - bottomZoneStart) / bottomZone);
         scrollDelta = maxSpeed * intensity;
       }
       
       if (scrollDelta !== 0) {
-        container.scrollTop += scrollDelta;
+        window.scrollBy(0, scrollDelta);
       }
     },
     
