@@ -6194,9 +6194,7 @@ function renderPlaylistEditView(playlist) {
         </div>
       </div>
       
-      <div class="playlist-items-container" id="playlist-items-container">
-        ${renderPlaylistItemsAsCards(playlist)}
-      </div>
+      ${renderPlaylistItemsAsCards(playlist)}
     </div>
   `;
   
@@ -6619,11 +6617,8 @@ function removeFromPlaylist(playlistId, itemIndex) {
   // Re-render the playlist items if in edit view
   const playlist = savedPlaylists.find(p => p.id === playlistId);
   if (playlist && playlistViewMode === 'editing') {
-      const itemsContainer = document.getElementById('playlist-items-container');
-      if (itemsContainer) {
-          itemsContainer.innerHTML = renderPlaylistItemsAsCards(playlist);
-          setupPlaylistDragAndDrop(playlistId);
-      }
+      // Re-render the entire edit view since items are part of the view structure
+      renderPlaylistEditView(playlist);
   }
 }
 
@@ -6779,7 +6774,7 @@ function savePlaylistItemAsNew(playlistId, itemIndex) {
 
 // Working drag and drop implementation based on research
 function setupPlaylistDragAndDrop(playlistId) {
-  const container = document.getElementById('playlist-items-container');
+  const container = document.querySelector('.playlist-edit-view');
   if (!container) return;
 
   // Destroy existing Sortable instance if it exists
@@ -6805,7 +6800,7 @@ function setupPlaylistDragAndDrop(playlistId) {
     
     // Auto-scroll acceleration
     scrollFn: function(offsetX, offsetY, originalEvent, touchEvt, hoverTargetEl) {
-      const container = document.getElementById('playlist-items-container');
+      const container = document.querySelector('.playlist-edit-view');
       if (!container) return;
       
       // Get container bounds
