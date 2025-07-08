@@ -3992,9 +3992,20 @@ class PlaylistTransitionEngine {
         
         if (!resolvedItem) {
             console.error('❌ Could not resolve playlist item:', item);
+            // Prevent infinite skip loops by checking if we've tried all items
+            this.failedSkipCount = (this.failedSkipCount || 0) + 1;
+            if (this.failedSkipCount >= this.currentPlaylist.items.length) {
+                console.error('❌ All playlist items failed to resolve, stopping playlist');
+                showStatus('❌ Playlist playback failed');
+                this.stopPlaylist();
+                return;
+            }
             await this.skipToNext();
             return;
         }
+        
+        // Reset fail counter on successful resolution
+        this.failedSkipCount = 0;
         
         console.log('🔄 Loading playlist item:', resolvedItem);
 
@@ -7406,26 +7417,48 @@ function resolvePlaylistItem(item) {
     }
     
     if (item.type === 'loop') {
-        // Reference-based format only - clean and simple
-        const savedLoop = savedLoops.find(l => l.id === item.savedLoopId);
-        if (!savedLoop) {
-            console.warn('⚠️ Referenced savedLoop not found:', item.savedLoopId);
-            return null;
+        // Handle both new reference-based format AND fallback to embedded data
+        if (item.savedLoopId) {
+            // NEW FORMAT: Reference-based
+            const savedLoop = savedLoops.find(l => l.id === item.savedLoopId);
+            if (savedLoop) {
+                return {
+                    type: 'loop',
+                    id: savedLoop.id,
+                    trackUri: savedLoop.track.uri,
+                    name: savedLoop.track.name,
+                    customName: item.overrides?.customName || savedLoop.name,
+                    artist: savedLoop.track.artist,
+                    duration: savedLoop.track.duration,
+                    image: savedLoop.track.image,
+                    start: savedLoop.loop.start,
+                    end: savedLoop.loop.end,
+                    playCount: item.overrides?.playCount || savedLoop.loop.repeat
+                };
+            }
+            console.warn('⚠️ Referenced savedLoop not found, checking for embedded data:', item.savedLoopId);
         }
         
-        return {
-            type: 'loop',
-            id: savedLoop.id,
-            trackUri: savedLoop.track.uri,
-            name: savedLoop.track.name,
-            customName: item.overrides?.customName || savedLoop.name,
-            artist: savedLoop.track.artist,
-            duration: savedLoop.track.duration,
-            image: savedLoop.track.image,
-            start: savedLoop.loop.start,
-            end: savedLoop.loop.end,
-            playCount: item.overrides?.playCount || savedLoop.loop.repeat
-        };
+        // FALLBACK: Try to use embedded data if reference fails (for robust playback)
+        if (item.id || item.trackUri || item.uri) {
+            console.log('📱 Using embedded data fallback for mobile compatibility');
+            return {
+                type: 'loop',
+                id: item.id || item.savedLoopId,
+                trackUri: item.trackUri || item.uri,
+                name: item.name || 'Unknown Track',
+                customName: item.customName || item.overrides?.customName,
+                artist: item.artist || 'Unknown Artist',
+                duration: item.duration || 180,
+                image: item.image || '',
+                start: item.start || 0,
+                end: item.end || 30,
+                playCount: item.playCount || item.overrides?.playCount || 1
+            };
+        }
+        
+        console.warn('⚠️ Could not resolve loop item:', item);
+        return null;
     }
     
     return null;
