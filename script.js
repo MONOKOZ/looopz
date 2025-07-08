@@ -1079,7 +1079,7 @@ function initializeStateSync() {
 let spotifyPlayer, spotifyDeviceId, spotifyAccessToken, isConnected, isPlaying, currentTrack;
 let currentTime, duration, loopStart, loopEnd, loopEnabled, loopCount, loopTarget, loopStartTime;
 let updateTimer, isLooping, isDragging, currentView, currentSearchResults, currentEditingLoopId;
-let currentContextMenuTrackIndex, isPlaylistMode, currentPlaylist, currentPlaylistIndex;
+let currentContextMenuTrackIndex, isPlaylistMode, currentPlaylist, currentPlaylistIndex, isReorderMode = false, tempPlaylistOrder = null;
 let playlistEngine, playlistViewMode, currentEditingPlaylistId, pendingPlaylistItem;
 let currentTrackOperation, operationCounter;
 
@@ -6240,6 +6240,33 @@ function renderPlaylistEditView(playlist) {
         <span>${playlist.name}</span>
         <span style="font-size: 14px; opacity: 0.7;">${playlist.items.length} items • ${formatTime(playlist.totalDuration, false)}</span>
       </h2>
+      
+      <!-- Reorder Mode Controls -->
+      <div class="reorder-controls" style="margin: 15px 0; display: flex; gap: 10px;">
+        ${!isReorderMode ? `
+          <button class="btn secondary" onclick="enterReorderMode('${playlist.id}')" ${isPlaylistMode ? 'disabled' : ''}>
+            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-move">
+              <polyline points="5 9 2 12 5 15"></polyline>
+              <polyline points="9 5 12 2 15 5"></polyline>
+              <polyline points="15 19 12 22 9 19"></polyline>
+              <polyline points="19 9 22 12 19 15"></polyline>
+              <line x1="2" y1="12" x2="22" y2="12"></line>
+              <line x1="12" y1="2" x2="12" y2="22"></line>
+            </svg>
+            Reorder Collection
+          </button>
+          ${isPlaylistMode ? '<span style="color: var(--text-muted); font-size: 14px;">Cannot reorder during playback</span>' : ''}
+        ` : `
+          <button class="btn primary" onclick="saveReorderChanges('${playlist.id}')">
+            💾 Save Order
+          </button>
+          <button class="btn secondary" onclick="cancelReorderMode('${playlist.id}')">
+            ❌ Cancel
+          </button>
+          <span style="color: var(--primary-yellow); font-size: 14px;">Drag items to reorder</span>
+        `}
+      </div>
+      
       <div id="playlist-items-list">
         ${renderPlaylistItemsAsCards(playlist)}
       </div>
@@ -6247,7 +6274,11 @@ function renderPlaylistEditView(playlist) {
   `;
   
   els.playlistsList.innerHTML = html;
-  setupPlaylistDragAndDrop(playlist.id);
+  
+  // Only setup drag and drop if in reorder mode
+  if (isReorderMode) {
+    setupPlaylistDragAndDrop(playlist.id);
+  }
 }
 
 function renderPlaylistItemsAsCards(playlist) {
@@ -6267,10 +6298,13 @@ function renderPlaylistItemsAsCards(playlist) {
       const customName = resolvedItem.customName;
       
       return `
-      <div class="saved-loop playlist-item" data-playlist-id="${playlist.id}" data-item-index="${index}" draggable="true">
+      <div class="saved-loop playlist-item" data-playlist-id="${playlist.id}" data-item-index="${index}" ${isReorderMode ? 'draggable="true"' : ''}>
+          ${!isReorderMode ? `
           <button class="delete-x-btn" onclick="removeFromPlaylist('${playlist.id}', ${index})" title="Remove from playlist">
               <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-x"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
           </button>
+          ` : ''}
+          ${isReorderMode ? `
           <div class="drag-handle" title="Drag to reorder">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-menu">
                   <line x1="3" y1="12" x2="21" y2="12"></line>
@@ -6278,6 +6312,7 @@ function renderPlaylistItemsAsCards(playlist) {
                   <line x1="3" y1="18" x2="21" y2="18"></line>
               </svg>
           </div>
+          ` : ''}
           <div class="loop-header">
               <img src="${resolvedItem.image || ''}" alt="${resolvedItem.name}" class="loop-thumbnail" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=\"http://www.w3.org/2000/svg\" viewBox=\"0 0 60 60\"%3E%3Crect width=\"60\" height=\"60\" fill=\"%23333\"/%3E%3C/svg%3E'">
               <div class="loop-details">
@@ -6953,6 +6988,60 @@ function setupPlaylistDragAndDrop(playlistId) {
   });
   
   console.log('SortableJS setup complete for playlist:', playlistId);
+}
+
+// Reorder Mode Functions
+function enterReorderMode(playlistId) {
+  if (isPlaylistMode) {
+    showStatus('❌ Cannot reorder during playback');
+    return;
+  }
+  
+  const playlist = savedPlaylists.find(p => p.id === playlistId);
+  if (!playlist) return;
+  
+  isReorderMode = true;
+  tempPlaylistOrder = [...playlist.items]; // Store current order as backup
+  
+  console.log('📝 Entered reorder mode for playlist:', playlistId);
+  showStatus('🔄 Reorder mode enabled');
+  
+  // Re-render to show drag handles and hide delete buttons
+  renderPlaylistEditView(playlist);
+}
+
+function saveReorderChanges(playlistId) {
+  const playlist = savedPlaylists.find(p => p.id === playlistId);
+  if (!playlist) return;
+  
+  isReorderMode = false;
+  tempPlaylistOrder = null;
+  
+  // Save to storage
+  savePlaylistsToStorage();
+  
+  console.log('💾 Saved reorder changes for playlist:', playlistId);
+  showStatus('✅ Order saved!');
+  
+  // Re-render to show normal view
+  renderPlaylistEditView(playlist);
+}
+
+function cancelReorderMode(playlistId) {
+  const playlist = savedPlaylists.find(p => p.id === playlistId);
+  if (!playlist || !tempPlaylistOrder) return;
+  
+  // Restore original order
+  playlist.items = [...tempPlaylistOrder];
+  
+  isReorderMode = false;
+  tempPlaylistOrder = null;
+  
+  console.log('❌ Cancelled reorder changes for playlist:', playlistId);
+  showStatus('🔄 Changes cancelled');
+  
+  // Re-render to show original order
+  renderPlaylistEditView(playlist);
 }
 
 // Removed getDragAfterElement - using simpler approach
@@ -8316,6 +8405,7 @@ function setupEventListeners() {
           }
           else if (target.matches('#playlist-back-btn, #playlist-edit-back-btn')) {
               e.preventDefault();
+              isReorderMode = false;
               playlistViewMode = 'overview';
               currentEditingPlaylistId = null;
               updatePlaylistDisplay();
