@@ -6569,12 +6569,22 @@ function updatePlaylistItem(playlistId, itemIndex) {
           
           // Sync with original saved loop if it exists
           const savedLoop = savedLoops.find(l => l.id === item.id);
+          console.log('🔍 Update debug:', {
+              itemId: item.id,
+              savedLoopsCount: savedLoops.length,
+              savedLoop: savedLoop,
+              allSavedLoopIds: savedLoops.map(l => l.id)
+          });
+          
           if (savedLoop) {
+              console.log('✅ Updating saved loop:', savedLoop.customName, '->', newName);
               savedLoop.customName = newName || null;
               savedLoop.loop.start = newStart;
               savedLoop.loop.end = newEnd;
               savedLoop.loop.repeat = newRepeat;
               localStorage.setItem('looopz_saved_loops', JSON.stringify(savedLoops));
+          } else {
+              console.log('❌ No saved loop found with ID:', item.id);
           }
       } else {
           showStatus('❌ Invalid values');
@@ -6599,11 +6609,6 @@ function updatePlaylistItem(playlistId, itemIndex) {
       itemsContainer.innerHTML = renderPlaylistItems(playlist);
       setupPlaylistDragAndDrop(playlistId);
   }
-  
-  // Close the edit form after re-render (elements are recreated)
-  setTimeout(() => {
-      cancelPlaylistItemEdit(playlistId, itemIndex);
-  }, 10);
   
   // Refresh library view if open to sync changes back to "My Moments"
   if (currentView === 'library') {
