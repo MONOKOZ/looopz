@@ -5931,10 +5931,7 @@ function addItemToPlaylist(playlistId, item) {
       const resolvedI = resolvePlaylistItem(i);
       const resolvedItem = resolvePlaylistItem(item);
       
-      if (!resolvedI || !resolvedItem) {
-          console.log('🔍 Could not resolve items for comparison:', { i, item, resolvedI, resolvedItem });
-          return false;
-      }
+      if (!resolvedI || !resolvedItem) return false;
       
       // Get URIs for comparison
       const iUri = resolvedI.type === 'loop' ? resolvedI.trackUri : resolvedI.uri;
@@ -5942,23 +5939,14 @@ function addItemToPlaylist(playlistId, item) {
       
       // For tracks, only compare URI and type (no start/end)
       if (resolvedI.type === 'track' && resolvedItem.type === 'track') {
-          const isDuplicate = iUri === itemUri;
-          console.log('🔍 Track comparison:', { iUri, itemUri, isDuplicate });
-          return isDuplicate;
+          return iUri === itemUri;
       }
       
       // For loops, compare URI, start, and end times
       if (resolvedI.type === 'loop' && resolvedItem.type === 'loop') {
-          const isDuplicate = iUri === itemUri && 
-                              resolvedI.start === resolvedItem.start && 
-                              resolvedI.end === resolvedItem.end;
-          console.log('🔍 Loop comparison:', { 
-              iUri, itemUri, 
-              iStart: resolvedI.start, itemStart: resolvedItem.start,
-              iEnd: resolvedI.end, itemEnd: resolvedItem.end,
-              isDuplicate 
-          });
-          return isDuplicate;
+          return iUri === itemUri && 
+                 resolvedI.start === resolvedItem.start && 
+                 resolvedI.end === resolvedItem.end;
       }
       
       return false; // Different types
@@ -6678,10 +6666,28 @@ function updatePlaylistItem(playlistId, itemIndex) {
   // Close the edit form
   cancelPlaylistItemEdit(playlistId, itemIndex);
   
-  // Update the displayed name directly without re-rendering
+  // Update the displayed elements directly without re-rendering
   const nameElement = document.querySelector(`[data-playlist-id="${playlistId}"][data-item-index="${itemIndex}"] .loop-custom-name`);
   if (nameElement) {
       nameElement.textContent = newName || 'Untitled Loop';
+  }
+  
+  // Update timestamp display for loops
+  if (isLoop) {
+      const resolvedItem = resolvePlaylistItem(item);
+      if (resolvedItem) {
+          // Update the time display (first .loop-stat div, second span)
+          const timeElement = document.querySelector(`[data-playlist-id="${playlistId}"][data-item-index="${itemIndex}"] .loop-stat:first-child span:nth-child(2)`);
+          if (timeElement) {
+              timeElement.textContent = `${formatTime(resolvedItem.start, false)} - ${formatTime(resolvedItem.end, false)}`;
+          }
+          
+          // Update the repeat count display (second .loop-stat div, second span)
+          const repeatElement = document.querySelector(`[data-playlist-id="${playlistId}"][data-item-index="${itemIndex}"] .loop-stat:nth-child(2) span:nth-child(2)`);
+          if (repeatElement) {
+              repeatElement.textContent = `${resolvedItem.playCount}×`;
+          }
+      }
   }
   
   // Refresh library view if open to sync changes back to "My Moments"  
