@@ -1966,6 +1966,46 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
    cursor: grabbing;
 }
 
+/* Auto-scroll zones for long playlists */
+#playlist-items-container {
+   position: relative;
+}
+
+#playlist-items-container::before,
+#playlist-items-container::after {
+   content: '';
+   position: absolute;
+   left: 0;
+   right: 0;
+   height: 120px;
+   pointer-events: none;
+   z-index: 10;
+   opacity: 0;
+   transition: opacity 0.3s ease;
+}
+
+#playlist-items-container::before {
+   top: 0;
+   background: linear-gradient(to bottom, 
+      rgba(168, 85, 247, 0.1) 0%,
+      rgba(168, 85, 247, 0.05) 50%,
+      transparent 100%);
+}
+
+#playlist-items-container::after {
+   bottom: 0;
+   background: linear-gradient(to top, 
+      rgba(168, 85, 247, 0.1) 0%,
+      rgba(168, 85, 247, 0.05) 50%,
+      transparent 100%);
+}
+
+/* Show scroll zones during drag */
+#playlist-items-container.sortable-active::before,
+#playlist-items-container.sortable-active::after {
+   opacity: 1;
+}
+
 /* Prebuffered playlist indicator */
 .playlist-card.prebuffered::before {
    content: '⚡';
