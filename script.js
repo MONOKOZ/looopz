@@ -6349,48 +6349,13 @@ function renderPlaylistItemsAsCards(playlist) {
           ${!isReorderMode ? `
           <!-- Three-dot menu for normal mode -->
           <div class="loop-menu" onclick="event.stopPropagation();">
-              <button class="three-dot-btn" onclick="toggleItemMenu('${playlist.id}', ${index})" title="More options">
+              <button class="three-dot-btn" onclick="showItemActionSheet('${playlist.id}', ${index}, ${JSON.stringify(resolvedItem).replace(/'/g, '&apos;').replace(/"/g, '&quot;')})" title="More options">
                   <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-more-vertical">
                       <circle cx="12" cy="5" r="1"></circle>
                       <circle cx="12" cy="12" r="1"></circle>
                       <circle cx="12" cy="19" r="1"></circle>
                   </svg>
               </button>
-              <div class="dropdown-menu" id="item-menu-${playlist.id}-${index}" style="display: none;">
-                  <button onclick="editPlaylistItem('${playlist.id}', ${index})">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-edit">
-                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
-                      </svg>
-                      Edit
-                  </button>
-                  <button class="share-btn" data-item='${JSON.stringify(resolvedItem).replace(/'/g, '&apos;')}'>
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-share">
-                          <circle cx="18" cy="5" r="3"></circle>
-                          <circle cx="6" cy="12" r="3"></circle>
-                          <circle cx="18" cy="19" r="3"></circle>
-                          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
-                          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
-                      </svg>
-                      Share
-                  </button>
-                  ${isLoop ? `
-                  <button onclick="savePlaylistItemAsNew('${playlist.id}', ${index})">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-copy">
-                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
-                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-                      </svg>
-                      Save as New
-                  </button>
-                  ` : ''}
-                  <button onclick="removeFromPlaylist('${playlist.id}', ${index})" class="danger">
-                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-trash">
-                          <polyline points="3 6 5 6 21 6"></polyline>
-                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
-                      </svg>
-                      Remove
-                  </button>
-              </div>
           </div>
           ` : `
           <!-- Full action buttons in edit mode -->
@@ -7045,42 +7010,141 @@ function setupPlaylistDragAndDrop(playlistId) {
   console.log('SortableJS setup complete for playlist:', playlistId);
 }
 
-// Toggle three-dot menu
-function toggleItemMenu(playlistId, itemIndex) {
-  const menuId = `item-menu-${playlistId}-${itemIndex}`;
-  const menu = document.getElementById(menuId);
+// Show action sheet for playlist item
+function showItemActionSheet(playlistId, itemIndex, itemData) {
+  const resolvedItem = typeof itemData === 'string' ? JSON.parse(itemData) : itemData;
+  const isLoop = resolvedItem.type === 'loop';
   
-  if (!menu) return;
+  // Create backdrop
+  const backdrop = document.createElement('div');
+  backdrop.className = 'modal-backdrop';
   
-  // Close all other menus
-  document.querySelectorAll('.dropdown-menu').forEach(m => {
-    if (m.id !== menuId) m.style.display = 'none';
+  // Create action sheet
+  const actionSheet = document.createElement('div');
+  actionSheet.className = 'action-sheet';
+  
+  actionSheet.innerHTML = `
+    <div class="action-sheet-header">
+      <p class="action-sheet-title">${isLoop ? 'Loop' : 'Track'}</p>
+      <p class="action-sheet-subtitle">${resolvedItem.customName || resolvedItem.name}</p>
+    </div>
+    <div class="action-sheet-options">
+      <button onclick="editPlaylistItemFromSheet('${playlistId}', ${itemIndex})">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-edit">
+          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+        </svg>
+        Edit Details
+      </button>
+      <button onclick="shareItemFromSheet(${JSON.stringify(resolvedItem).replace(/'/g, '&apos;').replace(/"/g, '&quot;')})">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-share">
+          <circle cx="18" cy="5" r="3"></circle>
+          <circle cx="6" cy="12" r="3"></circle>
+          <circle cx="18" cy="19" r="3"></circle>
+          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+        </svg>
+        Share
+      </button>
+      ${isLoop ? `
+      <button onclick="saveAsNewFromSheet('${playlistId}', ${itemIndex})">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-copy">
+          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+        </svg>
+        Save as New Loop
+      </button>
+      ` : ''}
+      <div class="action-sheet-divider"></div>
+      <button onclick="removeItemFromSheet('${playlistId}', ${itemIndex})" class="danger">
+        <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-trash">
+          <polyline points="3 6 5 6 21 6"></polyline>
+          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+        </svg>
+        Remove from Collection
+      </button>
+    </div>
+  `;
+  
+  // Add to DOM
+  document.body.appendChild(backdrop);
+  document.body.appendChild(actionSheet);
+  
+  // Animate in
+  requestAnimationFrame(() => {
+    backdrop.classList.add('active');
+    actionSheet.classList.add('active');
   });
   
-  // Toggle this menu
-  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+  // Close handlers
+  const closeSheet = () => {
+    backdrop.classList.remove('active');
+    actionSheet.classList.remove('active');
+    setTimeout(() => {
+      backdrop.remove();
+      actionSheet.remove();
+    }, 300);
+  };
   
-  // Close menu when clicking outside
-  if (menu.style.display === 'block') {
-    const closeMenu = (e) => {
-      if (!e.target.closest('.loop-menu')) {
-        menu.style.display = 'none';
-        document.removeEventListener('click', closeMenu);
-      }
-    };
-    setTimeout(() => document.addEventListener('click', closeMenu), 0);
+  backdrop.onclick = closeSheet;
+  
+  // Swipe down to close on mobile
+  let startY = 0;
+  let currentY = 0;
+  
+  actionSheet.addEventListener('touchstart', (e) => {
+    startY = e.touches[0].clientY;
+  });
+  
+  actionSheet.addEventListener('touchmove', (e) => {
+    currentY = e.touches[0].clientY;
+    const translateY = Math.max(0, currentY - startY);
+    if (translateY > 0) {
+      actionSheet.style.transform = `translateY(${translateY}px)`;
+    }
+  });
+  
+  actionSheet.addEventListener('touchend', () => {
+    const translateY = currentY - startY;
+    if (translateY > 100) {
+      closeSheet();
+    } else {
+      actionSheet.style.transform = '';
+    }
+  });
+  
+  // Store close function globally for action buttons
+  window.closeActionSheet = closeSheet;
+}
+
+// Action sheet handlers
+function editPlaylistItemFromSheet(playlistId, itemIndex) {
+  window.closeActionSheet?.();
+  // Toggle the edit form for the item
+  const editForm = document.getElementById(`edit-playlist-item-${playlistId}-${itemIndex}`);
+  if (editForm) {
+    editForm.style.display = 'block';
+    editForm.classList.add('active');
   }
 }
 
-// Helper to edit playlist item from menu
-function editPlaylistItem(playlistId, itemIndex) {
-  // Close menu
-  const menu = document.getElementById(`item-menu-${playlistId}-${itemIndex}`);
-  if (menu) menu.style.display = 'none';
-  
-  // Trigger the existing edit functionality
-  const editBtn = document.querySelector(`[data-playlist-id="${playlistId}"][data-item-index="${itemIndex}"] .edit-playlist-item-btn`);
-  if (editBtn) editBtn.click();
+function shareItemFromSheet(itemData) {
+  window.closeActionSheet?.();
+  const item = typeof itemData === 'string' ? JSON.parse(itemData) : itemData;
+  // Trigger share functionality
+  if (typeof shareLoop === 'function') {
+    shareLoop(item);
+  }
+}
+
+function saveAsNewFromSheet(playlistId, itemIndex) {
+  window.closeActionSheet?.();
+  savePlaylistItemAsNew(playlistId, itemIndex);
+}
+
+function removeItemFromSheet(playlistId, itemIndex) {
+  window.closeActionSheet?.();
+  removeFromPlaylist(playlistId, itemIndex);
 }
 
 // Reorder Mode Functions
