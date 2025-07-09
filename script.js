@@ -6248,17 +6248,13 @@ function renderPlaylistEditView(playlist) {
                   style="background: var(--bg-tertiary); border: 1px solid var(--border-default); color: var(--text-primary); 
                          padding: 6px 12px; border-radius: 6px; font-size: 13px; display: flex; align-items: center; gap: 6px; 
                          cursor: ${isPlaylistMode ? 'not-allowed' : 'pointer'}; opacity: ${isPlaylistMode ? '0.5' : '1'};">
-            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-move">
-              <polyline points="5 9 2 12 5 15"></polyline>
-              <polyline points="9 5 12 2 15 5"></polyline>
-              <polyline points="15 19 12 22 9 19"></polyline>
-              <polyline points="19 9 22 12 19 15"></polyline>
-              <line x1="2" y1="12" x2="22" y2="12"></line>
-              <line x1="12" y1="2" x2="12" y2="22"></line>
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-edit">
+              <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+              <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
             </svg>
-            Reorder
+            Edit
           </button>
-          ${isPlaylistMode ? '<span style="color: var(--text-muted); font-size: 12px;">Cannot reorder during playback</span>' : ''}
+          ${isPlaylistMode ? '<span style="color: var(--text-muted); font-size: 12px;">Cannot edit during playback</span>' : ''}
         ` : `
           <button onclick="saveReorderChanges('${playlist.id}')" 
                   style="background: var(--primary-purple); border: none; color: white; 
@@ -6305,12 +6301,12 @@ function renderPlaylistItemsAsCards(playlist) {
       const customName = resolvedItem.customName;
       
       return `
-      <div class="saved-loop playlist-item" data-playlist-id="${playlist.id}" data-item-index="${index}" ${isReorderMode ? 'draggable="true"' : ''}>
-          ${!isReorderMode ? `
-          <button class="delete-x-btn" onclick="removeFromPlaylist('${playlist.id}', ${index})" title="Remove from playlist">
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-x"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
-          </button>
-          ` : ''}
+      <div class="saved-loop playlist-item" 
+           data-playlist-id="${playlist.id}" 
+           data-item-index="${index}" 
+           ${isReorderMode ? 'draggable="true"' : ''}
+           ${!isReorderMode ? `onclick="loadPlaylistItem('${playlist.id}', ${index})" style="cursor: pointer;"` : ''}>
+          
           ${isReorderMode ? `
           <div class="drag-handle" title="Drag to reorder">
               <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-menu">
@@ -6350,13 +6346,65 @@ function renderPlaylistItemsAsCards(playlist) {
               </div>
           </div>
 
-          <div class="loop-actions">
-              <button class="loop-action-btn load-playlist-item-btn" data-playlist-id="${playlist.id}" data-item-index="${index}">Load</button>
-              <button class="loop-action-btn edit-playlist-item-btn" data-playlist-id="${playlist.id}" data-item-index="${index}">Edit</button>
-              <button class="loop-action-btn share-btn" data-item='${JSON.stringify(resolvedItem).replace(/'/g, '&apos;')}'>Share</button>
+          ${!isReorderMode ? `
+          <!-- Three-dot menu for normal mode -->
+          <div class="loop-menu" onclick="event.stopPropagation();">
+              <button class="three-dot-btn" onclick="toggleItemMenu('${playlist.id}', ${index})" title="More options">
+                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-more-vertical">
+                      <circle cx="12" cy="5" r="1"></circle>
+                      <circle cx="12" cy="12" r="1"></circle>
+                      <circle cx="12" cy="19" r="1"></circle>
+                  </svg>
+              </button>
+              <div class="dropdown-menu" id="item-menu-${playlist.id}-${index}" style="display: none;">
+                  <button onclick="editPlaylistItem('${playlist.id}', ${index})">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-edit">
+                          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                      </svg>
+                      Edit
+                  </button>
+                  <button class="share-btn" data-item='${JSON.stringify(resolvedItem).replace(/'/g, '&apos;')}'>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-share">
+                          <circle cx="18" cy="5" r="3"></circle>
+                          <circle cx="6" cy="12" r="3"></circle>
+                          <circle cx="18" cy="19" r="3"></circle>
+                          <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line>
+                          <line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line>
+                      </svg>
+                      Share
+                  </button>
+                  ${isLoop ? `
+                  <button onclick="savePlaylistItemAsNew('${playlist.id}', ${index})">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-copy">
+                          <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                      </svg>
+                      Save as New
+                  </button>
+                  ` : ''}
+                  <button onclick="removeFromPlaylist('${playlist.id}', ${index})" class="danger">
+                      <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-trash">
+                          <polyline points="3 6 5 6 21 6"></polyline>
+                          <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                      </svg>
+                      Remove
+                  </button>
+              </div>
           </div>
+          ` : `
+          <!-- Full action buttons in edit mode -->
+          <div class="loop-actions">
+              <button class="loop-action-btn load-playlist-item-btn" onclick="loadPlaylistItem('${playlist.id}', ${index})">Load</button>
+              <button class="loop-action-btn edit-playlist-item-btn" onclick="editPlaylistItem('${playlist.id}', ${index})">Edit</button>
+              <button class="loop-action-btn share-btn" data-item='${JSON.stringify(resolvedItem).replace(/'/g, '&apos;')}'>Share</button>
+              <button class="loop-action-btn" onclick="removeFromPlaylist('${playlist.id}', ${index})" style="color: var(--danger);">Delete</button>
+          </div>
+          `}
 
-          <div class="loop-edit-form" id="edit-playlist-item-${playlist.id}-${index}">
+          ${isReorderMode ? `
+          <div class="loop-edit-form" id="edit-playlist-item-${playlist.id}-${index}">`
+          : `<div class="loop-edit-form" id="edit-playlist-item-${playlist.id}-${index}" style="display: none;">`}
               <div class="edit-grid">
                   ${isLoop ? `
                   <div class="edit-field">
@@ -6995,6 +7043,44 @@ function setupPlaylistDragAndDrop(playlistId) {
   });
   
   console.log('SortableJS setup complete for playlist:', playlistId);
+}
+
+// Toggle three-dot menu
+function toggleItemMenu(playlistId, itemIndex) {
+  const menuId = `item-menu-${playlistId}-${itemIndex}`;
+  const menu = document.getElementById(menuId);
+  
+  if (!menu) return;
+  
+  // Close all other menus
+  document.querySelectorAll('.dropdown-menu').forEach(m => {
+    if (m.id !== menuId) m.style.display = 'none';
+  });
+  
+  // Toggle this menu
+  menu.style.display = menu.style.display === 'none' ? 'block' : 'none';
+  
+  // Close menu when clicking outside
+  if (menu.style.display === 'block') {
+    const closeMenu = (e) => {
+      if (!e.target.closest('.loop-menu')) {
+        menu.style.display = 'none';
+        document.removeEventListener('click', closeMenu);
+      }
+    };
+    setTimeout(() => document.addEventListener('click', closeMenu), 0);
+  }
+}
+
+// Helper to edit playlist item from menu
+function editPlaylistItem(playlistId, itemIndex) {
+  // Close menu
+  const menu = document.getElementById(`item-menu-${playlistId}-${itemIndex}`);
+  if (menu) menu.style.display = 'none';
+  
+  // Trigger the existing edit functionality
+  const editBtn = document.querySelector(`[data-playlist-id="${playlistId}"][data-item-index="${itemIndex}"] .edit-playlist-item-btn`);
+  if (editBtn) editBtn.click();
 }
 
 // Reorder Mode Functions
