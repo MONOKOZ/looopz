@@ -6097,6 +6097,32 @@ async function playPlaylist(playlistId, startIndex = 0) {
   }
 }
 
+/**
+ * Plays a playlist starting from a specific index
+ * This function provides a more explicit interface for index-based playlist playback
+ * @param {string} playlistId - The ID of the playlist to play
+ * @param {number} startIndex - The index to start playing from (0-based)
+ * @returns {Promise<void>}
+ */
+async function playPlaylistFromIndex(playlistId, startIndex) {
+  const playlist = savedPlaylists.find(p => p.id === playlistId);
+  if (!playlist || playlist.items.length === 0) {
+      showStatus('Playlist is empty');
+      return;
+  }
+
+  // Validate startIndex
+  if (startIndex < 0 || startIndex >= playlist.items.length) {
+      showStatus(`Invalid index: ${startIndex}. Playlist has ${playlist.items.length} items.`);
+      return;
+  }
+
+  console.log(`🎵 Starting playlist "${playlist.name}" from index ${startIndex} (${playlist.items[startIndex].name})`);
+  
+  // Use the existing playPlaylist function with the specified startIndex
+  return playPlaylist(playlistId, startIndex);
+}
+
 // Helper function to update playlist state when loop parameters change
 function updatePlaylistStateIfActive() {
     if (isPlaylistMode && currentPlaylist && currentPlaylistIndex !== undefined) {
@@ -6305,7 +6331,7 @@ function renderPlaylistItemsAsCards(playlist) {
            data-playlist-id="${playlist.id}" 
            data-item-index="${index}" 
            ${isReorderMode ? 'draggable="true"' : ''}
-           ${!isReorderMode ? `onclick="loadPlaylistItem('${playlist.id}', ${index})" style="cursor: pointer;"` : ''}>
+           ${!isReorderMode ? `onclick="startPlaylistFromItem('${playlist.id}', ${index})" style="cursor: pointer;"` : ''}>
           
           ${isReorderMode ? `
           <div class="drag-handle" title="Drag to reorder">
@@ -6360,7 +6386,7 @@ function renderPlaylistItemsAsCards(playlist) {
           ` : `
           <!-- Full action buttons in edit mode -->
           <div class="loop-actions" onclick="event.stopPropagation();">
-              <button class="loop-action-btn load-playlist-item-btn" onclick="loadPlaylistItem('${playlist.id}', ${index})">Load</button>
+              <button class="loop-action-btn load-playlist-item-btn" onclick="loadPlaylistItem('${playlist.id}', ${index})" title="Load this item only">Load Only</button>
               <button class="loop-action-btn edit-playlist-item-btn" onclick="editPlaylistItem('${playlist.id}', ${index})">Edit</button>
               <button class="loop-action-btn share-btn" data-item='${JSON.stringify(resolvedItem).replace(/'/g, '&apos;')}'>Share</button>
               <button class="loop-action-btn" onclick="removeFromPlaylist('${playlist.id}', ${index})" style="color: var(--danger);">Delete</button>
@@ -7115,6 +7141,37 @@ function showItemActionSheet(playlistId, itemIndex, itemData) {
   
   // Store close function globally for action buttons
   window.closeActionSheet = closeSheet;
+}
+
+// Start playlist playback from specific item
+async function startPlaylistFromItem(playlistId, itemIndex) {
+  const playlist = savedPlaylists.find(p => p.id === playlistId);
+  if (!playlist) {
+    showStatus('❌ Playlist not found');
+    return;
+  }
+  
+  if (itemIndex < 0 || itemIndex >= playlist.items.length) {
+    showStatus('❌ Invalid item index');
+    return;
+  }
+  
+  const item = resolvePlaylistItem(playlist.items[itemIndex]);
+  if (!item) {
+    showStatus('❌ Could not load playlist item');
+    return;
+  }
+  
+  console.log(`🎵 Starting playlist "${playlist.name}" from item ${itemIndex}: ${item.customName || item.name}`);
+  showStatus(`🎵 Playing from "${playlist.name}"`);
+  
+  // Start the entire playlist from this position
+  try {
+    await playPlaylist(playlistId, itemIndex);
+  } catch (error) {
+    console.error('Failed to start playlist:', error);
+    showStatus('❌ Failed to start playlist');
+  }
 }
 
 // Action sheet handlers
