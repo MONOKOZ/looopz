@@ -2003,68 +2003,158 @@ input:checked + .toggle-slider:before { transform: translateX(26px); }
 }
 
 /* Three-dot menu styles */
+.saved-loop {
+   position: relative;
+}
+
 .loop-menu {
    position: absolute;
-   top: 12px;
-   right: 12px;
+   top: 8px;
+   right: 8px;
    z-index: 10;
 }
 
 .three-dot-btn {
-   background: transparent;
+   background: rgba(0, 0, 0, 0.3);
+   backdrop-filter: blur(10px);
    border: none;
-   color: var(--text-muted);
+   color: var(--text-primary);
    cursor: pointer;
-   padding: 8px;
-   border-radius: 6px;
+   padding: 6px;
+   border-radius: 50%;
+   width: 32px;
+   height: 32px;
+   display: flex;
+   align-items: center;
+   justify-content: center;
    transition: all 0.2s;
 }
 
 .three-dot-btn:hover {
-   background: var(--bg-tertiary);
-   color: var(--text-primary);
+   background: rgba(0, 0, 0, 0.5);
+   transform: scale(1.1);
 }
 
-.dropdown-menu {
-   position: absolute;
-   top: 100%;
+.three-dot-btn svg {
+   width: 16px;
+   height: 16px;
+}
+
+/* Slide-up modal backdrop */
+.modal-backdrop {
+   position: fixed;
+   top: 0;
+   left: 0;
    right: 0;
-   background: var(--bg-elevated);
-   border: 1px solid var(--border-default);
-   border-radius: 8px;
-   padding: 4px;
-   min-width: 160px;
-   box-shadow: var(--shadow-lg);
-   z-index: 100;
-   margin-top: 4px;
+   bottom: 0;
+   background: rgba(0, 0, 0, 0.6);
+   backdrop-filter: blur(4px);
+   z-index: 200;
+   opacity: 0;
+   pointer-events: none;
+   transition: opacity 0.3s ease;
 }
 
-.dropdown-menu button {
+.modal-backdrop.active {
+   opacity: 1;
+   pointer-events: auto;
+}
+
+/* Slide-up action sheet */
+.action-sheet {
+   position: fixed;
+   bottom: 0;
+   left: 0;
+   right: 0;
+   background: var(--bg-secondary);
+   border-radius: 20px 20px 0 0;
+   padding: 8px;
+   padding-bottom: calc(8px + env(safe-area-inset-bottom));
+   max-height: 70vh;
+   z-index: 201;
+   transform: translateY(100%);
+   transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.action-sheet.active {
+   transform: translateY(0);
+}
+
+/* Handle bar */
+.action-sheet::before {
+   content: '';
+   position: absolute;
+   top: 8px;
+   left: 50%;
+   transform: translateX(-50%);
+   width: 36px;
+   height: 4px;
+   background: var(--text-muted);
+   border-radius: 2px;
+   opacity: 0.5;
+}
+
+.action-sheet-header {
+   padding: 20px 16px 12px;
+   text-align: center;
+}
+
+.action-sheet-title {
+   font-size: 14px;
+   color: var(--text-muted);
+   margin: 0;
+}
+
+.action-sheet-subtitle {
+   font-size: 16px;
+   color: var(--text-primary);
+   margin: 4px 0 0;
+   font-weight: 500;
+}
+
+.action-sheet-options {
+   padding: 8px;
+}
+
+.action-sheet button {
    display: flex;
    align-items: center;
-   gap: 8px;
+   gap: 16px;
    width: 100%;
-   padding: 8px 12px;
+   padding: 16px;
    background: transparent;
    border: none;
    color: var(--text-primary);
-   font-size: 13px;
+   font-size: 16px;
    text-align: left;
    cursor: pointer;
-   border-radius: 4px;
+   border-radius: 12px;
    transition: background 0.2s;
 }
 
-.dropdown-menu button:hover {
+.action-sheet button:hover {
    background: var(--bg-tertiary);
 }
 
-.dropdown-menu button.danger {
+.action-sheet button svg {
+   width: 20px;
+   height: 20px;
+   flex-shrink: 0;
+}
+
+.action-sheet button.danger {
    color: var(--danger);
 }
 
-.dropdown-menu button.danger:hover {
+.action-sheet button.danger:hover {
    background: rgba(239, 83, 80, 0.1);
+}
+
+/* Divider */
+.action-sheet-divider {
+   height: 1px;
+   background: var(--border-subtle);
+   margin: 8px 0;
 }
 
 /* Prebuffered playlist indicator */
