@@ -6242,10 +6242,13 @@ function renderPlaylistEditView(playlist) {
       </h2>
       
       <!-- Reorder Mode Controls -->
-      <div class="reorder-controls" style="margin: 15px 0; display: flex; gap: 10px;">
+      <div class="reorder-controls" style="margin: 10px 0; display: flex; gap: 8px; align-items: center;">
         ${!isReorderMode ? `
-          <button class="btn secondary" onclick="enterReorderMode('${playlist.id}')" ${isPlaylistMode ? 'disabled' : ''}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-move">
+          <button onclick="enterReorderMode('${playlist.id}')" ${isPlaylistMode ? 'disabled' : ''} 
+                  style="background: var(--bg-tertiary); border: 1px solid var(--border-default); color: var(--text-primary); 
+                         padding: 6px 12px; border-radius: 6px; font-size: 13px; display: flex; align-items: center; gap: 6px; 
+                         cursor: ${isPlaylistMode ? 'not-allowed' : 'pointer'}; opacity: ${isPlaylistMode ? '0.5' : '1'};">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="feather feather-move">
               <polyline points="5 9 2 12 5 15"></polyline>
               <polyline points="9 5 12 2 15 5"></polyline>
               <polyline points="15 19 12 22 9 19"></polyline>
@@ -6253,17 +6256,21 @@ function renderPlaylistEditView(playlist) {
               <line x1="2" y1="12" x2="22" y2="12"></line>
               <line x1="12" y1="2" x2="12" y2="22"></line>
             </svg>
-            Reorder Collection
+            Reorder
           </button>
-          ${isPlaylistMode ? '<span style="color: var(--text-muted); font-size: 14px;">Cannot reorder during playback</span>' : ''}
+          ${isPlaylistMode ? '<span style="color: var(--text-muted); font-size: 12px;">Cannot reorder during playback</span>' : ''}
         ` : `
-          <button class="btn primary" onclick="saveReorderChanges('${playlist.id}')">
-            💾 Save Order
+          <button onclick="saveReorderChanges('${playlist.id}')" 
+                  style="background: var(--primary-purple); border: none; color: white; 
+                         padding: 6px 12px; border-radius: 6px; font-size: 13px; cursor: pointer;">
+            💾 Save
           </button>
-          <button class="btn secondary" onclick="cancelReorderMode('${playlist.id}')">
-            ❌ Cancel
+          <button onclick="cancelReorderMode('${playlist.id}')" 
+                  style="background: var(--bg-tertiary); border: 1px solid var(--border-default); color: var(--text-primary); 
+                         padding: 6px 12px; border-radius: 6px; font-size: 13px; cursor: pointer;">
+            Cancel
           </button>
-          <span style="color: var(--primary-yellow); font-size: 14px;">Drag items to reorder</span>
+          <span style="color: var(--primary-yellow); font-size: 12px;">Drag to reorder</span>
         `}
       </div>
       
