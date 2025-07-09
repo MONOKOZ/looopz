@@ -6359,7 +6359,7 @@ function renderPlaylistItemsAsCards(playlist) {
           </div>
           ` : `
           <!-- Full action buttons in edit mode -->
-          <div class="loop-actions">
+          <div class="loop-actions" onclick="event.stopPropagation();">
               <button class="loop-action-btn load-playlist-item-btn" onclick="loadPlaylistItem('${playlist.id}', ${index})">Load</button>
               <button class="loop-action-btn edit-playlist-item-btn" onclick="editPlaylistItem('${playlist.id}', ${index})">Edit</button>
               <button class="loop-action-btn share-btn" data-item='${JSON.stringify(resolvedItem).replace(/'/g, '&apos;')}'>Share</button>
@@ -6368,8 +6368,8 @@ function renderPlaylistItemsAsCards(playlist) {
           `}
 
           ${isReorderMode ? `
-          <div class="loop-edit-form" id="edit-playlist-item-${playlist.id}-${index}">`
-          : `<div class="loop-edit-form" id="edit-playlist-item-${playlist.id}-${index}" style="display: none;">`}
+          <div class="loop-edit-form" id="edit-playlist-item-${playlist.id}-${index}" onclick="event.stopPropagation();">`
+          : `<div class="loop-edit-form" id="edit-playlist-item-${playlist.id}-${index}" style="display: none;" onclick="event.stopPropagation();">`}
               <div class="edit-grid">
                   ${isLoop ? `
                   <div class="edit-field">
