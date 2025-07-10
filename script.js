@@ -6674,13 +6674,17 @@ function savePlaylistEdits(playlistId) {
 function editPlaylistItem(playlistId, itemIndex) {
   const editForm = document.getElementById(`edit-playlist-item-${playlistId}-${itemIndex}`);
   if (editForm) {
+      editForm.style.removeProperty('display'); // Remove inline style to let CSS take over
       editForm.classList.add('active');
   }
 }
 
 function cancelPlaylistItemEdit(playlistId, itemIndex) {
   const editForm = document.getElementById(`edit-playlist-item-${playlistId}-${itemIndex}`);
-  if (editForm) editForm.classList.remove('active');
+  if (editForm) {
+    editForm.classList.remove('active');
+    editForm.style.display = 'none';
+  }
 }
 
 function updatePlaylistItem(playlistId, itemIndex) {
