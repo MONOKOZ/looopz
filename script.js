@@ -1,5 +1,76 @@
 // SPOTIFY INTEGRATION - WITH SEAMLESS SEARCH-TO-PLAYER TRANSITION AND PLAYLIST MANAGEMENT
 
+// Error Tracking System - AAA+ Reliability
+const ErrorTracker = {
+    errors: [],
+    maxErrors: 100,
+    
+    log(error, context = '', severity = 'error') {
+        const errorEntry = {
+            timestamp: new Date().toISOString(),
+            message: error.message || error,
+            stack: error.stack || '',
+            context,
+            severity,
+            userAgent: navigator.userAgent
+        };
+        
+        this.errors.push(errorEntry);
+        if (this.errors.length > this.maxErrors) {
+            this.errors.shift();
+        }
+        
+        // Console output with context
+        console.error(`[${severity.toUpperCase()}] ${context}:`, error);
+        
+        // Show user-friendly error for critical issues
+        if (severity === 'critical') {
+            this.showUserError(error, context);
+        }
+        
+        // Store in localStorage for debugging
+        try {
+            localStorage.setItem('looopz_error_log', JSON.stringify(this.errors.slice(-20)));
+        } catch (e) {
+            console.warn('Failed to store error log:', e);
+        }
+    },
+    
+    showUserError(error, context) {
+        let userMessage = 'Something went wrong. ';
+        
+        // Provide specific recovery suggestions
+        if (context.includes('auth') || context.includes('token')) {
+            userMessage += 'Please try logging in again.';
+        } else if (context.includes('network') || error.message?.includes('fetch')) {
+            userMessage += 'Check your internet connection and try again.';
+        } else if (context.includes('playback')) {
+            userMessage += 'Try selecting a different track.';
+        } else if (context.includes('rate')) {
+            userMessage += 'Too many requests. Please wait a moment.';
+        } else {
+            userMessage += 'Please refresh the page if the issue persists.';
+        }
+        
+        showStatus(userMessage, 5000);
+    },
+    
+    getRecentErrors() {
+        return this.errors.slice(-10);
+    },
+    
+    clear() {
+        this.errors = [];
+        localStorage.removeItem('looopz_error_log');
+    }
+};
+
+// Global error handler for unhandled promise rejections
+window.addEventListener('unhandledrejection', event => {
+    ErrorTracker.log(event.reason, 'Unhandled Promise Rejection', 'critical');
+    event.preventDefault();
+});
+
 // Config
 const SPOTIFY_CLIENT_ID = '46637d8f5adb41c0a4be34e0df0c1597';
 
@@ -1561,6 +1632,12 @@ function parseTimeInput(input) {
 }
 
 function showStatus(message, duration = 3000) {
+  // Clear any existing status timer
+  if (window.statusTimer) {
+    clearTimeout(window.statusTimer);
+    window.statusTimer = null;
+  }
+  
   // Schedule batched status updates
   appScheduler.pendingUpdates.statusText = message;
   appScheduler.pendingUpdates.statusShow = true;
@@ -1568,9 +1645,10 @@ function showStatus(message, duration = 3000) {
   appScheduler.schedule();
   
   // Schedule hide after duration
-  setTimeout(() => {
+  window.statusTimer = setTimeout(() => {
     appScheduler.pendingUpdates.statusShow = false;
     appScheduler.schedule();
+    window.statusTimer = null;
   }, duration);
 }
 
@@ -2113,49 +2191,61 @@ async function connectSpotify() {
 }
 
 async function exchangeCodeForToken(code) {
-  const codeVerifier = localStorage.getItem('code_verifier');
-  if (!codeVerifier) throw new Error('Code verifier not found');
+  try {
+    const codeVerifier = localStorage.getItem('code_verifier');
+    if (!codeVerifier) throw new Error('Code verifier not found');
 
-  const response = await fetch('https://accounts.spotify.com/api/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-          grant_type: 'authorization_code',
-          code: code,
-          redirect_uri: getRedirectUri(),
-          client_id: SPOTIFY_CLIENT_ID,
-          code_verifier: codeVerifier,
-      }),
-  });
+    const response = await fetch('https://accounts.spotify.com/api/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+            grant_type: 'authorization_code',
+            code: code,
+            redirect_uri: getRedirectUri(),
+            client_id: SPOTIFY_CLIENT_ID,
+            code_verifier: codeVerifier,
+        }),
+    });
 
-  const data = await response.json();
-  if (data.access_token) {
-      appState.set('spotify.accessToken', data.access_token);
-      localStorage.setItem('spotify_access_token', data.access_token);
-      spotifyAccessToken = data.access_token; // Update global variable
-      
-      if (data.refresh_token) localStorage.setItem('spotify_refresh_token', data.refresh_token);
-      
-      // Store token expiry time and schedule refresh
-      if (data.expires_in) {
-          const expiryTime = Date.now() + (data.expires_in * 1000) - 300000; // Refresh 5 minutes before expiry
-          localStorage.setItem('spotify_token_expiry', expiryTime.toString());
-          scheduleTokenRefresh(data.expires_in);
-      }
-      
-      // For PWA, add additional persistence checks
-      if (isPWA()) {
-          console.log('🔐 PWA: Storing authentication state');
-          localStorage.setItem('spotify_pwa_authenticated', 'true');
-          localStorage.setItem('spotify_auth_timestamp', Date.now().toString());
-      }
-      
-      localStorage.removeItem('code_verifier');
-      window.history.replaceState({}, document.title, window.location.pathname);
-      initializeSpotifyPlayer();
-      showStatus('Successfully authenticated!');
-  } else {
-      throw new Error(data.error_description || 'Token exchange failed');
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error_description || `Token exchange failed: ${response.status}`);
+    }
+
+    const data = await response.json();
+    if (data.access_token) {
+        appState.set('spotify.accessToken', data.access_token);
+        localStorage.setItem('spotify_access_token', data.access_token);
+        spotifyAccessToken = data.access_token; // Update global variable
+        
+        if (data.refresh_token) localStorage.setItem('spotify_refresh_token', data.refresh_token);
+        
+        // Store token expiry time and schedule refresh
+        if (data.expires_in) {
+            const expiryTime = Date.now() + (data.expires_in * 1000) - 300000; // Refresh 5 minutes before expiry
+            localStorage.setItem('spotify_token_expiry', expiryTime.toString());
+            scheduleTokenRefresh(data.expires_in);
+        }
+        
+        // For PWA, add additional persistence checks
+        if (isPWA()) {
+            console.log('🔐 PWA: Storing authentication state');
+            localStorage.setItem('spotify_pwa_authenticated', 'true');
+            localStorage.setItem('spotify_auth_timestamp', Date.now().toString());
+        }
+        
+        localStorage.removeItem('code_verifier');
+        window.history.replaceState({}, document.title, window.location.pathname);
+        initializeSpotifyPlayer();
+        showStatus('Successfully authenticated!');
+    } else {
+        throw new Error(data.error_description || 'Token exchange failed');
+    }
+  } catch (error) {
+    ErrorTracker.log(error, 'Token exchange', 'critical');
+    showStatus('Authentication failed. Please try again.');
+    showView('login');
+    throw error;
   }
 }
 
@@ -2471,19 +2561,24 @@ const API_RATE_LIMIT_MS = 1000; // Minimum 1 second between API calls for same t
  * Check if token needs refresh before API calls
  */
 async function ensureValidToken() {
-    const tokenExpiry = localStorage.getItem('spotify_token_expiry');
-    if (tokenExpiry) {
-        const expiryTime = parseInt(tokenExpiry);
-        const now = Date.now();
-        
-        // If token expires in less than 2 minutes, refresh it now
-        if (expiryTime - now < 120000) {
-            console.log('🔄 Token expiring soon, refreshing proactively...');
-            const success = await refreshSpotifyToken();
-            if (!success) {
-                throw new Error('Token refresh failed');
+    try {
+        const tokenExpiry = localStorage.getItem('spotify_token_expiry');
+        if (tokenExpiry) {
+            const expiryTime = parseInt(tokenExpiry);
+            const now = Date.now();
+            
+            // If token expires in less than 2 minutes, refresh it now
+            if (expiryTime - now < 120000) {
+                console.log('🔄 Token expiring soon, refreshing proactively...');
+                const success = await refreshSpotifyToken();
+                if (!success) {
+                    throw new Error('Token refresh failed');
+                }
             }
         }
+    } catch (error) {
+        ErrorTracker.log(error, 'Token validation', 'critical');
+        throw error;
     }
 }
 
@@ -4255,22 +4350,34 @@ class PlaylistTransitionEngine {
 function initializeSpotifyPlayer() {
   showStatus('Connecting to Spotify...');
 
-  // Define the callback function in the global scope BEFORE loading the SDK
-  window.onSpotifyWebPlaybackSDKReady = () => {
-      spotifyPlayer = new Spotify.Player({
-          name: 'LOOOPZ Player',
-          getOAuthToken: cb => cb(spotifyAccessToken),
-          volume: 0.8
-      });
+  try {
+    // Define the callback function in the global scope BEFORE loading the SDK
+    window.onSpotifyWebPlaybackSDKReady = () => {
+        try {
+            spotifyPlayer = new Spotify.Player({
+                name: 'LOOOPZ Player',
+                getOAuthToken: cb => cb(spotifyAccessToken),
+                volume: 0.8
+            });
 
-      spotifyPlayer.addListener('initialization_error', ({ message }) => showStatus('Failed to initialize: ' + message));
-      spotifyPlayer.addListener('authentication_error', ({ message }) => {
-          localStorage.removeItem('spotify_access_token');
-          showView('login');
-          showStatus('Authentication failed. Please reconnect.');
-      });
-      spotifyPlayer.addListener('account_error', ({ message }) => showStatus('Spotify Premium required'));
-      spotifyPlayer.addListener('playback_error', ({ message }) => showStatus('Playback error: ' + message));
+            spotifyPlayer.addListener('initialization_error', ({ message }) => {
+                ErrorTracker.log(new Error(message), 'Spotify initialization', 'critical');
+                showStatus('Failed to initialize: ' + message);
+            });
+            spotifyPlayer.addListener('authentication_error', ({ message }) => {
+                ErrorTracker.log(new Error(message), 'Spotify authentication', 'critical');
+                localStorage.removeItem('spotify_access_token');
+                showView('login');
+                showStatus('Authentication failed. Please reconnect.');
+            });
+            spotifyPlayer.addListener('account_error', ({ message }) => {
+                ErrorTracker.log(new Error(message), 'Spotify account', 'critical');
+                showStatus('Spotify Premium required');
+            });
+            spotifyPlayer.addListener('playback_error', ({ message }) => {
+                ErrorTracker.log(new Error(message), 'Spotify playback', 'error');
+                showStatus('Playback error: ' + message);
+            });
 
       spotifyPlayer.addListener('ready', ({ device_id }) => {
           console.log('🎵 Spotify player ready with Device ID:', device_id);
@@ -4392,12 +4499,32 @@ function initializeSpotifyPlayer() {
           }
       });
 
-      spotifyPlayer.connect();
-  };
+            spotifyPlayer.connect().catch(error => {
+                ErrorTracker.log(error, 'Spotify player connect', 'critical');
+                showStatus('Failed to connect player');
+            });
+        } catch (error) {
+            ErrorTracker.log(error, 'Spotify player creation', 'critical');
+            showStatus('Failed to create player');
+        }
+    };
 
-  // Check if Spotify SDK is already loaded
-  if (window.Spotify) {
-      window.onSpotifyWebPlaybackSDKReady();
+    // Check if Spotify SDK is already loaded
+    if (window.Spotify) {
+        window.onSpotifyWebPlaybackSDKReady();
+    } else {
+        // Load the SDK if not already loaded
+        const script = document.createElement('script');
+        script.src = 'https://sdk.scdn.co/spotify-player.js';
+        script.onerror = () => {
+            ErrorTracker.log(new Error('Failed to load Spotify SDK'), 'SDK loading', 'critical');
+            showStatus('Failed to load Spotify player. Please refresh.');
+        };
+        document.body.appendChild(script);
+    }
+  } catch (error) {
+    ErrorTracker.log(error, 'Initialize Spotify player', 'critical');
+    showStatus('Failed to initialize player');
   }
 }
 
@@ -4481,31 +4608,39 @@ let lastProgressUpdate = 0;
 let backgroundUpdateTimer = null;
 let isBackgrounded = false;
 
-function startProgressUpdates() {
-  // Prevent multiple timers
-  if (progressUpdateActive) {
-    console.log('⚠️ Progress updates already active');
-    return;
-  }
-  
-  stopProgressUpdates();
-  progressUpdateActive = true;
-  let consecutiveFailures = 0;
-  let lastKnownPosition = 0;
-  let updateCount = 0;
-  
-  console.log('🎵 Starting progress updates');
-  
-  updateTimer = setInterval(async () => {
-      updateCount++;
-      
-      // Safety check - ensure we should still be running
-      if (!progressUpdateActive) {
-          console.log('🚫 Progress updates deactivated, stopping timer');
-          clearInterval(updateTimer);
-          updateTimer = null;
-          return;
-      }
+// Singleton Progress Manager - Prevents multiple timer instances
+const ProgressManager = {
+    _timer: null,
+    _isActive: false,
+    _startCallCount: 0,
+    
+    start() {
+        this._startCallCount++;
+        console.log(`🎵 Progress start request #${this._startCallCount}, active: ${this._isActive}`);
+        
+        // Always clear existing timer first
+        this.stop();
+        
+        // Mark as active and store in appState
+        this._isActive = true;
+        progressUpdateActive = true;
+        appState.set('operations.updateTimer', 'active');
+        
+        let consecutiveFailures = 0;
+        let lastKnownPosition = 0;
+        let updateCount = 0;
+        
+        console.log('✅ Starting NEW progress timer');
+        
+        this._timer = setInterval(async () => {
+            updateCount++;
+            
+            // Safety check - ensure we should still be running
+            if (!this._isActive || !progressUpdateActive) {
+                console.log('🚫 Progress updates deactivated, stopping timer');
+                this.stop();
+                return;
+            }
       
       // Skip progress updates during drag operations to prevent visual conflicts
       if (isDragging) {
@@ -4599,8 +4734,9 @@ function startProgressUpdates() {
                       showStatus('🔄 Reconnecting...');
                   } else if (consecutiveFailures > 60) { // 3 seconds of total failure
                       console.error('🚨 Progress updates completely failed, restarting...');
+                      this._isActive = false;
                       progressUpdateActive = false;
-                      setTimeout(() => startProgressUpdates(), 1000);
+                      setTimeout(() => this.start(), 1000);
                       return;
                   }
               }
@@ -4610,8 +4746,9 @@ function startProgressUpdates() {
               consecutiveFailures++;
               if (consecutiveFailures > 100) {
                   console.log('📡 Not connected, reducing update frequency');
+                  this._isActive = false;
                   progressUpdateActive = false;
-                  setTimeout(() => startProgressUpdates(), 2000);
+                  setTimeout(() => this.start(), 2000);
                   return;
               }
           }
@@ -4625,24 +4762,44 @@ function startProgressUpdates() {
           if (consecutiveFailures > 80) { // 4 seconds of errors
               console.error('🚨 Critical progress update failure, forcing restart');
               showStatus('⚠️ Connection issues - restarting...');
-              progressUpdateActive = false;
-              setTimeout(() => startProgressUpdates(), 2000);
-              return;
-          }
-      }
-  }, 50); // 50ms for smooth updates
+                    this._isActive = false;
+                    progressUpdateActive = false;
+                    setTimeout(() => this.start(), 2000);
+                    return;
+                }
+            }
+        }, 50); // 50ms for smooth updates
+    },
+    
+    stop() {
+        if (this._timer) {
+            console.log(`🛑 Stopping progress timer (was active: ${this._isActive})`);
+            clearInterval(this._timer);
+            this._timer = null;
+        }
+        this._isActive = false;
+        progressUpdateActive = false;
+        appState.set('operations.updateTimer', null);
+        
+        // Also clear the old updateTimer variable for compatibility
+        if (updateTimer) {
+            clearInterval(updateTimer);
+            updateTimer = null;
+        }
+    },
+    
+    isActive() {
+        return this._isActive && this._timer !== null;
+    }
+};
+
+// Wrapper functions for backward compatibility
+function startProgressUpdates() {
+    ProgressManager.start();
 }
 
 function stopProgressUpdates() {
-  if (progressUpdateActive) {
-    console.log('🛑 Stopping progress updates');
-  }
-  progressUpdateActive = false;
-  
-  if (updateTimer) {
-      clearInterval(updateTimer);
-      updateTimer = null;
-  }
+    ProgressManager.stop();
 }
 
 // Background-safe progress updates for lock screen support
@@ -5159,6 +5316,51 @@ async function selectTrack(uri, name, artist, durationMs, imageUrl, stayInSearch
 
 // Views
 function showView(view) {
+  console.log(`🔄 Switching to view: ${view}`);
+  
+  // CRITICAL: Clean up ALL timers to prevent memory leaks
+  try {
+    // Stop progress updates
+    stopProgressUpdates();
+    
+    // Clear background timer
+    if (backgroundUpdateTimer) {
+      clearInterval(backgroundUpdateTimer);
+      backgroundUpdateTimer = null;
+    }
+    
+    // Clear any debounce timers
+    if (window.seekDebounceTimer) {
+      clearTimeout(window.seekDebounceTimer);
+      window.seekDebounceTimer = null;
+    }
+    
+    // Clear any status message timers
+    if (window.statusTimer) {
+      clearTimeout(window.statusTimer);
+      window.statusTimer = null;
+    }
+    
+    // Clear any action sheet auto-hide timers
+    const actionSheets = document.querySelectorAll('.action-sheet');
+    actionSheets.forEach(sheet => {
+      if (sheet._hideTimer) {
+        clearTimeout(sheet._hideTimer);
+        sheet._hideTimer = null;
+      }
+    });
+    
+    // Cancel any ongoing animations
+    if (window.loopAnimationFrame) {
+      cancelAnimationFrame(window.loopAnimationFrame);
+      window.loopAnimationFrame = null;
+    }
+    
+    console.log('✅ All timers cleaned up');
+  } catch (error) {
+    ErrorTracker.log(error, 'Timer cleanup in showView', 'warning');
+  }
+  
   // Cancel any ongoing track operations to prevent race conditions
   if (currentTrackOperation) {
     currentTrackOperation.cancelled = true;
