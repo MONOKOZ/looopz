@@ -65,6 +65,57 @@ const ErrorTracker = {
     }
 };
 
+// Event Listener Manager - Prevents memory leaks
+const EventManager = {
+    listeners: new Map(),
+    
+    add(element, event, handler, options) {
+        if (!element) return;
+        
+        const key = `${element.id || element.className || 'unknown'}_${event}`;
+        
+        // Remove existing listener if any
+        this.remove(element, event);
+        
+        // Add new listener
+        element.addEventListener(event, handler, options);
+        
+        // Store reference for cleanup
+        this.listeners.set(key, { element, event, handler, options });
+    },
+    
+    remove(element, event) {
+        if (!element) return;
+        
+        const key = `${element.id || element.className || 'unknown'}_${event}`;
+        const listener = this.listeners.get(key);
+        
+        if (listener) {
+            listener.element.removeEventListener(listener.event, listener.handler, listener.options);
+            this.listeners.delete(key);
+        }
+    },
+    
+    removeAll() {
+        this.listeners.forEach(listener => {
+            listener.element.removeEventListener(listener.event, listener.handler, listener.options);
+        });
+        this.listeners.clear();
+    },
+    
+    // Remove all listeners for a specific element
+    removeByElement(element) {
+        const toRemove = [];
+        this.listeners.forEach((listener, key) => {
+            if (listener.element === element) {
+                listener.element.removeEventListener(listener.event, listener.handler, listener.options);
+                toRemove.push(key);
+            }
+        });
+        toRemove.forEach(key => this.listeners.delete(key));
+    }
+};
+
 // Global error handler for unhandled promise rejections
 window.addEventListener('unhandledrejection', event => {
     ErrorTracker.log(event.reason, 'Unhandled Promise Rejection', 'critical');
@@ -155,7 +206,7 @@ function setupMediaSession() {
     }
     
     // Focus handler - restore minimal state if needed
-    window.addEventListener('focus', async () => {
+    EventManager.add(window, 'focus', async () => {
         if (spotifyPlayer) {
             console.log('📱 Window focused');
             
@@ -256,7 +307,7 @@ function setupMediaSession() {
     });
     
     // Visibility handler - same minimal restoration
-    document.addEventListener('visibilitychange', async () => {
+    EventManager.add(document, 'visibilitychange', async () => {
         if (!document.hidden && spotifyPlayer) {
             console.log('📱 Page visible');
             
@@ -571,6 +622,72 @@ class AppState {
 
 // Global state instance
 const appState = new AppState();
+
+// State Accessors - Centralizes state management to prevent synchronization issues
+const State = {
+    // Playback state
+    get isPlaying() { return appState.get('playback.isPlaying'); },
+    set isPlaying(val) { 
+        appState.set('playback.isPlaying', val);
+        isPlaying = val; // Keep legacy var in sync during migration
+    },
+    
+    get currentTrack() { return appState.get('playback.currentTrack'); },
+    set currentTrack(val) { 
+        appState.set('playback.currentTrack', val);
+        currentTrack = val; // Keep legacy var in sync
+    },
+    
+    get currentTime() { return appState.get('playback.currentTime'); },
+    set currentTime(val) { 
+        appState.set('playback.currentTime', val);
+        currentTime = val; // Keep legacy var in sync
+    },
+    
+    get duration() { return appState.get('playback.duration'); },
+    set duration(val) { 
+        appState.set('playback.duration', val);
+        duration = val; // Keep legacy var in sync
+    },
+    
+    // Loop state
+    get loopEnabled() { return appState.get('loop.enabled'); },
+    set loopEnabled(val) { 
+        appState.set('loop.enabled', val);
+        loopEnabled = val; // Keep legacy var in sync
+    },
+    
+    get loopStart() { return appState.get('loop.start'); },
+    set loopStart(val) { 
+        appState.set('loop.start', val);
+        loopStart = val; // Keep legacy var in sync
+    },
+    
+    get loopEnd() { return appState.get('loop.end'); },
+    set loopEnd(val) { 
+        appState.set('loop.end', val);
+        loopEnd = val; // Keep legacy var in sync
+    },
+    
+    // Spotify state
+    get isConnected() { return appState.get('spotify.isConnected'); },
+    set isConnected(val) { 
+        appState.set('spotify.isConnected', val);
+        isConnected = val; // Keep legacy var in sync
+    },
+    
+    // Helper to sync all state at once
+    syncFromAppState() {
+        isPlaying = appState.get('playback.isPlaying');
+        currentTrack = appState.get('playback.currentTrack');
+        currentTime = appState.get('playback.currentTime');
+        duration = appState.get('playback.duration');
+        loopEnabled = appState.get('loop.enabled');
+        loopStart = appState.get('loop.start');
+        loopEnd = appState.get('loop.end');
+        isConnected = appState.get('spotify.isConnected');
+    }
+};
 
 // PLAYER STATE GUARD - Enhanced resilience for embed player stability
 class PlayerStateGuard {
@@ -1421,6 +1538,58 @@ const mobileUIDetector = new MobileBrowserUIDetector();
 let lastSeekTime = 0; // For debouncing seeks
 const SEEK_DEBOUNCE_MS = 500; // Minimum time between seeks
 const LOOP_END_THRESHOLD = 0.05; // More precise timing (50ms)
+
+// Enhanced debounce mechanism for seek operations
+const SeekDebouncer = {
+    _timer: null,
+    _lastSeekTime: 0,
+    _pendingSeek: null,
+    
+    seek(positionMs, callback) {
+        const now = Date.now();
+        
+        // Clear any pending seek
+        if (this._timer) {
+            clearTimeout(this._timer);
+            this._timer = null;
+        }
+        
+        // Store the latest seek request
+        this._pendingSeek = { positionMs, callback };
+        
+        // If enough time has passed since last seek, execute immediately
+        if (now - this._lastSeekTime >= SEEK_DEBOUNCE_MS) {
+            this.executePendingSeek();
+        } else {
+            // Otherwise, schedule for later
+            const delay = SEEK_DEBOUNCE_MS - (now - this._lastSeekTime);
+            this._timer = setTimeout(() => this.executePendingSeek(), delay);
+        }
+    },
+    
+    executePendingSeek() {
+        if (!this._pendingSeek) return;
+        
+        const { positionMs, callback } = this._pendingSeek;
+        this._pendingSeek = null;
+        this._lastSeekTime = Date.now();
+        
+        // Execute the actual seek
+        seekToPositionInternal(positionMs).then(() => {
+            if (callback) callback();
+        }).catch(error => {
+            ErrorTracker.log(error, 'Debounced seek', 'error');
+        });
+    },
+    
+    cancel() {
+        if (this._timer) {
+            clearTimeout(this._timer);
+            this._timer = null;
+        }
+        this._pendingSeek = null;
+    }
+};
 
 // SMART LOOP DETECTION - Adaptive polling for performance optimization
 class SmartLoopDetector {
@@ -2291,46 +2460,47 @@ async function loadTrackIntoSpotify(track, startPositionMs = 0, retryCount = 0) 
           }
       }
 
-      const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${spotifyDeviceId}`, {
-          method: 'PUT',
-          body: JSON.stringify({
-              uris: [track.uri],
-              position_ms: startPositionMs
-          }),
-          headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${spotifyAccessToken}`
-          },
-      });
+      await APIRetryHandler.executeWithRetry(async () => {
+          const response = await fetch(`https://api.spotify.com/v1/me/player/play?device_id=${spotifyDeviceId}`, {
+              method: 'PUT',
+              body: JSON.stringify({
+                  uris: [track.uri],
+                  position_ms: startPositionMs
+              }),
+              headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${spotifyAccessToken}`
+              },
+          });
 
-      if (!response.ok) {
-          if (response.status === 400 || response.status === 404) {
-              console.warn('🔄 Device issue detected, attempting to reconnect player...');
-              // Device might be inactive or conflicted, try to reconnect
-              if (spotifyPlayer && retryCount < 2) {
-                  try {
-                      await spotifyPlayer.disconnect();
-                      await new Promise(resolve => setTimeout(resolve, 1000));
-                      await spotifyPlayer.connect();
-                      await new Promise(resolve => setTimeout(resolve, 1000));
-                      
-                      // Retry loading after reconnect
-                      return await loadTrackIntoSpotify(track, startPositionMs, retryCount + 1);
-                  } catch (reconnectError) {
-                      console.error('Failed to reconnect:', reconnectError);
+          if (!response.ok) {
+              if (response.status === 400 || response.status === 404) {
+                  console.warn('🔄 Device issue detected, attempting to reconnect player...');
+                  // Device might be inactive or conflicted, try to reconnect
+                  if (spotifyPlayer && retryCount < 2) {
+                      try {
+                          await spotifyPlayer.disconnect();
+                          await new Promise(resolve => setTimeout(resolve, 1000));
+                          await spotifyPlayer.connect();
+                          await new Promise(resolve => setTimeout(resolve, 1000));
+                          
+                          // Retry loading after reconnect
+                          return await loadTrackIntoSpotify(track, startPositionMs, retryCount + 1);
+                      } catch (reconnectError) {
+                          console.error('Failed to reconnect:', reconnectError);
+                      }
                   }
               }
+              
+              const error = new Error(`Load failed: ${response.status}`);
+              error.status = response.status;
+              throw error;
           }
-          
-          // Auto-retry on 502/503 errors (server issues)
-          if ((response.status === 502 || response.status === 503) && retryCount < 2) {
-              console.log('🔄 Server error, retrying in 1 second...');
-              await new Promise(resolve => setTimeout(resolve, 1000));
-              return await loadTrackIntoSpotify(track, startPositionMs, retryCount + 1);
-          }
-          
-          throw new Error(`Load failed: ${response.status}`);
-      }
+      }, {
+          context: `Load track: ${track.name}`,
+          maxRetries: 2,
+          initialDelay: 1000
+      });
 
       let synced = false;
       let attempts = 0;
@@ -2509,16 +2679,8 @@ async function playFromPosition(positionMs = 0) {
   }
 }
 
-// Quick seeking with debouncing
-async function seekToPosition(positionMs) {
-  // FIX 4: Implement seek debouncing
-  const now = Date.now();
-  if (now - lastSeekTime < SEEK_DEBOUNCE_MS) {
-      console.log('⏳ Seek debounced - too soon after last seek');
-      return;
-  }
-  lastSeekTime = now;
-
+// Internal seek function without debouncing
+async function seekToPositionInternal(positionMs) {
   try {
       if (spotifyPlayer) {
           await spotifyPlayer.seek(positionMs);
@@ -2538,8 +2700,16 @@ async function seekToPosition(positionMs) {
       appState.set('playback.currentTime', positionMs / 1000);
       updateProgress();
   } catch (apiError) {
+      ErrorTracker.log(apiError, 'Seek operation', 'error');
       showStatus('Seek failed');
+      throw apiError;
   }
+}
+
+// Quick seeking with enhanced debouncing
+async function seekToPosition(positionMs) {
+  // Use the enhanced debouncer
+  SeekDebouncer.seek(positionMs);
 }
 
 // DJ SMART TRANSITION FUNCTIONS MODULE
@@ -2556,6 +2726,72 @@ async function seekToPosition(positionMs) {
 // API debouncing to prevent 403 errors
 const apiRequestQueue = new Map();
 const API_RATE_LIMIT_MS = 1000; // Minimum 1 second between API calls for same track
+
+// Enhanced API retry mechanism with exponential backoff
+const APIRetryHandler = {
+    async executeWithRetry(apiCall, options = {}) {
+        const {
+            maxRetries = 3,
+            initialDelay = 1000,
+            maxDelay = 16000,
+            retryableStatuses = [429, 500, 502, 503, 504],
+            context = 'API call'
+        } = options;
+        
+        let lastError;
+        
+        for (let attempt = 0; attempt <= maxRetries; attempt++) {
+            try {
+                // Add delay before retry (skip on first attempt)
+                if (attempt > 0) {
+                    const delay = Math.min(initialDelay * Math.pow(2, attempt - 1), maxDelay);
+                    console.log(`🔄 Retry ${attempt}/${maxRetries} after ${delay}ms for ${context}`);
+                    await new Promise(resolve => setTimeout(resolve, delay));
+                }
+                
+                // Ensure valid token before API call
+                await ensureValidToken();
+                
+                // Execute the API call
+                const result = await apiCall();
+                
+                // Success - return result
+                if (attempt > 0) {
+                    console.log(`✅ Retry succeeded for ${context}`);
+                }
+                return result;
+                
+            } catch (error) {
+                lastError = error;
+                
+                // Check if error is retryable
+                const status = error.status || (error.response && error.response.status);
+                const isRetryable = retryableStatuses.includes(status) || 
+                                  error.message?.includes('network') ||
+                                  error.message?.includes('fetch');
+                
+                if (!isRetryable || attempt === maxRetries) {
+                    // Not retryable or max retries reached
+                    ErrorTracker.log(error, `${context} (attempt ${attempt + 1})`, 
+                                   attempt === maxRetries ? 'critical' : 'error');
+                    throw error;
+                }
+                
+                // Handle rate limiting specifically
+                if (status === 429) {
+                    const retryAfter = error.headers?.get('Retry-After');
+                    if (retryAfter) {
+                        const waitTime = parseInt(retryAfter) * 1000;
+                        console.log(`⏳ Rate limited - waiting ${waitTime}ms as requested`);
+                        await new Promise(resolve => setTimeout(resolve, waitTime));
+                    }
+                }
+            }
+        }
+        
+        throw lastError;
+    }
+};
 
 /**
  * Check if token needs refresh before API calls
@@ -5073,34 +5309,37 @@ async function searchTracks(query) {
       }
 
       const limit = 10; // Reduced initial limit
-      const response = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=${limit}&offset=${searchState.currentOffset}`, {
-          headers: { 'Authorization': `Bearer ${spotifyAccessToken}` }
+      
+      const data = await APIRetryHandler.executeWithRetry(async () => {
+          const response = await fetch(`https://api.spotify.com/v1/search?q=${encodeURIComponent(query)}&type=track&limit=${limit}&offset=${searchState.currentOffset}`, {
+              headers: { 'Authorization': `Bearer ${spotifyAccessToken}` }
+          });
+
+          if (response.status === 401) {
+              localStorage.removeItem('spotify_access_token');
+              showView('login');
+              showStatus('Session expired. Please reconnect.');
+              throw new Error('Authentication required');
+          }
+          
+          if (response.status === 403) {
+              showStatus('Access denied. Check account permissions.');
+              throw new Error('Access denied');
+          }
+
+          if (!response.ok) {
+              const error = new Error(`Search failed: ${response.statusText}`);
+              error.status = response.status;
+              error.response = response;
+              throw error;
+          }
+
+          return await response.json();
+      }, {
+          context: `Search for "${query}"`,
+          maxRetries: 2,
+          retryableStatuses: [429, 500, 502, 503, 504]
       });
-
-      // Debug info
-      if (!response.ok) {
-          showStatus(`Search error: ${response.status} ${response.statusText}`);
-          console.error('Search failed:', response.status, await response.text());
-      }
-
-      if (response.status === 401) {
-          localStorage.removeItem('spotify_access_token');
-          showView('login');
-          showStatus('Session expired. Please reconnect.');
-          return;
-      }
-      
-      if (response.status === 429) {
-          showStatus('Rate limited. Please wait a moment.');
-          return;
-      }
-      
-      if (response.status === 403) {
-          showStatus('Access denied. Check account permissions.');
-          return;
-      }
-
-      const data = await response.json();
       const tracks = data.tracks?.items || [];
 
       // Update search state
@@ -5329,11 +5568,8 @@ function showView(view) {
       backgroundUpdateTimer = null;
     }
     
-    // Clear any debounce timers
-    if (window.seekDebounceTimer) {
-      clearTimeout(window.seekDebounceTimer);
-      window.seekDebounceTimer = null;
-    }
+    // Cancel any pending seek operations
+    SeekDebouncer.cancel();
     
     // Clear any status message timers
     if (window.statusTimer) {
@@ -5356,9 +5592,18 @@ function showView(view) {
       window.loopAnimationFrame = null;
     }
     
-    console.log('✅ All timers cleaned up');
+    // Clean up view-specific event listeners
+    if (currentView === 'player') {
+      // Remove loop handle listeners when leaving player view
+      EventManager.remove(els.loopStartHandle, 'mousedown');
+      EventManager.remove(els.loopEndHandle, 'mousedown');
+      EventManager.remove(els.loopStartHandle, 'touchstart');
+      EventManager.remove(els.loopEndHandle, 'touchstart');
+    }
+    
+    console.log('✅ All timers and listeners cleaned up');
   } catch (error) {
-    ErrorTracker.log(error, 'Timer cleanup in showView', 'warning');
+    ErrorTracker.log(error, 'Cleanup in showView', 'warning');
   }
   
   // Cancel any ongoing track operations to prevent race conditions
@@ -5660,15 +5905,16 @@ function setupLoopHandles() {
       }
   }
 
-  els.loopStartHandle.addEventListener('mousedown', (e) => startDrag(e, els.loopStartHandle));
-  els.loopEndHandle.addEventListener('mousedown', (e) => startDrag(e, els.loopEndHandle));
-  document.addEventListener('mousemove', updateDrag);
-  document.addEventListener('mouseup', stopDrag);
+  // Use EventManager for proper cleanup
+  EventManager.add(els.loopStartHandle, 'mousedown', (e) => startDrag(e, els.loopStartHandle));
+  EventManager.add(els.loopEndHandle, 'mousedown', (e) => startDrag(e, els.loopEndHandle));
+  EventManager.add(document, 'mousemove', updateDrag);
+  EventManager.add(document, 'mouseup', stopDrag);
 
-  els.loopStartHandle.addEventListener('touchstart', (e) => startDrag(e.touches[0], els.loopStartHandle), { passive: false });
-  els.loopEndHandle.addEventListener('touchstart', (e) => startDrag(e.touches[0], els.loopEndHandle), { passive: false });
-  document.addEventListener('touchmove', (e) => { if (isDragging && e.touches[0]) updateDrag(e.touches[0]); }, { passive: false });
-  document.addEventListener('touchend', stopDrag, { passive: false });
+  EventManager.add(els.loopStartHandle, 'touchstart', (e) => startDrag(e.touches[0], els.loopStartHandle), { passive: false });
+  EventManager.add(els.loopEndHandle, 'touchstart', (e) => startDrag(e.touches[0], els.loopEndHandle), { passive: false });
+  EventManager.add(document, 'touchmove', (e) => { if (isDragging && e.touches[0]) updateDrag(e.touches[0]); }, { passive: false });
+  EventManager.add(document, 'touchend', stopDrag, { passive: false });
 }
 
 // ===============================================
